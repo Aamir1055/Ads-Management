@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Frontend Role Management Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 2rem;
+            line-height: 1.6;
+        }
+        .test-section {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+        }
+        .success { border-color: #28a745; background-color: #d4edda; }
+        .error { border-color: #dc3545; background-color: #f8d7da; }
+        .warning { border-color: #ffc107; background-color: #fff3cd; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 0.75rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 0.25rem;
+        }
+        button:hover { background: #0056b3; }
+        pre { background: #f1f3f4; padding: 1rem; border-radius: 4px; overflow-x: auto; }
+        .status { font-weight: bold; margin: 0.5rem 0; }
+    </style>
+</head>
+<body>
+    <h1>🛡️ Frontend Role Management System Test</h1>
+    
+    <div class="test-section">
+        <h2>📋 Test Overview</h2>
+        <p>This page tests the API endpoints that your frontend role management system uses.</p>
+        <p><strong>Backend Server:</strong> <span id="server-url">http://localhost:5000</span></p>
+        <div class="status" id="server-status">⏳ Checking server status...</div>
+    </div>
+
+    <div class="test-section">
+        <h2>🔧 API Endpoint Tests</h2>
+        
+        <div class="status" id="roles-status">⏳ Testing roles endpoint...</div>
+        <button onclick="testRoles()">Test Roles API</button>
+        <pre id="roles-result"></pre>
+        
+        <div class="status" id="modules-status">⏳ Testing modules endpoint...</div>
+        <button onclick="testModules()">Test Modules API</button>
+        <pre id="modules-result"></pre>
+        
+        <div class="status" id="permissions-status">⏳ Testing permissions endpoint...</div>
+        <button onclick="testPermissions()">Test Permissions API</button>
+        <pre id="permissions-result"></pre>
+        
+        <div class="status" id="users-status">⏳ Testing users endpoint...</div>
+        <button onclick="testUsers()">Test Users API</button>
+        <pre id="users-result"></pre>
+    </div>
+
+    <div class="test-section">
+        <h2>🚀 Next Steps</h2>
+        <ol>
+            <li>Ensure all API tests pass (green status)</li>
+            <li>Start your frontend development server</li>
+            <li>Navigate to the Role Management section</li>
+            <li>Test the role management functionality</li>
+        </ol>
+    </div>
+
+    <div class="test-section">
+        <h2>📱 Frontend Commands</h2>
+        <pre>
+# Navigate to frontend directory
+cd frontend
+
+# Install dependencies (if not already done)
+npm install
+
+# Start development server
+npm run dev
+
+# Open browser and navigate to Role Management
+# Look for the "🔑 Role Management" item in the sidebar
+        </pre>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000/api';
+
+        // Test server health
+        async function checkServerHealth() {
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    updateStatus('server-status', '✅ Server is running', 'success');
+                    testAllEndpoints();
+                } else {
+                    updateStatus('server-status', '❌ Server health check failed', 'error');
+                }
+            } catch (error) {
+                updateStatus('server-status', '❌ Cannot connect to server', 'error');
+            }
+        }
+
+        async function testRoles() {
+            try {
+                const response = await fetch(`${API_BASE}/permissions/roles-list`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    updateStatus('roles-status', '✅ Roles API working', 'success');
+                    document.getElementById('roles-result').textContent = JSON.stringify(data, null, 2);
+                } else {
+                    updateStatus('roles-status', '❌ Roles API failed', 'error');
+                    document.getElementById('roles-result').textContent = JSON.stringify(data, null, 2);
+                }
+            } catch (error) {
+                updateStatus('roles-status', '❌ Roles API error', 'error');
+                document.getElementById('roles-result').textContent = error.message;
+            }
+        }
+
+        async function testModules() {
+            try {
+                const response = await fetch(`${API_BASE}/permissions/modules`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    updateStatus('modules-status', '✅ Modules API working', 'success');
+                    document.getElementById('modules-result').textContent = JSON.stringify(data, null, 2);
+                } else {
+                    updateStatus('modules-status', '❌ Modules API failed', 'error');
+                    document.getElementById('modules-result').textContent = JSON.stringify(data, null, 2);
+                }
+            } catch (error) {
+                updateStatus('modules-status', '❌ Modules API error', 'error');
+                document.getElementById('modules-result').textContent = error.message;
+            }
+        }
+
+        async function testPermissions() {
+            try {
+                const response = await fetch(`${API_BASE}/permissions/permissions-list`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    updateStatus('permissions-status', '✅ Permissions API working', 'success');
+                    document.getElementById('permissions-result').textContent = JSON.stringify(data, null, 2);
+                } else {
+                    updateStatus('permissions-status', '❌ Permissions API failed', 'error');
+                    document.getElementById('permissions-result').textContent = JSON.stringify(data, null, 2);
+                }
+            } catch (error) {
+                updateStatus('permissions-status', '❌ Permissions API error', 'error');
+                document.getElementById('permissions-result').textContent = error.message;
+            }
+        }
+
+        async function testUsers() {
+            try {
+                const response = await fetch(`${API_BASE}/users/check/username/test`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    updateStatus('users-status', '✅ Users API working', 'success');
+                    document.getElementById('users-result').textContent = JSON.stringify(data, null, 2);
+                } else {
+                    updateStatus('users-status', '❌ Users API failed', 'error');
+                    document.getElementById('users-result').textContent = JSON.stringify(data, null, 2);
+                }
+            } catch (error) {
+                updateStatus('users-status', '❌ Users API error', 'error');
+                document.getElementById('users-result').textContent = error.message;
+            }
+        }
+
+        function updateStatus(elementId, message, type = '') {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = 'status ' + type;
+        }
+
+        async function testAllEndpoints() {
+            await testRoles();
+            await testModules();
+            await testPermissions();
+            await testUsers();
+        }
+
+        // Start testing when page loads
+        window.onload = () => {
+            checkServerHealth();
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ads Reporting Software - API Tester</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <style>
+    .resp { max-height: 420px; overflow: auto; }
+    .monospace { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    details > summary { cursor: pointer; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <div class="container mx-auto p-4 md:p-6">
+    <div class="bg-white rounded-lg shadow mb-6">
+      <div class="px-6 py-4 border-b flex flex-wrap items-center gap-4">
+        <div>
+          <h1 class="text-2xl font-bold">Ads Reporting API Tester</h1>
+          <p class="text-gray-600 text-sm">Only modules found in this project are included.</p>
+        </div>
+        <div class="ml-auto flex gap-2 items-center">
+          <label class="text-sm text-gray-600">Base URL</label>
+          <input id="baseUrl" class="border rounded px-3 py-1 w-64" value="http://localhost:5000" />
+          <button id="pingBtn" class="px-3 py-1 bg-green-600 text-white rounded">Ping</button>
+          <span id="serverBadge" class="text-sm"></span>
+        </div>
+      </div>
+      <div class="px-6 py-3 flex flex-wrap gap-3 items-center">
+        <input id="authToken" class="border rounded px-3 py-1 flex-1 min-w-[300px]" placeholder="Paste Bearer token here (optional)" />
+        <button id="saveTokenBtn" class="px-3 py-1 bg-blue-600 text-white rounded">Save token</button>
+        <button id="clearTokenBtn" class="px-3 py-1 bg-gray-600 text-white rounded">Clear</button>
+        <span id="tokenHint" class="text-sm text-gray-600"></span>
+      </div>
+    </div>
+
+    <div id="modules" class="space-y-6">
+      <!-- Health & Docs -->
+      <section class="bg-white rounded-lg shadow">
+        <div class="px-6 py-3 border-b bg-gray-100 rounded-t-lg">
+          <h2 class="font-semibold">Health & Docs</h2>
+        </div>
+        <div class="p-6 grid sm:grid-cols-2 gap-4">
+          <div>
+            <details open class="border rounded">
+              <summary class="px-3 py-2 bg-green-50">GET /api/health</summary>
+              <div class="p-3 space-y-3">
+                <p class="text-sm text-gray-600">Check server and DB status.</p>
+                <button class="px-3 py-1 bg-green-600 text-white rounded" onclick="call('GET','/api/health')">Test</button>
+              </div>
+            </details>
+          </div>
+          <div>
+            <details class="border rounded">
+              <summary class="px-3 py-2 bg-blue-50">GET /api/docs</summary>
+              <div class="p-3 space-y-3">
+                <p class="text-sm text-gray-600">Basic API doc stub.</p>
+                <button class="px-3 py-1 bg-blue-600 text-white rounded" onclick="call('GET','/api/docs')">Test</button>
+              </div>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <!-- Auth -->
+      <section class="bg-white rounded-lg shadow">
+        <div class="px-6 py-3 border-b bg-gray-100 rounded-t-lg">
+          <h2 class="font-semibold">Authentication</h2>
+        </div>
+        <div class="p-6 grid sm:grid-cols-2 gap-4">
+          <details class="border rounded" open>
+            <summary class="px-3 py-2 bg-blue-50">POST /api/auth/login</summary>
+            <div class="p-3 space-y-3">
+              <p class="text-sm text-gray-600">Login with username and password.</p>
+              <div>
+                <label class="text-xs text-gray-600">Sample request</label>
+                <textarea id="req-auth-login" class="w-full h-28 border rounded p-2 monospace">{
+  "username": "admin",
+  "password": "admin123"
+}</textarea>
+              </div>
+              <button class="px-3 py-1 bg-blue-600 text-white rounded" onclick="callWithBody('POST','/api/auth/login','req-auth-login')">Test</button>
+              <div class="text-xs text-gray-600">Response: { success, message, data: { requires_2fa | token, user }, timestamp }</div>
+            </div>
+          </details>
+
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-blue-50">POST /api/auth/login-2fa</summary>
+            <div class="p-3 space-y-3">
+              <p class="text-sm text-gray-600">Complete login with 6-digit 2FA token.</p>
+              <textarea id="req-auth-login2fa" class="w-full h-28 border rounded p-2 monospace">{
+  "user_id": 1,
+  "token": "123456"
+}</textarea>
+              <button class="px-3 py-1 bg-blue-600 text-white rounded" onclick="callWithBody('POST','/api/auth/login-2fa','req-auth-login2fa')">Test</button>
+              <div class="text-xs text-gray-600">Response: { success, data: { token, user }, timestamp }</div>
+            </div>
+          </details>
+
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-blue-50">GET /api/auth/me</summary>
+            <div class="p-3 space-y-3">
+              <p class="text-sm text-gray-600">Get current user (may require auth in future).</p>
+              <button class="px-3 py-1 bg-blue-600 text-white rounded" onclick="call('GET','/api/auth/me', true)">Test</button>
+            </div>
+          </details>
+
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-blue-50">POST /api/auth/logout</summary>
+            <div class="p-3 space-y-3">
+              <button class="px-3 py-1 bg-gray-700 text-white rounded" onclick="call('POST','/api/auth/logout')">Test</button>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <!-- 2FA -->
+      <section class="bg-white rounded-lg shadow">
+        <div class="px-6 py-3 border-b bg-gray-100 rounded-t-lg">
+          <h2 class="font-semibold">Two-Factor Authentication (2FA)</h2>
+        </div>
+        <div class="p-6 grid sm:grid-cols-2 gap-4">
+          <details class="border rounded" open>
+            <summary class="px-3 py-2 bg-indigo-50">POST /api/2fa/setup</summary>
+            <div class="p-3 space-y-3">
+              <textarea id="req-2fa-setup" class="w-full h-24 border rounded p-2 monospace">{
+  "username": "testuser"
+}</textarea>
+              <button class="px-3 py-1 bg-indigo-600 text-white rounded" onclick="callWithBody('POST','/api/2fa/setup','req-2fa-setup', true)">Test</button>
+              <div class="text-xs text-gray-600">Response includes QR code (data URL) and manual key.</div>
+            </div>
+          </details>
+
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-indigo-50">POST /api/2fa/verify-setup</summary>
+            <div class="p-3 space-y-3">
+              <textarea id="req-2fa-verify-setup" class="w-full h-24 border rounded p-2 monospace">{
+  "user_id": 1,
+  "token": "123456"
+}</textarea>
+              <button class="px-3 py-1 bg-indigo-600 text-white rounded" onclick="callWithBody('POST','/api/2fa/verify-setup','req-2fa-verify-setup', true)">Test</button>
+            </div>
+          </details>
+
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-indigo-50">POST /api/2fa/verify-login</summary>
+            <div class="p-3 space-y-3">
+              <textarea id="req-2fa-verify-login" class="w-full h-24 border rounded p-2 monospace">{
+  "user_id": 1,
+  "token": "123456"
+}</textarea>
+              <button class="px-3 py-1 bg-indigo-600 text-white rounded" onclick="callWithBody('POST','/api/2fa/verify-login','req-2fa-verify-login')">Test</button>
+            </div>
+          </details>
+
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-indigo-50">GET /api/2fa/status/:user_id</summary>
+            <div class="p-3 space-y-3">
+              <input id="param-2fa-user-id" class="border rounded px-2 py-1" value="1" />
+              <button class="px-3 py-1 bg-indigo-600 text-white rounded" onclick="call('GET', `/api/2fa/status/${document.getElementById('param-2fa-user-id').value}`, true)">Test</button>
+            </div>
+          </details>
+
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-indigo-50">POST /api/2fa/disable</summary>
+            <div class="p-3 space-y-3">
+              <textarea id="req-2fa-disable" class="w-full h-24 border rounded p-2 monospace">{
+  "user_id": 1,
+  "current_token": "123456"
+}</textarea>
+              <button class="px-3 py-1 bg-indigo-600 text-white rounded" onclick="callWithBody('POST','/api/2fa/disable','req-2fa-disable', true)">Test</button>
+            </div>
+          </details>
+
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-indigo-50">POST /api/2fa/backup-codes</summary>
+            <div class="p-3 space-y-3">
+              <textarea id="req-2fa-backup" class="w-full h-24 border rounded p-2 monospace">{
+  "user_id": 1,
+  "current_token": "123456"
+}</textarea>
+              <button class="px-3 py-1 bg-indigo-600 text-white rounded" onclick="callWithBody('POST','/api/2fa/backup-codes','req-2fa-backup', true)">Test</button>
+            </div>
+          </details>
+
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-indigo-50">GET /api/2fa/info</summary>
+            <div class="p-3 space-y-3">
+              <button class="px-3 py-1 bg-indigo-600 text-white rounded" onclick="call('GET','/api/2fa/info')">Test</button>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <!-- Users -->
+      <section class="bg-white rounded-lg shadow">
+        <div class="px-6 py-3 border-b bg-gray-100 rounded-t-lg">
+          <h2 class="font-semibold">Users</h2>
+        </div>
+        <div class="p-6 grid sm:grid-cols-2 gap-4">
+          <details class="border rounded" open>
+            <summary class="px-3 py-2 bg-amber-50">POST /api/users</summary>
+            <div class="p-3 space-y-3">
+              <textarea id="req-user-create" class="w-full h-40 border rounded p-2 monospace">{
+  "username": "testuser",
+  "password": "TestPassword123!",
+  "confirm_password": "TestPassword123!",
+  "role_id": 2,
+  "enable_2fa": false
+}</textarea>
+              <button class="px-3 py-1 bg-amber-600 text-white rounded" onclick="callWithBody('POST','/api/users','req-user-create')">Test</button>
+            </div>
+          </details>
+
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-amber-50">GET /api/users</summary>
+            <div class="p-3 space-y-3">
+              <button class="px-3 py-1 bg-amber-600 text-white rounded" onclick="call('GET','/api/users', true)">Test</button>
+            </div>
+          </details>
+
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-amber-50">GET /api/users/:id</summary>
+            <div class="p-3 space-y-3">
+              <input id="param-user-id" class="border rounded px-2 py-1" value="1" />
+              <button class="px-3 py-1 bg-amber-600 text-white rounded" onclick="call('GET', `/api/users/${document.getElementById('param-user-id').value}`, true)">Test</button>
+            </div>
+          </details>
+
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-amber-50">PUT /api/users/:id</summary>
+            <div class="p-3 space-y-3">
+              <input id="param-user-id-put" class="border rounded px-2 py-1" value="1" />
+              <textarea id="req-user-update" class="w-full h-32 border rounded p-2 monospace">{
+  "username": "updateduser",
+  "role_id": 2
+}</textarea>
+              <button class="px-3 py-1 bg-amber-600 text-white rounded" onclick="callWithBody('PUT', `/api/users/${document.getElementById('param-user-id-put').value}`, 'req-user-update', true)">Test</button>
+            </div>
+          </details>
+
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-amber-50">DELETE /api/users/:id</summary>
+            <div class="p-3 space-y-3">
+              <input id="param-user-id-del" class="border rounded px-2 py-1" value="1" />
+              <button class="px-3 py-1 bg-amber-600 text-white rounded" onclick="call('DELETE', `/api/users/${document.getElementById('param-user-id-del').value}`, true)">Test</button>
+            </div>
+          </details>
+
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-amber-50">PATCH /api/users/:id/toggle-status</summary>
+            <div class="p-3 space-y-3">
+              <input id="param-user-id-toggle" class="border rounded px-2 py-1" value="1" />
+              <button class="px-3 py-1 bg-amber-600 text-white rounded" onclick="call('PATCH', `/api/users/${document.getElementById('param-user-id-toggle').value}/toggle-status`, true)">Test</button>
+            </div>
+          </details>
+
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-amber-50">GET /api/users/roles</summary>
+            <div class="p-3 space-y-3">
+              <button class="px-3 py-1 bg-amber-600 text-white rounded" onclick="call('GET','/api/users/roles', true)">Test</button>
+            </div>
+          </details>
+
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-amber-50">GET /api/users/stats</summary>
+            <div class="p-3 space-y-3">
+              <button class="px-3 py-1 bg-amber-600 text-white rounded" onclick="call('GET','/api/users/stats', true)">Test</button>
+            </div>
+          </details>
+
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-amber-50">GET /api/users/check/username/:username</summary>
+            <div class="p-3 space-y-3">
+              <input id="param-username" class="border rounded px-2 py-1" value="testuser" />
+              <button class="px-3 py-1 bg-amber-600 text-white rounded" onclick="call('GET', `/api/users/check/username/${encodeURIComponent(document.getElementById('param-username').value)}`)">Test</button>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <!-- Campaign Types -->
+      <section class="bg-white rounded-lg shadow">
+        <div class="px-6 py-3 border-b bg-gray-100 rounded-t-lg">
+          <h2 class="font-semibold">Campaign Types</h2>
+        </div>
+        <div class="p-6 grid sm:grid-cols-2 gap-4">
+          <details class="border rounded" open>
+            <summary class="px-3 py-2 bg-purple-50">GET /api/campaign-types</summary>
+            <div class="p-3 space-y-3">
+              <button class="px-3 py-1 bg-purple-600 text-white rounded" onclick="call('GET','/api/campaign-types')">Test</button>
+            </div>
+          </details>
+
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-purple-50">GET /api/campaign-types/:id</summary>
+            <div class="p-3 space-y-3">
+              <input id="param-ctype-id" class="border rounded px-2 py-1" value="1" />
+              <button class="px-3 py-1 bg-purple-600 text-white rounded" onclick="call('GET', `/api/campaign-types/${document.getElementById('param-ctype-id').value}`)">Test</button>
+            </div>
+          </details>
+
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-purple-50">POST /api/campaign-types</summary>
+            <div class="p-3 space-y-3">
+              <textarea id="req-ctype-create" class="w-full h-28 border rounded p-2 monospace">{
+  "name": "Search Ads",
+  "description": "Google Search Campaign"
+}</textarea>
+              <button class="px-3 py-1 bg-purple-600 text-white rounded" onclick="callWithBody('POST','/api/campaign-types','req-ctype-create')">Test</button>
+            </div>
+          </details>
+
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-purple-50">PUT /api/campaign-types/:id</summary>
+            <div class="p-3 space-y-3">
+              <input id="param-ctype-id-put" class="border rounded px-2 py-1" value="1" />
+              <textarea id="req-ctype-update" class="w-full h-24 border rounded p-2 monospace">{
+  "name": "Updated Type"
+}</textarea>
+              <button class="px-3 py-1 bg-purple-600 text-white rounded" onclick="callWithBody('PUT', `/api/campaign-types/${document.getElementById('param-ctype-id-put').value}`, 'req-ctype-update')">Test</button>
+            </div>
+          </details>
+
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-purple-50">DELETE /api/campaign-types/:id</summary>
+            <div class="p-3 space-y-3">
+              <input id="param-ctype-id-del" class="border rounded px-2 py-1" value="1" />
+              <button class="px-3 py-1 bg-purple-600 text-white rounded" onclick="call('DELETE', `/api/campaign-types/${document.getElementById('param-ctype-id-del').value}`)">Test</button>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <!-- Campaign Data -->
+      <section class="bg-white rounded-lg shadow">
+        <div class="px-6 py-3 border-b bg-gray-100 rounded-t-lg">
+          <h2 class="font-semibold">Campaign Data</h2>
+        </div>
+        <div class="p-6 grid sm:grid-cols-2 gap-4">
+          <details class="border rounded" open>
+            <summary class="px-3 py-2 bg-teal-50">GET /api/campaign-data</summary>
+            <div class="p-3 space-y-3">
+              <button class="px-3 py-1 bg-teal-600 text-white rounded" onclick="call('GET','/api/campaign-data')">Test</button>
+            </div>
+          </details>
+
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-teal-50">GET /api/campaign-data/:id</summary>
+            <div class="p-3 space-y-3">
+              <input id="param-cdata-id" class="border rounded px-2 py-1" value="1" />
+              <button class="px-3 py-1 bg-teal-600 text-white rounded" onclick="call('GET', `/api/campaign-data/${document.getElementById('param-cdata-id').value}`)">Test</button>
+            </div>
+          </details>
+
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-teal-50">POST /api/campaign-data</summary>
+            <div class="p-3 space-y-3">
+              <textarea id="req-cdata-create" class="w-full h-40 border rounded p-2 monospace">{
+  "campaign_id": 1,
+  "date": "2025-09-01",
+  "impressions": 1000,
+  "clicks": 120,
+  "spend": 250.50
+}</textarea>
+              <button class="px-3 py-1 bg-teal-600 text-white rounded" onclick="callWithBody('POST','/api/campaign-data','req-cdata-create')">Test</button>
+            </div>
+          </details>
+
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-teal-50">PUT /api/campaign-data/:id</summary>
+            <div class="p-3 space-y-3">
+              <input id="param-cdata-id-put" class="border rounded px-2 py-1" value="1" />
+              <textarea id="req-cdata-update" class="w-full h-40 border rounded p-2 monospace">{
+  "impressions": 1500,
+  "clicks": 180,
+  "spend": 300.00
+}</textarea>
+              <button class="px-3 py-1 bg-teal-600 text-white rounded" onclick="callWithBody('PUT', `/api/campaign-data/${document.getElementById('param-cdata-id-put').value}`, 'req-cdata-update')">Test</button>
+            </div>
+          </details>
+
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-teal-50">DELETE /api/campaign-data/:id</summary>
+            <div class="p-3 space-y-3">
+              <input id="param-cdata-id-del" class="border rounded px-2 py-1" value="1" />
+              <button class="px-3 py-1 bg-teal-600 text-white rounded" onclick="call('DELETE', `/api/campaign-data/${document.getElementById('param-cdata-id-del').value}`)">Test</button>
+            </div>
+          </details>
+
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-teal-50">GET /api/campaign-data/campaigns</summary>
+            <div class="p-3 space-y-3">
+              <button class="px-3 py-1 bg-teal-600 text-white rounded" onclick="call('GET','/api/campaign-data/campaigns')">Test</button>
+            </div>
+          </details>
+
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-teal-50">GET /api/campaign-data/cards</summary>
+            <div class="p-3 space-y-3">
+              <button class="px-3 py-1 bg-teal-600 text-white rounded" onclick="call('GET','/api/campaign-data/cards')">Test</button>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <!-- Ads -->
+      <section class="bg-white rounded-lg shadow">
+        <div class="px-6 py-3 border-b bg-gray-100 rounded-t-lg">
+          <h2 class="font-semibold">Ads</h2>
+        </div>
+        <div class="p-6 grid sm:grid-cols-2 gap-4">
+          <details class="border rounded" open>
+            <summary class="px-3 py-2 bg-lime-50">GET /api/ads</summary>
+            <div class="p-3 space-y-3">
+              <button class="px-3 py-1 bg-lime-600 text-white rounded" onclick="call('GET','/api/ads', true)">Test</button>
+            </div>
+          </details>
+
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-lime-50">GET /api/ads/:id</summary>
+            <div class="p-3 space-y-3">
+              <input id="param-ad-id" class="border rounded px-2 py-1" value="1" />
+              <button class="px-3 py-1 bg-lime-600 text-white rounded" onclick="call('GET', `/api/ads/${document.getElementById('param-ad-id').value}`, true)">Test</button>
+            </div>
+          </details>
+
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-lime-50">POST /api/ads</summary>
+            <div class="p-3 space-y-3">
+              <textarea id="req-ad-create" class="w-full h-40 border rounded p-2 monospace">{
+  "title": "New Campaign",
+  "description": "Promo",
+  "budget": 1000,
+  "status": "draft",
+  "start_date": "2025-09-01",
+  "end_date": "2025-09-30"
+}</textarea>
+              <button class="px-3 py-1 bg-lime-600 text-white rounded" onclick="callWithBody('POST','/api/ads','req-ad-create', true)">Test</button>
+            </div>
+          </details>
+
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-lime-50">PUT /api/ads/:id</summary>
+            <div class="p-3 space-y-3">
+              <input id="param-ad-id-put" class="border rounded px-2 py-1" value="1" />
+              <textarea id="req-ad-update" class="w-full h-40 border rounded p-2 monospace">{
+  "title": "Updated Title",
+  "description": "Updated",
+  "budget": 1500,
+  "status": "active",
+  "start_date": "2025-09-01",
+  "end_date": "2025-09-30"
+}</textarea>
+              <button class="px-3 py-1 bg-lime-600 text-white rounded" onclick="callWithBody('PUT', `/api/ads/${document.getElementById('param-ad-id-put').value}`, 'req-ad-update', true)">Test</button>
+            </div>
+          </details>
+
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-lime-50">DELETE /api/ads/:id</summary>
+            <div class="p-3 space-y-3">
+              <input id="param-ad-id-del" class="border rounded px-2 py-1" value="1" />
+              <button class="px-3 py-1 bg-lime-600 text-white rounded" onclick="call('DELETE', `/api/ads/${document.getElementById('param-ad-id-del').value}`, true)">Test</button>
+            </div>
+          </details>
+
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-lime-50">GET /api/ads/:id/stats</summary>
+            <div class="p-3 space-y-3">
+              <input id="param-ad-id-stats" class="border rounded px-2 py-1" value="1" />
+              <button class="px-3 py-1 bg-lime-600 text-white rounded" onclick="call('GET', `/api/ads/${document.getElementById('param-ad-id-stats').value}/stats`, true)">Test</button>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <!-- Reports -->
+      <section class="bg-white rounded-lg shadow">
+        <div class="px-6 py-3 border-b bg-gray-100 rounded-t-lg">
+          <h2 class="font-semibold">Reports</h2>
+        </div>
+        <div class="p-6 grid sm:grid-cols-2 gap-4">
+          <details class="border rounded" open>
+            <summary class="px-3 py-2 bg-sky-50">POST /api/reports/build?date=YYYY-MM-DD</summary>
+            <div class="p-3 space-y-3">
+              <input id="param-report-date" class="border rounded px-2 py-1" value="2025-09-01" />
+              <button class="px-3 py-1 bg-sky-600 text-white rounded" onclick="call('POST', `/api/reports/build?date=${encodeURIComponent(document.getElementById('param-report-date').value)}`)">Test</button>
+            </div>
+          </details>
+
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-sky-50">POST /api/reports/build-range?from=..&to=..</summary>
+            <div class="p-3 space-y-3">
+              <div class="flex gap-2">
+                <input id="param-report-from" class="border rounded px-2 py-1" value="2025-09-01" />
+                <input id="param-report-to" class="border rounded px-2 py-1" value="2025-09-07" />
+              </div>
+              <button class="px-3 py-1 bg-sky-600 text-white rounded" onclick="call('POST', `/api/reports/build-range?from=${encodeURIComponent(document.getElementById('param-report-from').value)}&to=${encodeURIComponent(document.getElementById('param-report-to').value)}`)">Test</button>
+            </div>
+          </details>
+
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-sky-50">POST /api/reports/rebuild-campaign?campaign_id=..&from=..&to=..</summary>
+            <div class="p-3 space-y-3">
+              <div class="flex gap-2">
+                <input id="param-campaign-id" class="border rounded px-2 py-1" value="1" />
+                <input id="param-campaign-from" class="border rounded px-2 py-1" value="2025-09-01" />
+                <input id="param-campaign-to" class="border rounded px-2 py-1" value="2025-09-07" />
+              </div>
+              <button class="px-3 py-1 bg-sky-600 text-white rounded" onclick="call('POST', `/api/reports/rebuild-campaign?campaign_id=${encodeURIComponent(document.getElementById('param-campaign-id').value)}&from=${encodeURIComponent(document.getElementById('param-campaign-from').value)}&to=${encodeURIComponent(document.getElementById('param-campaign-to').value)}`)">Test</button>
+            </div>
+          </details>
+
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-sky-50">GET /api/reports</summary>
+            <div class="p-3 space-y-3">
+              <button class="px-3 py-1 bg-sky-600 text-white rounded" onclick="call('GET','/api/reports')">Test</button>
+            </div>
+          </details>
+
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-sky-50">GET /api/reports/:id</summary>
+            <div class="p-3 space-y-3">
+              <input id="param-report-id" class="border rounded px-2 py-1" value="1" />
+              <button class="px-3 py-1 bg-sky-600 text-white rounded" onclick="call('GET', `/api/reports/${document.getElementById('param-report-id').value}`)">Test</button>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <!-- Cards -->
+      <section class="bg-white rounded-lg shadow">
+        <div class="px-6 py-3 border-b bg-gray-100 rounded-t-lg">
+          <h2 class="font-semibold">Cards</h2>
+        </div>
+        <div class="p-6 grid sm:grid-cols-2 gap-4">
+          <details class="border rounded" open>
+            <summary class="px-3 py-2 bg-rose-50">POST /api/cards</summary>
+            <div class="p-3 space-y-3">
+              <textarea id="req-card-create" class="w-full h-28 border rounded p-2 monospace">{
+  "name": "Card A",
+  "issuer": "Bank X",
+  "limit": 5000
+}</textarea>
+              <button class="px-3 py-1 bg-rose-600 text-white rounded" onclick="callWithBody('POST','/api/cards','req-card-create')">Test</button>
+            </div>
+          </details>
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-rose-50">GET /api/cards</summary>
+            <div class="p-3 space-y-3">
+              <button class="px-3 py-1 bg-rose-600 text-white rounded" onclick="call('GET','/api/cards')">Test</button>
+            </div>
+          </details>
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-rose-50">GET /api/cards/:id</summary>
+            <div class="p-3 space-y-3">
+              <input id="param-card-id" class="border rounded px-2 py-1" value="1" />
+              <button class="px-3 py-1 bg-rose-600 text-white rounded" onclick="call('GET', `/api/cards/${document.getElementById('param-card-id').value}`)">Test</button>
+            </div>
+          </details>
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-rose-50">PUT /api/cards/:id</summary>
+            <div class="p-3 space-y-3">
+              <input id="param-card-id-put" class="border rounded px-2 py-1" value="1" />
+              <textarea id="req-card-update" class="w-full h-24 border rounded p-2 monospace">{
+  "name": "Updated Card"
+}</textarea>
+              <button class="px-3 py-1 bg-rose-600 text-white rounded" onclick="callWithBody('PUT', `/api/cards/${document.getElementById('param-card-id-put').value}`, 'req-card-update')">Test</button>
+            </div>
+          </details>
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-rose-50">DELETE /api/cards/:id</summary>
+            <div class="p-3 space-y-3">
+              <input id="param-card-id-del" class="border rounded px-2 py-1" value="1" />
+              <button class="px-3 py-1 bg-rose-600 text-white rounded" onclick="call('DELETE', `/api/cards/${document.getElementById('param-card-id-del').value}`)">Test</button>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <!-- Card Users -->
+      <section class="bg-white rounded-lg shadow">
+        <div class="px-6 py-3 border-b bg-gray-100 rounded-t-lg">
+          <h2 class="font-semibold">Card Users</h2>
+        </div>
+        <div class="p-6 grid sm:grid-cols-2 gap-4">
+          <details class="border rounded" open>
+            <summary class="px-3 py-2 bg-fuchsia-50">POST /api/card-users</summary>
+            <div class="p-3 space-y-3">
+              <textarea id="req-carduser-create" class="w-full h-28 border rounded p-2 monospace">{
+  "card_id": 1,
+  "user_id": 1,
+  "is_primary": true
+}</textarea>
+              <button class="px-3 py-1 bg-fuchsia-600 text-white rounded" onclick="callWithBody('POST','/api/card-users','req-carduser-create')">Test</button>
+            </div>
+          </details>
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-fuchsia-50">GET /api/card-users</summary>
+            <div class="p-3 space-y-3">
+              <button class="px-3 py-1 bg-fuchsia-600 text-white rounded" onclick="call('GET','/api/card-users')">Test</button>
+            </div>
+          </details>
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-fuchsia-50">GET /api/card-users/:id</summary>
+            <div class="p-3 space-y-3">
+              <input id="param-carduser-id" class="border rounded px-2 py-1" value="1" />
+              <button class="px-3 py-1 bg-fuchsia-600 text-white rounded" onclick="call('GET', `/api/card-users/${document.getElementById('param-carduser-id').value}`)">Test</button>
+            </div>
+          </details>
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-fuchsia-50">PUT /api/card-users/:id</summary>
+            <div class="p-3 space-y-3">
+              <input id="param-carduser-id-put" class="border rounded px-2 py-1" value="1" />
+              <textarea id="req-carduser-update" class="w-full h-24 border rounded p-2 monospace">{
+  "is_primary": false
+}</textarea>
+              <button class="px-3 py-1 bg-fuchsia-600 text-white rounded" onclick="callWithBody('PUT', `/api/card-users/${document.getElementById('param-carduser-id-put').value}`, 'req-carduser-update')">Test</button>
+            </div>
+          </details>
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-fuchsia-50">DELETE /api/card-users/:id</summary>
+            <div class="p-3 space-y-3">
+              <input id="param-carduser-id-del" class="border rounded px-2 py-1" value="1" />
+              <button class="px-3 py-1 bg-fuchsia-600 text-white rounded" onclick="call('DELETE', `/api/card-users/${document.getElementById('param-carduser-id-del').value}`)">Test</button>
+            </div>
+          </details>
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-fuchsia-50">GET /api/card-users/user/:userId/cards</summary>
+            <div class="p-3 space-y-3">
+              <input id="param-carduser-user" class="border rounded px-2 py-1" value="1" />
+              <button class="px-3 py-1 bg-fuchsia-600 text-white rounded" onclick="call('GET', `/api/card-users/user/${document.getElementById('param-carduser-user').value}/cards`)">Test</button>
+            </div>
+          </details>
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-fuchsia-50">GET /api/card-users/card/:cardId/users</summary>
+            <div class="p-3 space-y-3">
+              <input id="param-carduser-card" class="border rounded px-2 py-1" value="1" />
+              <button class="px-3 py-1 bg-fuchsia-600 text-white rounded" onclick="call('GET', `/api/card-users/card/${document.getElementById('param-carduser-card').value}/users`)">Test</button>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <!-- Modules (system modules registry) -->
+      <section class="bg-white rounded-lg shadow">
+        <div class="px-6 py-3 border-b bg-gray-100 rounded-t-lg">
+          <h2 class="font-semibold">Modules (System)</h2>
+        </div>
+        <div class="p-6 grid sm:grid-cols-2 gap-4">
+          <details class="border rounded" open>
+            <summary class="px-3 py-2 bg-gray-50">POST /api/modules</summary>
+            <div class="p-3 space-y-3">
+              <textarea id="req-mod-create" class="w-full h-28 border rounded p-2 monospace">{
+  "name": "Reports",
+  "active": true
+}</textarea>
+              <button class="px-3 py-1 bg-gray-700 text-white rounded" onclick="callWithBody('POST','/api/modules','req-mod-create')">Test</button>
+            </div>
+          </details>
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-gray-50">GET /api/modules</summary>
+            <div class="p-3 space-y-3">
+              <button class="px-3 py-1 bg-gray-700 text-white rounded" onclick="call('GET','/api/modules')">Test</button>
+            </div>
+          </details>
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-gray-50">GET /api/modules/:id</summary>
+            <div class="p-3 space-y-3">
+              <input id="param-mod-id" class="border rounded px-2 py-1" value="1" />
+              <button class="px-3 py-1 bg-gray-700 text-white rounded" onclick="call('GET', `/api/modules/${document.getElementById('param-mod-id').value}`)">Test</button>
+            </div>
+          </details>
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-gray-50">PUT /api/modules/:id</summary>
+            <div class="p-3 space-y-3">
+              <input id="param-mod-id-put" class="border rounded px-2 py-1" value="1" />
+              <textarea id="req-mod-update" class="w-full h-24 border rounded p-2 monospace">{
+  "active": false
+}</textarea>
+              <button class="px-3 py-1 bg-gray-700 text-white rounded" onclick="callWithBody('PUT', `/api/modules/${document.getElementById('param-mod-id-put').value}`, 'req-mod-update')">Test</button>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <!-- Permissions -->
+      <section class="bg-white rounded-lg shadow">
+        <div class="px-6 py-3 border-b bg-gray-100 rounded-t-lg">
+          <h2 class="font-semibold">Permissions</h2>
+        </div>
+        <div class="p-6 grid sm:grid-cols-2 gap-4">
+          <details class="border rounded" open>
+            <summary class="px-3 py-2 bg-slate-50">POST /api/permissions/roles</summary>
+            <div class="p-3 space-y-3">
+              <textarea id="req-role-create" class="w-full h-24 border rounded p-2 monospace">{
+  "name": "manager"
+}</textarea>
+              <button class="px-3 py-1 bg-slate-700 text-white rounded" onclick="callWithBody('POST','/api/permissions/roles','req-role-create')">Test</button>
+            </div>
+          </details>
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-slate-50">GET /api/permissions/roles</summary>
+            <div class="p-3 space-y-3">
+              <button class="px-3 py-1 bg-slate-700 text-white rounded" onclick="call('GET','/api/permissions/roles')">Test</button>
+            </div>
+          </details>
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-slate-50">POST /api/permissions/modules</summary>
+            <div class="p-3 space-y-3">
+              <textarea id="req-perm-module-create" class="w-full h-28 border rounded p-2 monospace">{
+  "name": "Ads",
+  "description": "Ads module"
+}</textarea>
+              <button class="px-3 py-1 bg-slate-700 text-white rounded" onclick="callWithBody('POST','/api/permissions/modules','req-perm-module-create')">Test</button>
+            </div>
+          </details>
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-slate-50">GET /api/permissions/modules</summary>
+            <div class="p-3 space-y-3">
+              <button class="px-3 py-1 bg-slate-700 text-white rounded" onclick="call('GET','/api/permissions/modules')">Test</button>
+            </div>
+          </details>
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-slate-50">POST /api/permissions/grant</summary>
+            <div class="p-3 space-y-3">
+              <textarea id="req-perm-grant" class="w-full h-40 border rounded p-2 monospace">{
+  "role_name": "manager",
+  "module_name": "Ads",
+  "can_get": true,
+  "can_post": true,
+  "can_put": true,
+  "can_delete": false
+}</textarea>
+              <button class="px-3 py-1 bg-slate-700 text-white rounded" onclick="callWithBody('POST','/api/permissions/grant','req-perm-grant')">Test</button>
+            </div>
+          </details>
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-slate-50">GET /api/permissions</summary>
+            <div class="p-3 space-y-3">
+              <button class="px-3 py-1 bg-slate-700 text-white rounded" onclick="call('GET','/api/permissions')">Test</button>
+            </div>
+          </details>
+          <details class="border rounded">
+            <summary class="px-3 py-2 bg-slate-50">DELETE /api/permissions</summary>
+            <div class="p-3 space-y-3">
+              <div class="text-xs text-gray-600">Provide query params role_id/role_name and module_id/module_name</div>
+              <input id="param-perm-role" class="border rounded px-2 py-1" placeholder="role_name=manager" value="role_name=manager" />
+              <input id="param-perm-module" class="border rounded px-2 py-1" placeholder="module_name=Ads" value="module_name=Ads" />
+              <button class="px-3 py-1 bg-slate-700 text-white rounded" onclick="call('DELETE', `/api/permissions?${document.getElementById('param-perm-role').value}&${document.getElementById('param-perm-module').value}`)">Test</button>
+            </div>
+          </details>
+        </div>
+      </section>
+    </div>
+
+    <!-- Shared response viewer -->
+    <section class="mt-8 bg-white rounded-lg shadow">
+      <div class="px-6 py-3 border-b bg-gray-800 text-white rounded-t-lg">
+        <h2 class="font-semibold">Responses</h2>
+      </div>
+      <div id="responses" class="p-6 space-y-4"></div>
+    </section>
+  </div>
+
+  <script>
+    const responses = document.getElementById('responses');
+    const baseUrlInput = document.getElementById('baseUrl');
+    const tokenInput = document.getElementById('authToken');
+    const serverBadge = document.getElementById('serverBadge');
+    const tokenHint = document.getElementById('tokenHint');
+
+    // Load saved base URL and token
+    baseUrlInput.value = localStorage.getItem('ads_api_base') || baseUrlInput.value;
+    tokenInput.value = localStorage.getItem('ads_api_token') || '';
+    updateTokenHint();
+
+    document.getElementById('saveTokenBtn').onclick = () => {
+      localStorage.setItem('ads_api_token', tokenInput.value.trim());
+      updateTokenHint();
+    };
+    document.getElementById('clearTokenBtn').onclick = () => {
+      tokenInput.value = '';
+      localStorage.removeItem('ads_api_token');
+      updateTokenHint();
+    };
+    document.getElementById('pingBtn').onclick = async () => {
+      localStorage.setItem('ads_api_base', baseUrlInput.value.trim());
+      try {
+        const r = await axios.get(`${baseUrlInput.value.trim()}/api/health`, { timeout: 4000 });
+        serverBadge.textContent = 'Connected';
+        serverBadge.className = 'text-green-600 text-sm';
+        addResp('GET', '/api/health', r.status, r.data);
+      } catch (e) {
+        serverBadge.textContent = 'Unavailable';
+        serverBadge.className = 'text-red-600 text-sm';
+        addResp('GET', '/api/health', e.response?.status || 0, {
+          error: e.message,
+          data: e.response?.data
+        });
+      }
+    };
+
+    function authHeaders(requireAuth) {
+      const h = { 'Content-Type': 'application/json' };
+      const token = tokenInput.value.trim();
+      if (requireAuth && token) h['Authorization'] = `Bearer ${token}`;
+      return h;
+    }
+
+    async function call(method, path, requireAuth = false) {
+      const base = baseUrlInput.value.trim();
+      try {
+        const t0 = performance.now();
+        const res = await axios({ method, url: `${base}${path}`, headers: authHeaders(requireAuth) });
+        const t1 = performance.now();
+        addResp(method, path, res.status, res.data, t1 - t0);
+      } catch (e) {
+        addResp(method, path, e.response?.status || 0, {
+          message: e.message,
+          statusText: e.response?.statusText,
+          data: e.response?.data
+        });
+      }
+    }
+
+    async function callWithBody(method, path, textareaId, requireAuth = false) {
+      const base = baseUrlInput.value.trim();
+      let body = {};
+      try {
+        const txt = document.getElementById(textareaId).value;
+        body = txt ? JSON.parse(txt) : {};
+      } catch {
+        alert('Invalid JSON body');
+        return;
+      }
+      try {
+        const t0 = performance.now();
+        const res = await axios({ method, url: `${base}${path}`, data: body, headers: authHeaders(requireAuth) });
+        const t1 = performance.now();
+        addResp(method, path, res.status, res.data, t1 - t0, body);
+      } catch (e) {
+        addResp(method, path, e.response?.status || 0, {
+          message: e.message,
+          statusText: e.response?.statusText,
+          data: e.response?.data
+        }, undefined, body);
+      }
+    }
+
+    function addResp(method, path, status, data, ms, body) {
+      const wrap = document.createElement('div');
+      wrap.className = 'border rounded-lg overflow-hidden';
+      
+      // Determine status color
+      let statusColor = 'bg-gray-500';
+      if (status >= 200 && status < 300) statusColor = 'bg-green-500';
+      else if (status >= 400 && status < 500) statusColor = 'bg-yellow-500';
+      else if (status >= 500) statusColor = 'bg-red-500';
+      
+      const head = document.createElement('div');
+      head.className = 'px-4 py-2 bg-gray-100 flex justify-between items-center';
+      head.innerHTML = `
+        <div class="flex gap-2 items-center">
+          <span class="px-2 py-0.5 text-xs rounded bg-gray-800 text-white">${method}</span>
+          <span class="monospace">${path}</span>
+          <span class="px-2 py-0.5 text-xs rounded text-white ${statusColor}">${status}</span>
+        </div>
+        <div class="text-xs text-gray-600">${ms ? `${ms.toFixed(0)}ms` : ''}</div>
+      `;
+      
+      const bodyEl = document.createElement('div');
+      bodyEl.className = 'p-4 grid md:grid-cols-2 gap-4';
+      bodyEl.innerHTML = `
+        <div>
+          <div class='text-xs text-gray-600 mb-1'>Request Body</div>
+          <pre class='resp bg-gray-900 text-gray-100 p-3 rounded monospace whitespace-pre-wrap text-sm'>${body ? safe(JSON.stringify(body, null, 2)) : '(no body)'}</pre>
+        </div>
+        <div>
+          <div class='text-xs text-gray-600 mb-1'>Response (Status: ${status})</div>
+          <pre class='resp bg-gray-900 ${status >= 200 && status < 300 ? 'text-green-300' : 'text-red-300'} p-3 rounded monospace whitespace-pre-wrap text-sm'>${safe(JSON.stringify(data, null, 2))}</pre>
+        </div>
+      `;
+      
+      wrap.appendChild(head);
+      wrap.appendChild(bodyEl);
+      responses.prepend(wrap);
+      
+      // Clear "no responses" message if it exists
+      const noResponses = responses.querySelector('.text-center');
+      if (noResponses) noResponses.remove();
+    }
+
+    function safe(s) {
+      return String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+    }
+
+    function updateTokenHint() {
+      tokenHint.textContent = tokenInput.value ? 'Token set' : 'No token';
+      tokenHint.className = tokenInput.value ? 'text-sm text-green-600' : 'text-sm text-red-600';
+    }
+  </script>
+</body>
+</html>
