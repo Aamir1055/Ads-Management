@@ -24,7 +24,7 @@ function App() {
         
         {/* Redirect root to dashboard if authenticated, otherwise to login */}
         <Route path="/" element={
-          localStorage.getItem('authToken') ? 
+          (localStorage.getItem('access_token') || localStorage.getItem('authToken')) ? 
           <Navigate to="/dashboard" replace /> : 
           <Navigate to="/login" replace />
         } />

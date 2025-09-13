@@ -12,9 +12,13 @@ const api = axios.create({
 // Request interceptor to add auth token
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('authToken')
+    // Check for access_token first, then fall back to authToken for compatibility
+    const token = localStorage.getItem('access_token') || localStorage.getItem('authToken')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
+      console.log('🔑 Using token from services/api.js:', token.substring(0, 20) + '...')
+    } else {
+      console.log('⚠️ No token found in services/api.js')
     }
     return config
   },
@@ -30,9 +34,21 @@ api.interceptors.response.use(
   },
   (error) => {
     if (error.response?.status === 401) {
-      // Token expired or invalid
+      // Token expired or invalid - clear all token types
+      localStorage.removeItem('access_token')
       localStorage.removeItem('authToken')
+      localStorage.removeItem('auth_token')
+      localStorage.removeItem('refresh_token')
       localStorage.removeItem('user')
+      window.location.href = '/login'
+    } else if (error.response?.status === 403 && error.response?.data?.message?.includes('malformed')) {
+      // Malformed token - clear everything and redirect
+      localStorage.removeItem('access_token')
+      localStorage.removeItem('authToken')
+      localStorage.removeItem('auth_token')
+      localStorage.removeItem('refresh_token')
+      localStorage.removeItem('user')
+      console.log('🧹 Malformed token detected, clearing storage')
       window.location.href = '/login'
     }
     return Promise.reject(error)

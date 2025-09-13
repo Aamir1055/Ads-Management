@@ -50,7 +50,24 @@ const CardUsers = () => {
       const response = await cardUsersService.getAll(params)
       
       if (response.success) {
-        setAssignments(response.data?.assignments || response.data?.cardUsers || response.data || [])
+        // Debug logging
+        console.log('📊 Card Users API Response:', response);
+        console.log('📊 Response data structure:', Object.keys(response.data || {}));
+        
+        const assignments = response.data?.assignments || response.data?.cardUsers || response.data || [];
+        console.log('📊 Extracted assignments:', assignments.length);
+        
+        if (assignments.length > 0) {
+          console.log('📊 First assignment sample:', {
+            id: assignments[0].id,
+            card_name: assignments[0].card_name,
+            username: assignments[0].username,
+            card_id: assignments[0].card_id,
+            user_id: assignments[0].user_id
+          });
+        }
+        
+        setAssignments(assignments);
       } else {
         setError(response.message || 'Failed to fetch card assignments')
       }

@@ -10,10 +10,45 @@ const api = axios.create({
   },
 })
 
+// Global function for manual token cleanup (accessible from console)
+window.clearAllTokens = () => {
+  console.log('🧹 Clearing all tokens manually...');
+  localStorage.removeItem('access_token');
+  localStorage.removeItem('authToken');
+  localStorage.removeItem('auth_token');
+  localStorage.removeItem('refresh_token');
+  localStorage.removeItem('user');
+  sessionStorage.clear();
+  console.log('✅ All tokens cleared! Redirecting to login...');
+  window.location.href = '/login';
+};
+
+// Clean up old tokens and ensure we're using the correct token
+const cleanupOldTokens = () => {
+  // If we have old tokens but no access_token, clear everything
+  const accessToken = localStorage.getItem('access_token')
+  const oldAuthToken = localStorage.getItem('authToken')
+  const oldToken = localStorage.getItem('auth_token')
+  
+  if (!accessToken && (oldAuthToken || oldToken)) {
+    console.log('Cleaning up old token format, please login again')
+    localStorage.removeItem('authToken')
+    localStorage.removeItem('auth_token')
+    localStorage.removeItem('user')
+    // Redirect to login if not already there
+    if (window.location.pathname !== '/login') {
+      window.location.href = '/login'
+    }
+    return null
+  }
+  
+  return accessToken
+}
+
 // Add auth token to requests if available
 api.interceptors.request.use((config) => {
-  // Check both token names for compatibility
-  const token = localStorage.getItem('access_token') || localStorage.getItem('authToken')
+  const token = cleanupOldTokens()
+  console.log('🔑 Token being sent:', token ? `${token.substring(0, 20)}...` : 'No token')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
@@ -26,9 +61,11 @@ api.interceptors.response.use(
   (error) => {
     // Handle different error scenarios
     if (error.response?.status === 401) {
-      // Clear auth data (both token names for compatibility)
+      // Clear auth data (all possible token names for compatibility)
       localStorage.removeItem('access_token')
       localStorage.removeItem('authToken')
+      localStorage.removeItem('auth_token')
+      localStorage.removeItem('refresh_token')
       localStorage.removeItem('user')
       
       // Show user-friendly message
@@ -41,9 +78,24 @@ api.interceptors.response.use(
         window.location.href = '/login'
       }
     } else if (error.response?.status === 403) {
-      // Permission denied - show user-friendly message
+      // Permission denied - check if it's a token type issue
       const message = error.response?.data?.message || 'Access denied. You don\'t have permission to perform this action.'
       console.error('Permission denied:', message)
+      
+      // If it's a token type error, clear old tokens and redirect to login
+      if (message.includes('Wrong token type') || message.includes('access token')) {
+        console.log('Token type error detected, clearing old tokens')
+        localStorage.removeItem('access_token')
+        localStorage.removeItem('authToken')
+        localStorage.removeItem('auth_token')
+        localStorage.removeItem('refresh_token')
+        localStorage.removeItem('user')
+        
+        if (window.location.pathname !== '/login') {
+          sessionStorage.setItem('loginMessage', 'Please log in again to get a fresh access token.')
+          window.location.href = '/login'
+        }
+      }
       // You could show a toast notification here
     } else if (error.response?.status === 404) {
       // Resource not found

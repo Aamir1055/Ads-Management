@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Card Users Frontend</title>
+</head>
+<body>
+    <h1>Card Users Frontend Debug</h1>
+    <div id="output"></div>
+    
+    <script>
+        function log(message) {
+            document.getElementById('output').innerHTML += '<p>' + message + '</p>';
+            console.log(message);
+        }
+        
+        async function debugCardUsers() {
+            try {
+                log('🔍 Testing Card Users from Frontend perspective...');
+                
+                // Get token from localStorage
+                const token = localStorage.getItem('access_token') || localStorage.getItem('authToken');
+                log('Token found: ' + (token ? 'YES' : 'NO'));
+                
+                if (!token) {
+                    log('❌ No token found. Please login first.');
+                    return;
+                }
+                
+                // Make API call
+                log('📡 Making API call to /api/card-users...');
+                const response = await fetch('http://localhost:5000/api/card-users', {
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                log('Response status: ' + response.status);
+                
+                if (!response.ok) {
+                    throw new Error('HTTP error! status: ' + response.status);
+                }
+                
+                const data = await response.json();
+                log('✅ API call successful');
+                
+                // Analyze response structure
+                log('📊 Response structure:');
+                log('  Top level keys: ' + Object.keys(data).join(', '));
+                
+                if (data.data) {
+                    log('  data keys: ' + Object.keys(data.data).join(', '));
+                    
+                    if (data.data.cardUsers) {
+                        const assignments = data.data.cardUsers;
+                        log('  Found ' + assignments.length + ' assignments in data.cardUsers');
+                        
+                        if (assignments.length > 0) {
+                            const first = assignments[0];
+                            log('  First assignment structure:');
+                            log('    ID: ' + first.id);
+                            log('    Card ID: ' + first.card_id);
+                            log('    Card Name: ' + (first.card_name || 'MISSING ❌'));
+                            log('    User ID: ' + first.user_id);
+                            log('    Username: ' + (first.username || 'MISSING ❌'));
+                            log('    Is Primary: ' + first.is_primary);
+                            log('    Assigned Date: ' + first.assigned_date);
+                            
+                            // Test what frontend code would do
+                            log('🧪 Testing frontend data extraction...');
+                            
+                            // Simulate line 53 from CardUsers.jsx
+                            const extractedData = data.data?.assignments || data.data?.cardUsers || data.data || [];
+                            log('  Extracted data length: ' + extractedData.length);
+                            log('  Extraction method used: ' + (
+                                data.data?.assignments ? 'assignments' :
+                                data.data?.cardUsers ? 'cardUsers' :
+                                'direct data'
+                            ));
+                            
+                            if (extractedData.length > 0) {
+                                const extractedFirst = extractedData[0];
+                                log('  Extracted first item:');
+                                log('    Card Name: ' + (extractedFirst.card_name || 'MISSING ❌'));
+                                log('    Username: ' + (extractedFirst.username || 'MISSING ❌'));
+                                
+                                if (extractedFirst.card_name && extractedFirst.username) {
+                                    log('✅ FRONTEND SHOULD WORK - Names are present');
+                                } else {
+                                    log('❌ FRONTEND ISSUE - Names missing after extraction');
+                                }
+                            }
+                        }
+                    } else {
+                        log('  ❌ No cardUsers array found in data');
+                    }
+                } else {
+                    log('  ❌ No data object in response');
+                }
+                
+                // Show raw response for debugging
+                log('🔍 Raw response (first 500 chars):');
+                log(JSON.stringify(data, null, 2).substring(0, 500) + '...');
+                
+            } catch (error) {
+                log('❌ Error: ' + error.message);
+                console.error('Full error:', error);
+            }
+        }
+        
+        debugCardUsers();
+    </script>
+</body>
+</html>

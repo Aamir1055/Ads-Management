@@ -23,15 +23,36 @@ const Login = ({ onLoginSuccess }) => {
       })
 
       if (response.data.success) {
-        const { token, user } = response.data.data
+        const { access_token, refresh_token, user } = response.data.data
         
-        // Store token in localStorage
-        localStorage.setItem('auth_token', token)
+        console.log('🔐 Login response received:', {
+          has_access_token: !!access_token,
+          has_refresh_token: !!refresh_token,
+          user_id: user?.id
+        })
+        
+        // Clear any old tokens first
+        localStorage.removeItem('auth_token')
+        localStorage.removeItem('authToken')
+        
+        // Store new tokens in localStorage
+        if (access_token) {
+          localStorage.setItem('access_token', access_token)
+          console.log('✅ Access token stored:', access_token.substring(0, 20) + '...')
+        } else {
+          console.error('❌ No access token received!')
+        }
+        
+        if (refresh_token) {
+          localStorage.setItem('refresh_token', refresh_token)
+          console.log('✅ Refresh token stored')
+        }
+        
         localStorage.setItem('user', JSON.stringify(user))
         
         // Call success callback
         if (onLoginSuccess) {
-          onLoginSuccess(user, token)
+          onLoginSuccess(user, access_token)
         }
         
         alert('Login successful!')

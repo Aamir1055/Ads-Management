@@ -1,0 +1,99 @@
+const express = require('express');
+const router = express.Router();
+const { pool } = require('../config/database');
+const { authenticateToken } = require('../middleware/authMiddleware');
+
+// Apply authentication to all routes
+router.use(authenticateToken);
+
+// GET /api/user-access/modules - Get which modules current user can access
+router.get('/modules', async (req, res) => {
+  try {
+    if (!req.user || !req.user.id || !req.user.role || !req.user.role.id) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not authenticated or invalid user data'
+      });
+    }
+
+    const userId = req.user.id;
+    const roleId = req.user.role.id;
+    const roleName = req.user.role.name;
+
+    console.log(`Checking access for user ${userId} with role ${roleName} (${roleId})`);
+    console.log(`User has ${req.user.permissions.length} permissions loaded`);
+
+    // Use permissions already loaded by middleware
+    const moduleAccess = req.user.permissionsDetailed;
+    console.log('Module access:', Object.keys(moduleAccess));
+
+    // Define which frontend routes correspond to which backend modules
+    const moduleRouteMap = {
+      'users': '/user-management',
+      'campaign_data': '/campaign-data',
+      'campaign_types': '/campaign-types',
+      'campaigns': '/campaigns',
+      'cards': '/cards',
+      'card_users': '/card-users',
+      'reports': '/reports-table',
+      'analytics': '/analytics',
+      'permissions': '/role-management',
+      'settings': '/settings'
+    };
+
+    // Build allowed routes list
+    const allowedRoutes = ['/dashboard']; // Dashboard is always allowed
+    const allowedModules = Object.keys(moduleAccess);
+
+    // Add routes based on module access
+    allowedModules.forEach(module => {
+      if (moduleRouteMap[module]) {
+        allowedRoutes.push(moduleRouteMap[module]);
+      }
+    });
+
+    console.log('Allowed modules:', allowedModules);
+    console.log('Allowed routes:', allowedRoutes);
+
+    res.json({
+      success: true,
+      message: 'User access retrieved successfully',
+      data: {
+        user: {
+          id: req.user.id,
+          username: req.user.username,
+          role_id: roleId
+        },
+        role: req.user.role,
+        allowedModules: allowedModules,
+        allowedRoutes: allowedRoutes,
+        moduleAccess: moduleAccess,
+        // Navigation items that should be shown
+        navigation: [
+          { name: 'Dashboard', href: '/dashboard', icon: 'Home', allowed: true },
+          { name: 'User Management', href: '/user-management', icon: 'Users', allowed: allowedModules.includes('users') },
+          { name: 'Campaign Data', href: '/campaign-data', icon: 'Database', allowed: allowedModules.includes('campaign_data') },
+          { name: 'Role Management', href: '/role-management', icon: 'Key', allowed: allowedModules.includes('permissions') },
+          { name: 'Campaign Types', href: '/campaign-types', icon: 'Tags', allowed: allowedModules.includes('campaign_types') },
+          { name: 'Cards', href: '/cards', icon: 'CreditCard', allowed: allowedModules.includes('cards') },
+          { name: 'Card Users', href: '/card-users', icon: 'UserCheck', allowed: allowedModules.includes('card_users') },
+          { name: 'Campaigns', href: '/campaigns', icon: 'Target', allowed: allowedModules.includes('campaigns') },
+          { name: 'Analytics', href: '/analytics', icon: 'BarChart3', allowed: allowedModules.includes('analytics') },
+          { name: 'Reports', href: '/reports-table', icon: 'FileText', allowed: allowedModules.includes('reports') },
+          { name: 'Report Analytics', href: '/reports', icon: 'BarChart3', allowed: allowedModules.includes('reports') },
+          { name: 'Settings', href: '/settings', icon: 'Settings', allowed: allowedModules.includes('settings') }
+        ].filter(item => item.allowed) // Only return allowed navigation items
+      }
+    });
+
+  } catch (error) {
+    console.error('Error getting user access:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get user access information',
+      error: error.message
+    });
+  }
+});
+
+module.exports = router;

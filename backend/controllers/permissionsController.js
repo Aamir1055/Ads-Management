@@ -94,7 +94,7 @@ const permissionsController = {
       }
       
       // Check if role is assigned to any users
-      const [userCount] = await pool.query('SELECT COUNT(*) as count FROM user_roles WHERE role_id = ? AND is_active = 1', [id]);
+      const [userCount] = await pool.query('SELECT COUNT(*) as count FROM users WHERE role_id = ? AND is_active = 1', [id]);
       if (userCount[0].count > 0) {
         return res.status(400).json(createResponse(false, `Cannot delete role: ${userCount[0].count} user(s) are assigned to this role`));
       }
@@ -499,7 +499,20 @@ const permissionsController = {
   // GET /api/permissions/roles-list
   getAllRoles: async (req, res) => {
     try {
-      const roles = await PermissionManager.getAllRoles();
+      // Direct database query instead of using PermissionManager
+      const [roles] = await pool.query(`
+        SELECT 
+          id, 
+          name, 
+          description,
+          level,
+          is_active,
+          is_system_role,
+          created_at,
+          updated_at
+        FROM roles 
+        ORDER BY level DESC, name ASC
+      `);
       return res.status(200).json(createResponse(true, `Retrieved ${roles.length} roles`, roles));
     } catch (error) {
       console.error('[Permissions] getAllRoles error:', error);
@@ -525,46 +538,46 @@ const permissionsController = {
   },
 
   // GET /api/permissions/modules-with-permissions
+  // Compatibility function for existing database structure
   getModulesWithPermissions: async (req, res) => {
     try {
-      const [modules] = await pool.query(`
-        SELECT id, module_name, description 
-        FROM modules 
-        WHERE is_active = 1 
-        ORDER BY module_name ASC
-      `);
-      
+      // Get all permissions and group them by category (simulate modules)
       const [permissions] = await pool.query(`
         SELECT 
-          p.id,
-          p.module_id,
-          p.permission_name,
-          p.permission_key,
-          p.description,
-          p.http_method,
-          p.api_endpoint
-        FROM permissions p
-        WHERE p.is_active = 1
-        ORDER BY p.permission_name ASC
+          id,
+          name,
+          display_name,
+          category,
+          is_active
+        FROM permissions 
+        WHERE is_active = 1
+        ORDER BY category, display_name ASC
       `);
       
-      // Group permissions by module
-      const modulesWithPermissions = modules.map(module => {
-        const modulePermissions = permissions.filter(p => p.module_id === module.id);
-        return {
-          id: module.id,
-          name: module.module_name,
-          description: module.description,
-          permissions: modulePermissions.map(p => ({
-            id: p.id,
-            name: p.permission_name,
-            key: p.permission_key,
-            description: p.description,
-            http_method: p.http_method,
-            api_endpoint: p.api_endpoint
-          }))
-        };
+      // Group permissions by category (treating categories as modules)
+      const categoriesMap = {};
+      permissions.forEach(permission => {
+        const category = permission.category || 'General';
+        if (!categoriesMap[category]) {
+          categoriesMap[category] = {
+            id: Object.keys(categoriesMap).length + 1,
+            name: category,
+            description: `${category} related permissions`,
+            permissions: []
+          };
+        }
+        
+        categoriesMap[category].permissions.push({
+          id: permission.id,
+          name: permission.display_name || permission.name,
+          key: permission.name, // Use the actual permission name as key
+          description: permission.display_name || permission.name,
+          http_method: 'GET,POST,PUT,DELETE',
+          api_endpoint: `/${category.toLowerCase()}`
+        });
       });
+      
+      const modulesWithPermissions = Object.values(categoriesMap);
       
       return res.status(200).json(createResponse(true, `Retrieved ${modulesWithPermissions.length} modules with permissions`, modulesWithPermissions));
     } catch (error) {
@@ -581,8 +594,30 @@ const permissionsController = {
         return res.status(400).json(createResponse(false, 'Invalid role ID'));
       }
 
-      const permissions = await PermissionManager.getRolePermissions(roleId);
-      return res.status(200).json(createResponse(true, `Retrieved ${permissions.length} permissions for role`, permissions));
+      // Direct database query instead of using PermissionManager
+      const [permissions] = await pool.query(`
+        SELECT 
+          p.id,
+          p.name,
+          p.display_name,
+          p.category,
+          p.description,
+          p.is_active
+        FROM permissions p
+        JOIN role_permissions rp ON p.id = rp.permission_id
+        WHERE rp.role_id = ? AND p.is_active = 1
+        ORDER BY p.category ASC, p.display_name ASC
+      `, [roleId]);
+      
+      const formattedPermissions = permissions.map(p => ({
+        id: p.id,
+        permission_name: p.display_name || p.name,
+        permission_key: p.name,
+        category: p.category,
+        description: p.description
+      }));
+
+      return res.status(200).json(createResponse(true, `Retrieved ${formattedPermissions.length} permissions for role`, formattedPermissions));
     } catch (error) {
       console.error('[Permissions] getRolePermissions error:', error);
       return res.status(500).json(createResponse(false, 'Failed to get role permissions', null, process.env.NODE_ENV === 'development' ? { error: error.message } : null));
@@ -714,10 +749,6 @@ const permissionsController = {
   assignPermissionsToRole: async (req, res) => {
     try {
       const { roleId, permissions } = req.body;
-      // Check if user 1 exists, otherwise use null
-      const [userCheck] = await pool.query('SELECT id FROM users WHERE id = 1 LIMIT 1');
-      const assignedBy = userCheck.length > 0 ? 1 : null;
-
       if (!roleId) {
         return res.status(400).json(createResponse(false, 'roleId is required'));
       }
@@ -736,8 +767,8 @@ const permissionsController = {
       const permissionIds = [];
       for (const permissionKey of permissions) {
         const [permRows] = await pool.query(
-          'SELECT id FROM permissions WHERE permission_key = ? OR permission_key = ?', 
-          [permissionKey, permissionKey.toLowerCase()]
+          'SELECT id FROM permissions WHERE name = ?', 
+          [permissionKey]
         );
         if (permRows.length > 0) {
           permissionIds.push(permRows[0].id);
@@ -753,29 +784,19 @@ const permissionsController = {
       // Clear existing permissions for this role
       await pool.query('DELETE FROM role_permissions WHERE role_id = ?', [Number(roleId)]);
 
-      // Insert new permissions
+      // Insert new permissions (only role_id and permission_id)
       const insertPromises = permissionIds.map(permissionId => 
         pool.query(
-          'INSERT INTO role_permissions (role_id, permission_id, granted_by) VALUES (?, ?, ?)',
-          [Number(roleId), permissionId, assignedBy]
+          'INSERT INTO role_permissions (role_id, permission_id) VALUES (?, ?)',
+          [Number(roleId), permissionId]
         )
       );
 
       await Promise.all(insertPromises);
 
-      // Log the action
-      const auditPromises = permissionIds.map(permissionId => 
-        pool.query(
-          'INSERT INTO permission_audit_log (role_id, permission_id, action, performed_by) VALUES (?, ?, "ASSIGN", ?)',
-          [Number(roleId), permissionId, assignedBy]
-        )
-      );
-      await Promise.all(auditPromises);
-
       return res.status(200).json(createResponse(true, `Successfully assigned ${permissionIds.length} permissions to role`, {
         roleId: Number(roleId),
-        assignedPermissions: permissionIds.length,
-        assignedBy
+        assignedPermissions: permissionIds.length
       }));
     } catch (error) {
       console.error('[Permissions] assignPermissionsToRole error:', error);

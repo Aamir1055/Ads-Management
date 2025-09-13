@@ -2,7 +2,8 @@ const express = require('express');
 const router = express.Router();
 
 const { permissionsController } = require('../controllers/permissionsController');
-// const { authenticate } = require('../middleware/auth'); // enable when ready
+const { protect } = require('../middleware/auth');
+const { attachUserPermissions } = require('../middleware/frontendPermissionCheck');
 
 // Request logger (sanitized)
 const requestLogger = (req, res, next) => {
@@ -42,7 +43,7 @@ const createRateLimit = (windowMs = 15 * 60 * 1000, max = 200) => {
 const rlRead = createRateLimit(5 * 60 * 1000, 300);
 const rlWrite = createRateLimit(15 * 60 * 1000, 100);
 
-// router.use(authenticate); // enable auth globally for this module if needed
+// router.use(protect); // enable auth globally for this module if needed
 
 // -------------------------------
 // Roles
@@ -81,6 +82,70 @@ router.get('/user/:userId/roles', rlRead, permissionsController.getUserRoles);
 
 // Permission Checking
 router.post('/check', rlRead, permissionsController.checkPermission);
+
+// My Permissions endpoint (for frontend compatibility)
+router.get('/my-permissions', protect, attachUserPermissions, (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Not authenticated'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'User permissions retrieved successfully',
+      data: {
+        user: {
+          id: req.user.id,
+          username: req.user.username,
+          role_id: req.user.role_id
+        },
+        role: req.userRole,
+        permissions: req.userPermissions || [],
+        permissionsByCategory: req.userPermissionsByCategory || {},
+        hasModuleAccess: {
+          users: req.hasModuleAccess ? req.hasModuleAccess('users') : false,
+          campaign_data: req.hasModuleAccess ? req.hasModuleAccess('campaign_data') : false,
+          // Add other modules as needed
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error getting user permissions:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get user permissions'
+    });
+  }
+});
+
+// My Roles endpoint (for frontend compatibility)
+router.get('/my-roles', protect, attachUserPermissions, (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Not authenticated'
+      });
+    }
+
+    const role = req.userRole || { name: 'Unknown', description: '', level: 0 };
+    
+    res.json({
+      success: true,
+      message: 'User roles retrieved successfully',
+      data: [role] // Return as array to match expected format
+    });
+  } catch (error) {
+    console.error('Error getting user roles:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get user roles'
+    });
+  }
+});
 
 // Role Assignment
 router.post('/assign-role', rlWrite, permissionsController.assignRoleToUser);

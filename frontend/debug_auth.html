@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Authentication</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .debug-box { background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .error { background: #ffe6e6; border: 1px solid #ff9999; }
+        .success { background: #e6ffe6; border: 1px solid #99ff99; }
+        button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Authentication Debug Tool</h1>
+    
+    <div class="debug-box">
+        <h3>Current localStorage Contents:</h3>
+        <div id="localStorage-content"></div>
+    </div>
+
+    <div class="debug-box">
+        <h3>Actions:</h3>
+        <button onclick="checkAuth()">Check Authentication</button>
+        <button onclick="testAPI()">Test API Call</button>
+        <button onclick="clearStorage()">Clear All Storage</button>
+        <button onclick="setTestToken()">Set Test Token</button>
+    </div>
+
+    <div id="results"></div>
+
+    <script>
+        function displayLocalStorage() {
+            const content = document.getElementById('localStorage-content');
+            let html = '<ul>';
+            
+            if (localStorage.length === 0) {
+                html += '<li><em>localStorage is empty</em></li>';
+            } else {
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    const value = localStorage.getItem(key);
+                    html += `<li><strong>${key}:</strong> ${value.substring(0, 100)}${value.length > 100 ? '...' : ''}</li>`;
+                }
+            }
+            html += '</ul>';
+            content.innerHTML = html;
+        }
+
+        function checkAuth() {
+            const tokens = {
+                access_token: localStorage.getItem('access_token'),
+                authToken: localStorage.getItem('authToken'),
+                token: localStorage.getItem('token'),
+                jwt: localStorage.getItem('jwt'),
+                user: localStorage.getItem('user')
+            };
+
+            let html = '<div class="debug-box"><h3>🔑 Authentication Check Results:</h3>';
+            
+            Object.entries(tokens).forEach(([key, value]) => {
+                const status = value ? 'success' : 'error';
+                html += `<div class="${status}"><strong>${key}:</strong> ${value ? '✅ Found' : '❌ Not found'}</div>`;
+                if (value) {
+                    html += `<div><small>Value: ${value.substring(0, 50)}...</small></div>`;
+                }
+            });
+
+            html += '</div>';
+            document.getElementById('results').innerHTML = html;
+        }
+
+        async function testAPI() {
+            const baseURL = 'http://localhost:5000/api';
+            const token = localStorage.getItem('access_token') || localStorage.getItem('authToken');
+            
+            const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+            
+            try {
+                console.log('Testing API with headers:', headers);
+                const response = await fetch(`${baseURL}/user-management`, { headers });
+                
+                let html = `<div class="debug-box"><h3>🔌 API Test Results:</h3>`;
+                html += `<div>Status: ${response.status}</div>`;
+                html += `<div>Headers sent: ${JSON.stringify(headers)}</div>`;
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    html += `<div class="success">✅ API call successful!</div>`;
+                    html += `<div>Response: ${JSON.stringify(data).substring(0, 200)}...</div>`;
+                } else {
+                    html += `<div class="error">❌ API call failed: ${response.status} ${response.statusText}</div>`;
+                    const errorText = await response.text();
+                    html += `<div>Error: ${errorText.substring(0, 200)}...</div>`;
+                }
+                html += '</div>';
+                document.getElementById('results').innerHTML = html;
+                
+            } catch (error) {
+                document.getElementById('results').innerHTML = 
+                    `<div class="debug-box error"><h3>❌ API Test Error:</h3>${error.message}</div>`;
+            }
+        }
+
+        function clearStorage() {
+            localStorage.clear();
+            sessionStorage.clear();
+            displayLocalStorage();
+            document.getElementById('results').innerHTML = 
+                '<div class="debug-box success">🧹 All storage cleared!</div>';
+        }
+
+        function setTestToken() {
+            // This is just for testing - you'll need your actual token
+            const testToken = 'your_actual_token_here';
+            localStorage.setItem('access_token', testToken);
+            displayLocalStorage();
+            document.getElementById('results').innerHTML = 
+                '<div class="debug-box success">🔑 Test token set in localStorage!</div>';
+        }
+
+        // Initialize
+        displayLocalStorage();
+    </script>
+</body>
+</html>

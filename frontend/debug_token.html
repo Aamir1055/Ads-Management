@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Token Storage</title>
+</head>
+<body>
+    <h1>Token Debugging Tool</h1>
+    <div id="output"></div>
+    
+    <script>
+        function log(message) {
+            document.getElementById('output').innerHTML += '<p>' + message + '</p>';
+            console.log(message);
+        }
+        
+        log('🔍 Checking localStorage tokens...');
+        
+        // Check what's currently in localStorage
+        const accessToken = localStorage.getItem('access_token');
+        const authToken = localStorage.getItem('authToken');
+        const user = localStorage.getItem('user');
+        
+        log('access_token: ' + (accessToken ? accessToken.substring(0, 30) + '...' : 'NULL'));
+        log('authToken: ' + (authToken ? authToken.substring(0, 30) + '...' : 'NULL'));
+        log('user: ' + (user ? 'EXISTS' : 'NULL'));
+        
+        if (user) {
+            try {
+                const userObj = JSON.parse(user);
+                log('User object: ' + JSON.stringify(userObj));
+            } catch (e) {
+                log('Error parsing user: ' + e.message);
+            }
+        }
+        
+        // Test login to get fresh token
+        log('🔐 Testing fresh login...');
+        
+        fetch('http://localhost:5000/api/auth/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                username: 'admin',
+                password: 'admin123'
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            log('Login response: ' + JSON.stringify(data, null, 2));
+            
+            if (data.success && data.data.access_token) {
+                const newToken = data.data.access_token;
+                log('Fresh token obtained: ' + newToken.substring(0, 30) + '...');
+                
+                // Store the new token
+                localStorage.setItem('access_token', newToken);
+                localStorage.setItem('authToken', newToken);
+                localStorage.setItem('user', JSON.stringify(data.data.user));
+                
+                log('✅ New token stored in localStorage');
+                
+                // Test user management endpoint
+                log('🧑‍💼 Testing user management endpoint...');
+                return fetch('http://localhost:5000/api/user-management', {
+                    headers: {
+                        'Authorization': 'Bearer ' + newToken
+                    }
+                });
+            } else {
+                throw new Error('Login failed: ' + JSON.stringify(data));
+            }
+        })
+        .then(response => {
+            log('User management status: ' + response.status);
+            return response.json();
+        })
+        .then(data => {
+            log('User management response: ' + JSON.stringify(data));
+            if (data.success) {
+                log('✅ User management working! Found ' + data.data.users.length + ' users');
+            } else {
+                log('❌ User management failed: ' + data.message);
+            }
+        })
+        .catch(error => {
+            log('❌ Error: ' + error.message);
+        });
+        
+        // Add clear storage button
+        document.body.innerHTML += '<button onclick="clearStorage()">Clear All Storage</button>';
+        
+        function clearStorage() {
+            localStorage.clear();
+            log('🧹 localStorage cleared');
+        }
+        
+        window.clearStorage = clearStorage;
+    </script>
+</body>
+</html>

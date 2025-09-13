@@ -87,9 +87,9 @@ const Login = () => {
             } else {
               // Login successful without 2FA
               console.log('Login successful, storing token and navigating...')
-              // Store with consistent token key
-              localStorage.setItem('access_token', data.data.token)
-              localStorage.setItem('authToken', data.data.token)
+              // Store with consistent token key - fix: use access_token from API
+              localStorage.setItem('access_token', data.data.access_token)
+              localStorage.setItem('authToken', data.data.access_token)
               localStorage.setItem('user', JSON.stringify(data.data.user))
               navigate('/dashboard')
             }
@@ -160,11 +160,11 @@ const Login = () => {
           console.log('2FA API response:', data)
 
           if (data.success) {
-            const { token, user } = data.data
+            const { access_token, user } = data.data
             
             // Store tokens with consistent keys
-            localStorage.setItem('access_token', token)
-            localStorage.setItem('authToken', token)
+            localStorage.setItem('access_token', access_token)
+            localStorage.setItem('authToken', access_token)
             localStorage.setItem('user', JSON.stringify(user))
             
             console.log('2FA verification successful, navigating to dashboard')

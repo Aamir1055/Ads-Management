@@ -20,17 +20,26 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const initAuth = () => {
       try {
-        const storedToken = localStorage.getItem('authToken')
+        // Check for access_token first, then fall back to authToken
+        const storedToken = localStorage.getItem('access_token') || localStorage.getItem('authToken')
         const storedUser = localStorage.getItem('user')
         
         if (storedToken && storedUser) {
           setToken(storedToken)
           setUser(JSON.parse(storedUser))
+          
+          // If we found an old authToken, migrate it to access_token
+          if (localStorage.getItem('authToken') && !localStorage.getItem('access_token')) {
+            console.log('Migrating authToken to access_token')
+            localStorage.setItem('access_token', storedToken)
+            localStorage.removeItem('authToken')
+          }
         }
       } catch (error) {
         console.error('Error loading auth from localStorage:', error)
         // Clear invalid data
         localStorage.removeItem('authToken')
+        localStorage.removeItem('access_token')
         localStorage.removeItem('user')
       } finally {
         setLoading(false)
@@ -43,14 +52,21 @@ export const AuthProvider = ({ children }) => {
   const login = (userData, authToken) => {
     setUser(userData)
     setToken(authToken)
-    localStorage.setItem('authToken', authToken)
+    // Store as access_token for consistency
+    localStorage.setItem('access_token', authToken)
     localStorage.setItem('user', JSON.stringify(userData))
+    // Remove old token format if it exists
+    localStorage.removeItem('authToken')
   }
 
   const logout = () => {
     setUser(null)
     setToken(null)
+    // Clear all possible token formats
+    localStorage.removeItem('access_token')
     localStorage.removeItem('authToken')
+    localStorage.removeItem('auth_token')
+    localStorage.removeItem('refresh_token')
     localStorage.removeItem('user')
     
     // Optionally call logout endpoint

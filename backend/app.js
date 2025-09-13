@@ -30,6 +30,8 @@ const cardUsersRoutes = require('./routes/cardUsersRoutes');
 const campaignRoutes = require('./routes/campaignRoutes');
 const permissionsRoutes = require('./routes/permissionsRoutes');
 const modulesRoutes = require('./routes/modulesRoutes');
+const userManagementRoutes = require('./routes/userManagementRoutes');
+const userAccessRoutes = require('./routes/userAccessRoutes');
 
 const app = express();
 
@@ -202,6 +204,8 @@ app.use('/api/card-users', cardUsersRoutes);
 app.use('/api/campaigns', campaignRoutes);
 app.use('/api/permissions', permissionsRoutes);
 app.use('/api/modules', modulesRoutes);
+app.use('/api/user-management', userManagementRoutes);
+app.use('/api/user-access', userAccessRoutes);
 // Root
 app.get('/', (req, res) => {
   res.json({
@@ -215,6 +219,7 @@ app.get('/', (req, res) => {
     endpoints: {
       auth: '/api/auth',
       users: '/api/users',
+      userManagement: '/api/user-management',
       campaignTypes: '/api/campaign-types',
       campaignData: '/api/campaign-data',
       ads: '/api/ads',

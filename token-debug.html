@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Token Debug Tool</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }
+        .section { margin: 20px 0; padding: 15px; background: #f9f9f9; border-radius: 5px; }
+        .token-box { background: #e8f4fd; padding: 10px; border-radius: 4px; font-family: monospace; word-break: break-all; margin: 10px 0; }
+        .error { background: #ffe6e6; color: #d00; }
+        .success { background: #e6ffe6; color: #060; }
+        button { background: #007cba; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; margin: 5px; }
+        button:hover { background: #005a87; }
+        .clear-btn { background: #dc3545; }
+        .clear-btn:hover { background: #c82333; }
+        textarea { width: 100%; height: 100px; margin: 10px 0; }
+        .json { background: #f8f9fa; border: 1px solid #dee2e6; padding: 15px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 JWT Token Debug Tool</h1>
+        
+        <div class="section">
+            <h2>📱 Current Browser Storage</h2>
+            <button onclick="checkStorage()">Check Storage</button>
+            <button onclick="clearAllStorage()" class="clear-btn">Clear All Storage</button>
+            <div id="storage-result"></div>
+        </div>
+
+        <div class="section">
+            <h2>🔐 Test Login</h2>
+            <input type="text" id="username" placeholder="Username" value="admin" style="margin: 5px; padding: 8px;">
+            <input type="password" id="password" placeholder="Password" value="admin123" style="margin: 5px; padding: 8px;">
+            <button onclick="testLogin()">Login</button>
+            <div id="login-result"></div>
+        </div>
+
+        <div class="section">
+            <h2>🔍 Token Decoder</h2>
+            <p>Paste any JWT token to decode it:</p>
+            <textarea id="token-input" placeholder="Paste JWT token here..."></textarea>
+            <button onclick="decodeToken()">Decode Token</button>
+            <div id="decode-result"></div>
+        </div>
+
+        <div class="section">
+            <h2>🧪 API Test</h2>
+            <button onclick="testAPI()">Test /api/users</button>
+            <div id="api-result"></div>
+        </div>
+
+        <div class="section">
+            <h2>📋 Debug Log</h2>
+            <div id="debug-log" style="background: #f8f9fa; padding: 15px; border-radius: 4px; height: 200px; overflow-y: auto; font-family: monospace; font-size: 12px;"></div>
+            <button onclick="clearLog()">Clear Log</button>
+        </div>
+    </div>
+
+    <script>
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('debug-log');
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'error' ? '#d00' : type === 'success' ? '#060' : '#333';
+            logDiv.innerHTML += `<div style="color: ${color}">[${timestamp}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(message);
+        }
+
+        function checkStorage() {
+            const storageDiv = document.getElementById('storage-result');
+            const tokens = {
+                access_token: localStorage.getItem('access_token'),
+                authToken: localStorage.getItem('authToken'),
+                auth_token: localStorage.getItem('auth_token'),
+                refresh_token: localStorage.getItem('refresh_token'),
+                user: localStorage.getItem('user')
+            };
+
+            let html = '<h3>LocalStorage Contents:</h3>';
+            for (const [key, value] of Object.entries(tokens)) {
+                if (value) {
+                    html += `<div><strong>${key}:</strong><div class="token-box">${value}</div></div>`;
+                    
+                    // Try to decode if it looks like a JWT
+                    if (value && value.includes('.')) {
+                        try {
+                            const decoded = decodeJWT(value);
+                            html += `<div class="json"><strong>Decoded:</strong><pre>${JSON.stringify(decoded, null, 2)}</pre></div>`;
+                        } catch (e) {
+                            html += `<div class="error">Error decoding: ${e.message}</div>`;
+                        }
+                    }
+                } else {
+                    html += `<div><strong>${key}:</strong> <em>null</em></div>`;
+                }
+            }
+            
+            storageDiv.innerHTML = html;
+            log('Storage checked');
+        }
+
+        function clearAllStorage() {
+            localStorage.clear();
+            sessionStorage.clear();
+            log('All storage cleared', 'success');
+            checkStorage();
+        }
+
+        async function testLogin() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const resultDiv = document.getElementById('login-result');
+            
+            log(`Testing login for user: ${username}`);
+            
+            try {
+                const response = await fetch('http://localhost:5000/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success && data.data.access_token) {
+                    const token = data.data.access_token;
+                    localStorage.setItem('access_token', token);
+                    
+                    // Decode the token
+                    const decoded = decodeJWT(token);
+                    
+                    resultDiv.innerHTML = `
+                        <div class="success">✅ Login successful!</div>
+                        <div><strong>Access Token:</strong></div>
+                        <div class="token-box">${token}</div>
+                        <div class="json">
+                            <strong>Decoded Token:</strong>
+                            <pre>${JSON.stringify(decoded, null, 2)}</pre>
+                        </div>
+                    `;
+                    
+                    log('Login successful, token stored', 'success');
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ Login failed: ${data.message || 'Unknown error'}</div>`;
+                    log('Login failed: ' + (data.message || 'Unknown error'), 'error');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Login error: ${error.message}</div>`;
+                log('Login error: ' + error.message, 'error');
+            }
+        }
+
+        function decodeJWT(token) {
+            const parts = token.split('.');
+            if (parts.length !== 3) {
+                throw new Error('Invalid JWT format');
+            }
+            
+            // Decode header and payload
+            const header = JSON.parse(atob(parts[0].replace(/-/g, '+').replace(/_/g, '/')));
+            const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+            
+            return { header, payload };
+        }
+
+        function decodeToken() {
+            const token = document.getElementById('token-input').value.trim();
+            const resultDiv = document.getElementById('decode-result');
+            
+            if (!token) {
+                resultDiv.innerHTML = '<div class="error">Please paste a token first</div>';
+                return;
+            }
+            
+            try {
+                const decoded = decodeJWT(token);
+                resultDiv.innerHTML = `
+                    <div class="success">✅ Token decoded successfully</div>
+                    <div class="json">
+                        <strong>Header:</strong>
+                        <pre>${JSON.stringify(decoded.header, null, 2)}</pre>
+                        <strong>Payload:</strong>
+                        <pre>${JSON.stringify(decoded.payload, null, 2)}</pre>
+                    </div>
+                `;
+                log('Token decoded successfully', 'success');
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Decode error: ${error.message}</div>`;
+                log('Token decode error: ' + error.message, 'error');
+            }
+        }
+
+        async function testAPI() {
+            const token = localStorage.getItem('access_token');
+            const resultDiv = document.getElementById('api-result');
+            
+            if (!token) {
+                resultDiv.innerHTML = '<div class="error">❌ No access token found. Login first.</div>';
+                log('No access token for API test', 'error');
+                return;
+            }
+            
+            log(`Testing API with token: ${token.substring(0, 20)}...`);
+            
+            try {
+                const response = await fetch('http://localhost:5000/api/users', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <div class="success">✅ API call successful!</div>
+                        <div>Status: ${response.status}</div>
+                        <div>Users found: ${data.data?.users?.length || 'N/A'}</div>
+                    `;
+                    log(`API test successful: ${response.status}`, 'success');
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="error">❌ API call failed</div>
+                        <div>Status: ${response.status}</div>
+                        <div>Message: ${data.message || 'No message'}</div>
+                        <div class="json">
+                            <strong>Response:</strong>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                    log(`API test failed: ${response.status} - ${data.message}`, 'error');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ API error: ${error.message}</div>`;
+                log('API test error: ' + error.message, 'error');
+            }
+        }
+
+        function clearLog() {
+            document.getElementById('debug-log').innerHTML = '';
+        }
+
+        // Auto-check storage on load
+        window.onload = function() {
+            log('Token Debug Tool loaded');
+            checkStorage();
+        }
+    </script>
+</body>
+</html>

@@ -118,6 +118,25 @@ const RoleManagementInterface = () => {
     });
   };
 
+  // Handle select all permissions for a module (role creation)
+  const handleSelectAllModulePermissions = (moduleId, permissions, selectAll) => {
+    setSelectedPermissions(prev => {
+      if (selectAll) {
+        // Select all permissions for this module
+        return {
+          ...prev,
+          [moduleId]: permissions.map(p => p.key)
+        };
+      } else {
+        // Deselect all permissions for this module
+        return {
+          ...prev,
+          [moduleId]: []
+        };
+      }
+    });
+  };
+
   // Handle permission selection for role editing
   const handleEditPermissionToggle = (moduleId, permissionKey, isChecked) => {
     setEditSelectedPermissions(prev => {
@@ -134,6 +153,25 @@ const RoleManagementInterface = () => {
         return {
           ...prev,
           [moduleId]: modulePermissions.filter(p => p !== permissionKey)
+        };
+      }
+    });
+  };
+
+  // Handle select all permissions for a module (role editing)
+  const handleEditSelectAllModulePermissions = (moduleId, permissions, selectAll) => {
+    setEditSelectedPermissions(prev => {
+      if (selectAll) {
+        // Select all permissions for this module
+        return {
+          ...prev,
+          [moduleId]: permissions.map(p => p.key)
+        };
+      } else {
+        // Deselect all permissions for this module
+        return {
+          ...prev,
+          [moduleId]: []
         };
       }
     });
@@ -405,31 +443,56 @@ const RoleManagementInterface = () => {
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Permissions</label>
                 <div className="max-h-96 overflow-y-auto border border-gray-200 rounded-md p-4">
-                  {modules.map((module) => (
-                    <div key={module.id} className="mb-6 last:mb-0">
-                      <h4 className="font-medium text-gray-900 mb-3 text-base border-b pb-2">{module.name}</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {module.permissions && module.permissions.map((permission) => (
-                          <label key={`${module.id}-${permission.key}`} className="flex items-start space-x-3 p-2 hover:bg-gray-50 rounded">
-                            <input
-                              type="checkbox"
-                              className="mt-0.5 h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                              checked={selectedPermissions[module.id]?.includes(permission.key) || false}
-                              onChange={(e) => handlePermissionToggle(module.id, permission.key, e.target.checked)}
-                            />
-                            <div className="flex-1 min-w-0">
-                              <span className="text-sm font-medium text-gray-900">{permission.name}</span>
-                              {permission.description && (
-                                <p className="text-xs text-gray-500 mt-1">
-                                  {permission.description}
-                                </p>
-                              )}
-                            </div>
-                          </label>
-                        ))}
+                  {modules.map((module) => {
+                    const modulePermissions = selectedPermissions[module.id] || [];
+                    const allModulePermissionKeys = module.permissions ? module.permissions.map(p => p.key) : [];
+                    const allSelected = allModulePermissionKeys.length > 0 && allModulePermissionKeys.every(key => modulePermissions.includes(key));
+                    const someSelected = modulePermissions.length > 0 && !allSelected;
+                    
+                    return (
+                      <div key={module.id} className="mb-6 last:mb-0">
+                        <div className="flex items-center justify-between mb-3 pb-2 border-b">
+                          <h4 className="font-medium text-gray-900 text-base">{module.name}</h4>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-xs text-gray-500">
+                              {modulePermissions.length} of {allModulePermissionKeys.length} selected
+                            </span>
+                            <button
+                              type="button"
+                              className={`text-xs px-3 py-1 rounded border transition-colors ${
+                                allSelected 
+                                  ? 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'
+                                  : 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
+                              }`}
+                              onClick={() => handleSelectAllModulePermissions(module.id, module.permissions, !allSelected)}
+                            >
+                              {allSelected ? 'Deselect All' : 'Select All'}
+                            </button>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {module.permissions && module.permissions.map((permission) => (
+                            <label key={`${module.id}-${permission.key}`} className="flex items-start space-x-3 p-2 hover:bg-gray-50 rounded">
+                              <input
+                                type="checkbox"
+                                className="mt-0.5 h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                                checked={selectedPermissions[module.id]?.includes(permission.key) || false}
+                                onChange={(e) => handlePermissionToggle(module.id, permission.key, e.target.checked)}
+                              />
+                              <div className="flex-1 min-w-0">
+                                <span className="text-sm font-medium text-gray-900">{permission.name}</span>
+                                {permission.description && (
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    {permission.description}
+                                  </p>
+                                )}
+                              </div>
+                            </label>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -518,32 +581,59 @@ const RoleManagementInterface = () => {
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Permissions</label>
                 <div className="max-h-96 overflow-y-auto border border-gray-200 rounded-md p-4">
-                  {modules.map((module) => (
-                    <div key={module.id} className="mb-6 last:mb-0">
-                      <h4 className="font-medium text-gray-900 mb-3 text-base border-b pb-2">{module.name}</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {module.permissions && module.permissions.map((permission) => (
-                          <label key={`edit-${module.id}-${permission.key}`} className={`flex items-start space-x-3 p-2 hover:bg-gray-50 rounded ${editingRole.is_system_role ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                            <input
-                              type="checkbox"
-                              className="mt-0.5 h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                              checked={editSelectedPermissions[module.id]?.includes(permission.key) || false}
-                              onChange={(e) => handleEditPermissionToggle(module.id, permission.key, e.target.checked)}
-                              disabled={editingRole.is_system_role}
-                            />
-                            <div className="flex-1 min-w-0">
-                              <span className="text-sm font-medium text-gray-900">{permission.name}</span>
-                              {permission.description && (
-                                <p className="text-xs text-gray-500 mt-1">
-                                  {permission.description}
-                                </p>
-                              )}
-                            </div>
-                          </label>
-                        ))}
+                  {modules.map((module) => {
+                    const modulePermissions = editSelectedPermissions[module.id] || [];
+                    const allModulePermissionKeys = module.permissions ? module.permissions.map(p => p.key) : [];
+                    const allSelected = allModulePermissionKeys.length > 0 && allModulePermissionKeys.every(key => modulePermissions.includes(key));
+                    const someSelected = modulePermissions.length > 0 && !allSelected;
+                    
+                    return (
+                      <div key={module.id} className="mb-6 last:mb-0">
+                        <div className={`flex items-center justify-between mb-3 pb-2 border-b ${editingRole.is_system_role ? 'opacity-50' : ''}`}>
+                          <h4 className="font-medium text-gray-900 text-base">{module.name}</h4>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-xs text-gray-500">
+                              {modulePermissions.length} of {allModulePermissionKeys.length} selected
+                            </span>
+                            {!editingRole.is_system_role && (
+                              <button
+                                type="button"
+                                className={`text-xs px-3 py-1 rounded border transition-colors ${
+                                  allSelected 
+                                    ? 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'
+                                    : 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
+                                }`}
+                                onClick={() => handleEditSelectAllModulePermissions(module.id, module.permissions, !allSelected)}
+                              >
+                                {allSelected ? 'Deselect All' : 'Select All'}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {module.permissions && module.permissions.map((permission) => (
+                            <label key={`edit-${module.id}-${permission.key}`} className={`flex items-start space-x-3 p-2 hover:bg-gray-50 rounded ${editingRole.is_system_role ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                              <input
+                                type="checkbox"
+                                className="mt-0.5 h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                                checked={editSelectedPermissions[module.id]?.includes(permission.key) || false}
+                                onChange={(e) => handleEditPermissionToggle(module.id, permission.key, e.target.checked)}
+                                disabled={editingRole.is_system_role}
+                              />
+                              <div className="flex-1 min-w-0">
+                                <span className="text-sm font-medium text-gray-900">{permission.name}</span>
+                                {permission.description && (
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    {permission.description}
+                                  </p>
+                                )}
+                              </div>
+                            </label>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>

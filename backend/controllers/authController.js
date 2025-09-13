@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { generateTokens, storeRefreshToken } = require('../middleware/authMiddleware');
 
 // Helper functions
 const createResponse = (success, message, data = null, errors = null) => ({
@@ -11,19 +12,15 @@ const createResponse = (success, message, data = null, errors = null) => ({
   ...(errors && { errors })
 });
 
-// Generate JWT Token
-const generateToken = (userId, username, roleId) => {
-  return jwt.sign(
-    { 
-      id: userId, 
-      username: username,
-      role_id: roleId
-    }, 
-    process.env.JWT_SECRET, 
-    {
-      expiresIn: process.env.JWT_EXPIRE || '24h'
-    }
-  );
+// Generate JWT Token - Updated to use new token system
+const generateAuthTokens = async (userId) => {
+  const tokens = generateTokens(userId);
+  
+  // Store refresh token in database
+  const refreshExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+  await storeRefreshToken(userId, tokens.tokenId, refreshExpiresAt);
+  
+  return tokens;
 };
 
 // @desc    Login user with optional 2FA
@@ -68,12 +65,13 @@ exports.login = async (req, res, next) => {
     }
 
     // Generate token for non-2FA users
-    const token = generateToken(user.id, user.username, user.role_id);
+    const tokens = await generateAuthTokens(user.id);
     await User.updateLastLogin(user.id);
     res.status(200).json(
       createResponse(true, 'Login successful', {
         requires_2fa: false,
-        token,
+        access_token: tokens.accessToken,
+        refresh_token: tokens.refreshToken,
         user: {
           id: user.id,
           username: user.username,
@@ -156,14 +154,15 @@ exports.loginWith2FA = async (req, res, next) => {
     }
 
     // Generate token
-    const authToken = generateToken(user.id, user.username, user.role_id);
+    const tokens = await generateAuthTokens(user.id);
 
     // Update last login
     await User.updateLastLogin(user.id);
 
     res.status(200).json(
       createResponse(true, 'Login with 2FA successful', {
-        token: authToken,
+        access_token: tokens.accessToken,
+        refresh_token: tokens.refreshToken,
         user: {
           id: user.id,
           username: user.username,

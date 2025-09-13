@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { 
+import useUserAccess from '../hooks/useUserAccess'
+import {
   Menu, 
   X, 
   Home, 
@@ -25,6 +26,7 @@ const Layout = ({ children }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
+  const { userAccess, loading: permissionsLoading } = useUserAccess()
   
   // Get current user info from localStorage
   const currentUser = React.useMemo(() => {
@@ -46,7 +48,26 @@ const Layout = ({ children }) => {
     navigate('/login')
   }
 
-  const navigation = [
+  // Icon mapping for backend response
+  const iconMap = {
+    Home,
+    Users,
+    Key,
+    Tags,
+    Database,
+    CreditCard,
+    UserCheck,
+    Target,
+    BarChart3,
+    FileText,
+    Settings
+  }
+
+  // Use navigation from backend if available, otherwise show all (fallback)
+  const navigation = userAccess?.navigation?.map(item => ({
+    ...item,
+    icon: iconMap[item.icon] || Home // Map string to actual component
+  })) || [
     { name: 'Dashboard', href: '/dashboard', icon: Home },
     { name: 'User Management', href: '/user-management', icon: Users },
     { name: 'Role Management', href: '/role-management', icon: Key },

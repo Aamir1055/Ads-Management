@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auth Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; }
+        .form-group { margin: 10px 0; }
+        input, button { padding: 10px; margin: 5px; width: 200px; }
+        .result { background: #f0f0f0; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .error { background: #ffe6e6; border: 1px solid red; }
+        .success { background: #e6ffe6; border: 1px solid green; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Authentication Test</h1>
+        
+        <div class="form-group">
+            <h2>Step 1: Login</h2>
+            <input type="text" id="username" placeholder="Username" value="admin">
+            <input type="password" id="password" placeholder="Password" value="admin123">
+            <button onclick="login()">Login</button>
+        </div>
+        
+        <div class="form-group">
+            <h2>Step 2: Test API Call</h2>
+            <button onclick="testUsers()">Get Users</button>
+            <button onclick="clearTokens()">Clear Tokens</button>
+        </div>
+        
+        <div id="result" class="result"></div>
+    </div>
+
+    <script>
+        let accessToken = null;
+        
+        function log(message, type = 'info') {
+            const resultDiv = document.getElementById('result');
+            const timestamp = new Date().toLocaleTimeString();
+            resultDiv.innerHTML += `<div class="${type}">[${timestamp}] ${message}</div>`;
+            console.log(message);
+        }
+        
+        async function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            log('🔄 Attempting login...', 'info');
+            
+            try {
+                const response = await fetch('http://localhost:5000/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    accessToken = data.data.access_token;
+                    log('✅ Login successful! Token: ' + accessToken.substring(0, 30) + '...', 'success');
+                    
+                    // Store in localStorage for consistency
+                    localStorage.setItem('access_token', accessToken);
+                } else {
+                    log('❌ Login failed: ' + data.message, 'error');
+                }
+            } catch (error) {
+                log('❌ Login error: ' + error.message, 'error');
+            }
+        }
+        
+        async function testUsers() {
+            if (!accessToken) {
+                log('❌ No access token. Please login first.', 'error');
+                return;
+            }
+            
+            log('🔄 Testing API call...', 'info');
+            
+            try {
+                const response = await fetch('http://localhost:5000/api/users', {
+                    method: 'GET',
+                    headers: { 
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    log('✅ API call successful! Got ' + data.data.users.length + ' users', 'success');
+                } else {
+                    log('❌ API call failed: ' + data.message, 'error');
+                }
+            } catch (error) {
+                log('❌ API error: ' + error.message, 'error');
+            }
+        }
+        
+        function clearTokens() {
+            localStorage.clear();
+            sessionStorage.clear();
+            accessToken = null;
+            log('🧹 All tokens cleared', 'info');
+        }
+        
+        // Check for existing token on load
+        window.onload = function() {
+            const stored = localStorage.getItem('access_token');
+            if (stored) {
+                accessToken = stored;
+                log('📱 Found existing token: ' + stored.substring(0, 30) + '...', 'info');
+            }
+        }
+    </script>
+</body>
+</html>

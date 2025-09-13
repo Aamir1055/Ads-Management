@@ -3,8 +3,69 @@ const { pool } = require('../config/database');
 /**
  * Permission Manager Utility Class
  * Provides methods for checking and managing user permissions
+ * Updated to work with simplified role-permission structure
  */
 class PermissionManager {
+    
+    /**
+     * Get all roles
+     * @returns {Promise<Array>}
+     */
+    static async getAllRoles() {
+        try {
+            const [roles] = await pool.query(`
+                SELECT 
+                    id, 
+                    name, 
+                    description,
+                    level,
+                    is_active,
+                    is_system_role,
+                    created_at,
+                    updated_at
+                FROM roles 
+                ORDER BY level DESC, name ASC
+            `);
+            return roles;
+        } catch (error) {
+            console.error('PermissionManager.getAllRoles error:', error);
+            throw error;
+        }
+    }
+    
+    /**
+     * Get permissions for a specific role
+     * @param {number} roleId - The role ID
+     * @returns {Promise<Array>}
+     */
+    static async getRolePermissions(roleId) {
+        try {
+            const [permissions] = await pool.query(`
+                SELECT 
+                    p.id,
+                    p.name,
+                    p.display_name,
+                    p.category,
+                    p.description,
+                    p.is_active
+                FROM permissions p
+                JOIN role_permissions rp ON p.id = rp.permission_id
+                WHERE rp.role_id = ? AND p.is_active = 1
+                ORDER BY p.category ASC, p.display_name ASC
+            `, [roleId]);
+            
+            return permissions.map(p => ({
+                id: p.id,
+                permission_name: p.display_name || p.name,
+                permission_key: p.name,
+                category: p.category,
+                description: p.description
+            }));
+        } catch (error) {
+            console.error('PermissionManager.getRolePermissions error:', error);
+            throw error;
+        }
+    }
     /**
      * Check if a user has a specific permission
      * @param {number} userId - The user ID
@@ -51,25 +112,27 @@ class PermissionManager {
     }
 
     /**
-     * Get all permissions for a user
+     * Get all permissions for a user (through their role)
      * @param {number} userId - The user ID
      * @returns {Promise<Array>}
      */
     static async getUserPermissions(userId) {
         try {
-            const [rows] = await pool.query(`
-                SELECT DISTINCT
-                    module_name,
-                    permission_key,
-                    permission_name,
-                    http_method,
-                    api_endpoint
-                FROM user_permissions_view
-                WHERE user_id = ?
-                ORDER BY module_name, permission_name
+            const [permissions] = await pool.query(`
+                SELECT 
+                    p.name,
+                    p.display_name,
+                    p.category,
+                    p.description
+                FROM users u
+                JOIN roles r ON u.role_id = r.id
+                JOIN role_permissions rp ON r.id = rp.role_id
+                JOIN permissions p ON rp.permission_id = p.id
+                WHERE u.id = ? AND u.is_active = 1 AND r.is_active = 1 AND p.is_active = 1
+                ORDER BY p.category, p.display_name
             `, [userId]);
             
-            return rows;
+            return permissions.map(p => p.name);
         } catch (error) {
             console.error('Error getting user permissions:', error);
             return [];
@@ -128,24 +191,19 @@ class PermissionManager {
      */
     static async getUserRoles(userId) {
         try {
-            const [rows] = await pool.query(`
+            const [roles] = await pool.query(`
                 SELECT 
                     r.id,
                     r.name,
                     r.description,
                     r.level,
-                    ur.assigned_at,
-                    ur.expires_at
-                FROM user_roles ur
-                JOIN roles r ON ur.role_id = r.id
-                WHERE ur.user_id = ? 
-                AND ur.is_active = 1 
-                AND r.is_active = 1
-                AND (ur.expires_at IS NULL OR ur.expires_at > NOW())
-                ORDER BY r.level DESC
+                    r.is_system_role
+                FROM users u
+                JOIN roles r ON u.role_id = r.id
+                WHERE u.id = ? AND u.is_active = 1 AND r.is_active = 1
             `, [userId]);
             
-            return rows;
+            return roles;
         } catch (error) {
             console.error('Error getting user roles:', error);
             return [];
