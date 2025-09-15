@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Role Display Fix Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .example { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .before { background-color: #ffe6e6; }
+        .after { background-color: #e6ffe6; }
+        .role-item { margin: 5px 0; padding: 8px; background-color: #f5f5f5; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <h1>Role Management - Parentheses Fix Demonstration</h1>
+    
+    <div class="example before">
+        <h2>❌ Before (Issue): Role names with unwanted parentheses</h2>
+        <p>The old code was adding parentheses with level information:</p>
+        <div class="role-item">Aamir (L- )</div>
+        <div class="role-item">New Role (L1 )</div>
+        <div class="role-item">Advertiser (L2 )</div>
+        <div class="role-item">Super Admin (L10 )</div>
+        
+        <p><strong>Problem:</strong> The template literal was adding <code>(L${r.level ?? '-'} )</code> to every role name</p>
+        <pre><code>const roleOptions = useMemo(() => roles.map(r => ({ 
+  value: String(r.id), 
+  label: `${r.name} (L${r.level ?? '-'} )` 
+})), [roles])</code></pre>
+    </div>
+    
+    <div class="example after">
+        <h2>✅ After (Fixed): Clean role names without parentheses</h2>
+        <p>The fixed code shows clean role names:</p>
+        <div class="role-item">Aamir</div>
+        <div class="role-item">New Role</div>
+        <div class="role-item">Advertiser</div>
+        <div class="role-item">Super Admin</div>
+        
+        <p><strong>Solution:</strong> Simplified template literal to show only the role name</p>
+        <pre><code>const roleOptions = useMemo(() => roles.map(r => ({ 
+  value: String(r.id), 
+  label: r.name 
+})), [roles])</code></pre>
+    </div>
+
+    <div class="example">
+        <h2>🔧 Additional Fixes Applied</h2>
+        <ul>
+            <li>✅ Added missing <code>useMemo</code> import from React</li>
+            <li>✅ Added missing <code>Loader2</code> and <code>Users</code> icons from lucide-react</li>
+            <li>✅ Created inline <code>Section</code> and <code>Select</code> components</li>
+            <li>✅ Verified database has clean role names (no parentheses stored)</li>
+        </ul>
+    </div>
+
+    <div class="example">
+        <h2>📝 Summary of Changes</h2>
+        <p><strong>File:</strong> <code>frontend/src/modules/RoleBasedManagement.jsx</code></p>
+        
+        <h3>1. Fixed Role Display Format (Line 64)</h3>
+        <p>Changed from: <code>`${r.name} (L${r.level ?? '-'} )`</code></p>
+        <p>Changed to: <code>r.name</code></p>
+        
+        <h3>2. Added Missing Imports (Line 1)</h3>
+        <p>Added: <code>useMemo</code> from React</p>
+        <p>Added: <code>Loader2, Users</code> from lucide-react</p>
+        
+        <h3>3. Created Missing Components (Lines 5-33)</h3>
+        <p>Added inline <code>Section</code> and <code>Select</code> components</p>
+    </div>
+
+    <script>
+        // Demo data showing the fix
+        const roles = [
+            { id: 15, name: "Aamir", level: null },
+            { id: 14, name: "New Role", level: 1 },
+            { id: 13, name: "Advertiser", level: 2 },
+            { id: 12, name: "Super Admin", level: 10 }
+        ];
+
+        console.log("🔍 Role Management Fix Test");
+        console.log("==========================");
+        console.log("Roles from database:", roles);
+        
+        // Show old vs new format
+        console.log("\n❌ OLD FORMAT (with parentheses):");
+        roles.forEach(r => {
+            const oldLabel = `${r.name} (L${r.level ?? '-'} )`;
+            console.log(`  ${oldLabel}`);
+        });
+        
+        console.log("\n✅ NEW FORMAT (clean names):");
+        roles.forEach(r => {
+            const newLabel = r.name;
+            console.log(`  ${newLabel}`);
+        });
+    </script>
+</body>
+</html>

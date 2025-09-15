@@ -1,6 +1,36 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { roleService } from '../services/roleService'
-import { Plus, Edit, Trash2, X, Check, Shield } from 'lucide-react'
+import { Plus, Edit, Trash2, X, Check, Shield, Loader2, Users } from 'lucide-react'
+
+// Simple Section component
+const Section = ({ title, icon: Icon, children, actions }) => (
+  <div className="bg-white rounded-lg shadow border border-gray-200">
+    <div className="flex items-center justify-between p-4 border-b border-gray-200">
+      <div className="flex items-center">
+        {Icon && <Icon className="h-5 w-5 text-gray-500 mr-2" />}
+        <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+      </div>
+      {actions && <div className="flex space-x-2">{actions}</div>}
+    </div>
+    <div className="p-4">{children}</div>
+  </div>
+)
+
+// Simple Select component
+const Select = ({ value, onChange, options, placeholder }) => (
+  <select
+    value={value}
+    onChange={(e) => onChange(e.target.value)}
+    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+  >
+    {placeholder && <option value="">{placeholder}</option>}
+    {options.map((option) => (
+      <option key={option.value} value={option.value}>
+        {option.label}
+      </option>
+    ))}
+  </select>
+)
 
 const RoleBasedManagement = () => {
   const [loading, setLoading] = useState(true)
@@ -61,7 +91,7 @@ const RoleBasedManagement = () => {
     return map
   }, [permissions])
 
-  const roleOptions = useMemo(() => roles.map(r => ({ value: String(r.id), label: `${r.name} (L${r.level ?? '-'} )` })), [roles])
+  const roleOptions = useMemo(() => roles.map(r => ({ value: String(r.id), label: r.name })), [roles])
   const permOptions = useMemo(() => permissions.map(p => ({ value: String(p.id), label: `${p.key || p.permission_key}` })), [permissions])
 
   const handleCreateRole = async (e) => {

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { campaignTypesAPI } from '../services/campaignTypesService'
 import CampaignTypeForm from '../components/CampaignTypeForm'
+import { formatDate } from '../utils/dateUtils'
 
 const CampaignTypes = () => {
   const [campaignTypes, setCampaignTypes] = useState([])
@@ -179,16 +180,10 @@ const CampaignTypes = () => {
     setShowDeleteConfirm(true)
   }
 
-  // Format date
-  const formatDate = (dateString) => {
+  // Format date for display
+  const formatDateForDisplay = (dateString) => {
     if (!dateString) return '-'
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
+    return formatDate(dateString)
   }
 
   return (
@@ -362,7 +357,7 @@ const CampaignTypes = () => {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                    {formatDate(item.created_at)}
+                    {formatDateForDisplay(item.created_at)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex items-center space-x-3">

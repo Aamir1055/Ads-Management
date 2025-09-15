@@ -3,7 +3,7 @@ import {
   BarChart3, 
   TrendingUp, 
   TrendingDown,
-  DollarSign,
+  IndianRupee,
   Target,
   FileText,
   Activity,
@@ -247,12 +247,12 @@ const Reports = () => {
         <div className="space-y-6">
           {/* Report Summary Stats */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <StatCard
-              title="Total Spent"
-              value={reportsService.formatCurrency(generatedReport.summary?.totalSpent || 0)}
-              icon={DollarSign}
-              description={`From ${formatDateToDisplay(generatedReport.filters?.dateFrom)} to ${formatDateToDisplay(generatedReport.filters?.dateTo)}`}
-            />
+              <StatCard
+                title="Total Spent"
+                value={reportsService.formatCurrency(generatedReport.summary?.totalSpent || 0)}
+                icon={IndianRupee}
+                description={`From ${formatDateToDisplay(generatedReport.filters?.dateFrom)} to ${formatDateToDisplay(generatedReport.filters?.dateTo)}`}
+              />
             <StatCard
               title="Total Results"
               value={reportsService.formatNumber(generatedReport.summary?.totalResults || 0)}
@@ -394,7 +394,7 @@ const Reports = () => {
               <StatCard
                 title="Current Month"
                 value={reportsService.formatCurrency(dashboardStats.currentMonth?.totalSpent || 0)}
-                icon={DollarSign}
+                icon={IndianRupee}
                 description={`${dashboardStats.currentMonth?.month} overview`}
               />
               <StatCard

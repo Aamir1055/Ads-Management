@@ -25,6 +25,7 @@ const campaignTypeRoutes = require('./routes/campaignTypeRoutes_privacy');
 const campaignDataRoutes = require('./routes/campaignDataRoutes_privacy');
 const adsRoutes = require('./routes/adsRoutes');
 const reportRoutes = require('./routes/reportRoutes_privacy');
+const reportAnalyticsRoutes = require('./routes/reportAnalyticsRoutes');
 const cardsRoutes = require('./routes/cardsRoutes_privacy');
 const cardUsersRoutes = require('./routes/cardUsers_privacy');
 const campaignRoutes = require('./routes/campaignRoutes_privacy');
@@ -199,6 +200,7 @@ app.use('/api/campaign-types', campaignTypeRoutes);
 app.use('/api/campaign-data', campaignDataRoutes);
 app.use('/api/ads', adsRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/analytics', reportAnalyticsRoutes);
 app.use('/api/cards', cardsRoutes);
 app.use('/api/card-users', cardUsersRoutes);
 app.use('/api/campaigns', campaignRoutes);
@@ -224,6 +226,7 @@ app.get('/', (req, res) => {
       campaignData: '/api/campaign-data',
       ads: '/api/ads',
       reports: '/api/reports',
+      analytics: '/api/analytics',
       cards: '/api/cards',
       cardUsers: '/api/card-users'
     },

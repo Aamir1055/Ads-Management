@@ -13,7 +13,7 @@ import Cards from './components/Cards'
 import CardUsers from './pages/CardUsers'
 import Reports from './pages/Reports'
 import ReportsTable from './pages/ReportsTable'
-import ReportAnalytics from './components/ReportAnalytics'
+import ReportAnalyticsPage from './pages/ReportAnalyticsPage'
 
 function App() {
   return (
@@ -45,6 +45,7 @@ function App() {
                 <Route path="/analytics" element={<div className="p-6">Analytics Module (Coming Soon)</div>} />
                 <Route path="/reports-table" element={<ReportsTable />} />
                 <Route path="/reports" element={<Reports />} />
+                <Route path="/report-analytics" element={<ReportAnalyticsPage />} />
                 <Route path="/settings" element={<div className="p-6">Settings Module (Coming Soon)</div>} />
               </Routes>
             </Layout>

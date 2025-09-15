@@ -15,6 +15,7 @@ import {
   Clock,
   Search
 } from 'lucide-react';
+import { formatDate } from '../utils/dateUtils';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
@@ -367,15 +368,8 @@ const UserManagement = () => {
       const data = await response.json();
       
       if (data.success) {
-        setMessage({ type: 'success', content: 'User created successfully!' });
+        setMessage({ type: 'success', content: 'User created successfully! If 2FA is enabled, the user will set it up during their first login.' });
         setShowUserModal(false);
-        
-        // Show 2FA QR code if enabled
-        if (userData.enable_2fa && data.data.twoFA) {
-          setQrData(data.data.twoFA);
-          setShowQRModal(true);
-        }
-        
         await fetchUsers();
       } else {
         setMessage({ type: 'error', content: data.message || 'Failed to create user' });
@@ -625,12 +619,12 @@ const UserManagement = () => {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   {user.last_login 
-                    ? new Date(user.last_login).toLocaleDateString()
+                    ? formatDate(user.last_login)
                     : 'Never'
                   }
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {new Date(user.created_at).toLocaleDateString()}
+                  {formatDate(user.created_at)}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <div className="flex items-center justify-end space-x-2">

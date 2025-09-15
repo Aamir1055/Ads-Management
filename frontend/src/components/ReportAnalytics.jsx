@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { fetchAnalyticsData, fetchFilterOptions } from '../services/reportAnalyticsAdapter';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -16,7 +17,7 @@ import { Line, Bar, Doughnut } from 'react-chartjs-2';
 import {
   TrendingUp,
   TrendingDown,
-  DollarSign,
+  IndianRupee,
   Target,
   Activity,
   Users,
@@ -27,10 +28,6 @@ import {
   Calendar,
   Filter,
   AlertCircle,
-  Wifi,
-  WifiOff,
-  Play,
-  Square
 } from 'lucide-react';
 
 // Register Chart.js components
@@ -64,13 +61,6 @@ const ReportAnalytics = () => {
     dateRange: {}
   });
 
-  // Real-time WebSocket state
-  const [wsConnected, setWsConnected] = useState(false);
-  const [realtimeActive, setRealtimeActive] = useState(false);
-  const [updateCount, setUpdateCount] = useState(0);
-  const [lastUpdate, setLastUpdate] = useState(null);
-  const wsRef = useRef(null);
-
   // Auto-refresh state
   const [autoRefresh, setAutoRefresh] = useState(false);
   const autoRefreshRef = useRef(null);
@@ -80,13 +70,9 @@ const ReportAnalytics = () => {
     initializeDates();
     loadFilterOptions();
     loadAnalytics();
-    connectWebSocket();
 
     // Cleanup on unmount
     return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
       if (autoRefreshRef.current) {
         clearInterval(autoRefreshRef.current);
       }
@@ -108,11 +94,10 @@ const ReportAnalytics = () => {
   // Load filter options
   const loadFilterOptions = async () => {
     try {
-      const response = await fetch('/api/reports/filters');
-      const data = await response.json();
+      const result = await fetchFilterOptions();
       
-      if (data.success) {
-        setFilterOptions(data.data);
+      if (result.success) {
+        setFilterOptions(result.data);
       }
     } catch (error) {
       console.error('Error loading filter options:', error);
@@ -125,21 +110,12 @@ const ReportAnalytics = () => {
     setError(null);
 
     try {
-      const params = new URLSearchParams({
-        date_from: filters.dateFrom,
-        date_to: filters.dateTo
-      });
+      const result = await fetchAnalyticsData(filters);
 
-      if (filters.brand) params.append('brand', filters.brand);
-      if (filters.campaignId) params.append('campaign_id', filters.campaignId);
-
-      const response = await fetch(`/api/reports/charts?${params}`);
-      const data = await response.json();
-
-      if (data.success) {
-        setAnalyticsData(data.data);
+      if (result.success) {
+        setAnalyticsData(result.data);
       } else {
-        setError(data.message || 'Failed to load analytics data');
+        setError(result.message || 'Failed to load analytics data');
       }
     } catch (error) {
       console.error('Error loading analytics:', error);
@@ -149,105 +125,6 @@ const ReportAnalytics = () => {
     }
   };
 
-  // WebSocket connection
-  const connectWebSocket = () => {
-    if (wsRef.current) return;
-
-    try {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.hostname}:5000/ws/analytics`;
-      
-      wsRef.current = new WebSocket(wsUrl);
-
-      wsRef.current.onopen = () => {
-        console.log('WebSocket connected');
-        setWsConnected(true);
-        
-        // Subscribe to updates
-        wsRef.current.send(JSON.stringify({
-          type: 'subscribe',
-          filters: filters,
-          updateFrequency: 30000
-        }));
-      };
-
-      wsRef.current.onmessage = (event) => {
-        try {
-          const message = JSON.parse(event.data);
-          handleWebSocketMessage(message);
-        } catch (error) {
-          console.error('Error parsing WebSocket message:', error);
-        }
-      };
-
-      wsRef.current.onclose = () => {
-        console.log('WebSocket disconnected');
-        setWsConnected(false);
-        setRealtimeActive(false);
-        wsRef.current = null;
-
-        // Attempt to reconnect after 3 seconds
-        setTimeout(() => {
-          if (!wsRef.current) {
-            connectWebSocket();
-          }
-        }, 3000);
-      };
-
-      wsRef.current.onerror = (error) => {
-        console.error('WebSocket error:', error);
-        setWsConnected(false);
-      };
-    } catch (error) {
-      console.error('Failed to create WebSocket connection:', error);
-    }
-  };
-
-  // Handle WebSocket messages
-  const handleWebSocketMessage = (message) => {
-    switch (message.type) {
-      case 'welcome':
-        console.log('WebSocket welcome message received');
-        break;
-      case 'initial_data':
-      case 'data_update':
-      case 'realtime_update':
-        setAnalyticsData(message.data);
-        setUpdateCount(prev => prev + 1);
-        setLastUpdate(new Date());
-        break;
-      case 'error':
-        console.error('WebSocket error:', message.message);
-        setError(message.message);
-        break;
-      default:
-        console.log('Unknown WebSocket message type:', message.type);
-    }
-  };
-
-  // Toggle real-time updates
-  const toggleRealtime = () => {
-    if (!wsConnected) {
-      connectWebSocket();
-      return;
-    }
-
-    if (realtimeActive) {
-      setRealtimeActive(false);
-      if (wsRef.current) {
-        wsRef.current.send(JSON.stringify({ type: 'unsubscribe' }));
-      }
-    } else {
-      setRealtimeActive(true);
-      if (wsRef.current) {
-        wsRef.current.send(JSON.stringify({
-          type: 'subscribe',
-          filters: filters,
-          updateFrequency: 30000
-        }));
-      }
-    }
-  };
 
   // Toggle auto-refresh
   const toggleAutoRefresh = () => {
@@ -271,15 +148,6 @@ const ReportAnalytics = () => {
   // Apply filters and reload data
   const applyFilters = () => {
     loadAnalytics();
-    
-    // Update WebSocket subscription if connected
-    if (wsRef.current && wsConnected && realtimeActive) {
-      wsRef.current.send(JSON.stringify({
-        type: 'subscribe',
-        filters: filters,
-        updateFrequency: 30000
-      }));
-    }
   };
 
   // Export to CSV
@@ -319,9 +187,9 @@ const ReportAnalytics = () => {
   };
 
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('en-IN', {
       style: 'currency',
-      currency: 'USD'
+      currency: 'INR'
     }).format(amount || 0);
   };
 
@@ -460,7 +328,7 @@ const ReportAnalytics = () => {
         position: 'right',
         title: {
           display: true,
-          text: 'Spending ($)'
+          text: 'Spending (₹)'
         },
         grid: {
           drawOnChartArea: false,
@@ -502,44 +370,22 @@ const ReportAnalytics = () => {
       <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg p-6 text-white">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">📊 Analytics Dashboard</h1>
+            <h1 className="text-2xl font-bold">📊 Report Analytics Dashboard</h1>
             <p className="text-blue-100 mt-1">
               Comprehensive campaign performance insights and data visualization
             </p>
           </div>
           <div className="flex items-center space-x-2">
-            {/* WebSocket Status */}
-            <div className={`flex items-center space-x-1 px-3 py-1 rounded-full text-sm ${
-              wsConnected ? 'bg-green-500' : 'bg-red-500'
-            } bg-opacity-20`}>
-              {wsConnected ? <Wifi className="h-4 w-4" /> : <WifiOff className="h-4 w-4" />}
-              <span>{wsConnected ? 'Live' : 'Offline'}</span>
-            </div>
-            
-            {/* Real-time Toggle */}
             <button
-              onClick={toggleRealtime}
-              className={`flex items-center space-x-1 px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                realtimeActive 
-                  ? 'bg-red-500 bg-opacity-20 text-red-100' 
-                  : 'bg-green-500 bg-opacity-20 text-green-100'
-              }`}
+              onClick={loadAnalytics}
+              disabled={loading}
+              className="flex items-center space-x-1 px-3 py-1 rounded-full text-sm font-medium transition-colors bg-white bg-opacity-20 hover:bg-opacity-30 disabled:opacity-50"
             >
-              {realtimeActive ? <Square className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-              <span>{realtimeActive ? 'Stop Live' : 'Start Live'}</span>
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              <span>{loading ? 'Loading...' : 'Refresh Data'}</span>
             </button>
           </div>
         </div>
-
-        {/* Real-time Stats */}
-        {(updateCount > 0 || lastUpdate) && (
-          <div className="mt-4 flex items-center space-x-6 text-sm text-blue-100">
-            <div>Updates Received: {updateCount}</div>
-            {lastUpdate && (
-              <div>Last Update: {lastUpdate.toLocaleTimeString()}</div>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Controls */}
@@ -653,7 +499,7 @@ const ReportAnalytics = () => {
                   <p className="text-sm font-medium text-gray-600 uppercase tracking-wide">Total Spent</p>
                   <p className="text-3xl font-bold text-gray-900">{formatCurrency(kpis.totalSpent)}</p>
                 </div>
-                <DollarSign className="h-8 w-8 text-green-500" />
+                <IndianRupee className="h-8 w-8 text-green-500" />
               </div>
             </div>
 
@@ -709,7 +555,7 @@ const ReportAnalytics = () => {
             {/* Spending Distribution */}
             <div className="bg-white rounded-lg shadow p-6">
               <div className="flex items-center mb-4">
-                <DollarSign className="h-5 w-5 text-blue-600 mr-2" />
+                <IndianRupee className="h-5 w-5 text-blue-600 mr-2" />
                 <h3 className="text-lg font-medium text-gray-900">Spending Distribution</h3>
               </div>
               <div className="h-80">

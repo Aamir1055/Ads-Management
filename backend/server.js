@@ -1,6 +1,6 @@
 const app = require('./app');
 const { pool, testConnection } = require('./config/database');
-const AnalyticsWebSocket = require('./websocket/analyticsSocket');
+const ReportAnalyticsWebSocket = require('./websocket/reportAnalyticsSocket');
 require('dotenv').config();
 
 const PORT = process.env.PORT || 5000;
@@ -34,9 +34,9 @@ const startServer = async () => {
 
     // Initialize WebSocket server for real-time analytics
     try {
-      analyticsWS = new AnalyticsWebSocket(server);
+      analyticsWS = new ReportAnalyticsWebSocket(server);
       console.log('🔗 WebSocket analytics server initialized');
-      console.log(`📡 WebSocket URL: ws://localhost:${PORT}/ws/analytics`);
+      console.log(`📡 WebSocket URL: ws://localhost:${PORT}/ws/report-analytics`);
     } catch (error) {
       console.warn('⚠️  Failed to initialize WebSocket server:', error.message);
     }

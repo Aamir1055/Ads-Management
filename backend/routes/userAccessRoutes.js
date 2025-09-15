@@ -80,7 +80,7 @@ router.get('/modules', async (req, res) => {
           { name: 'Campaigns', href: '/campaigns', icon: 'Target', allowed: allowedModules.includes('campaigns') },
           { name: 'Analytics', href: '/analytics', icon: 'BarChart3', allowed: allowedModules.includes('analytics') },
           { name: 'Reports', href: '/reports-table', icon: 'FileText', allowed: allowedModules.includes('reports') },
-          { name: 'Report Analytics', href: '/reports', icon: 'BarChart3', allowed: allowedModules.includes('reports') },
+          { name: 'Report Analytics', href: '/report-analytics', icon: 'BarChart3', allowed: allowedModules.includes('reports') },
           { name: 'Settings', href: '/settings', icon: 'Settings', allowed: allowedModules.includes('settings') }
         ].filter(item => item.allowed) // Only return allowed navigation items
       }

@@ -10,7 +10,7 @@ import {
   XCircle,
   RefreshCw,
   Calendar,
-  DollarSign,
+  IndianRupee,
   CreditCard
 } from 'lucide-react'
 import cardsService from '../services/cardsService'
@@ -332,7 +332,7 @@ const Cards = () => {
                     <div>
                       <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Balance</p>
                       <div className="flex items-center">
-                        <DollarSign className="h-4 w-4 text-green-600 mr-1" />
+                        <IndianRupee className="h-4 w-4 text-green-600 mr-1" />
                         <span className="text-sm font-semibold text-green-600">
                           {Number(card.current_balance || 0).toFixed(2)}
                         </span>
@@ -460,7 +460,7 @@ const Cards = () => {
             <div className="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
               <div className="sm:flex sm:items-start">
                 <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-green-100 sm:mx-0 sm:h-10 sm:w-10">
-                  <DollarSign className="h-6 w-6 text-green-600" />
+                  <IndianRupee className="h-6 w-6 text-green-600" />
                 </div>
                 <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left flex-1">
                   <h3 className="text-lg leading-6 font-medium text-gray-900">Add Balance</h3>
@@ -470,11 +470,11 @@ const Cards = () => {
                     </p>
                     <div className="mt-4">
                       <label htmlFor="balance-amount" className="block text-sm font-medium text-gray-700 mb-2">
-                        Amount ($)
+                        Amount (₹)
                       </label>
                       <div className="relative">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                          <DollarSign className="h-4 w-4 text-gray-400" />
+                          <IndianRupee className="h-4 w-4 text-gray-400" />
                         </div>
                         <input
                           type="number"

@@ -230,10 +230,10 @@ const reportsService = {
    * @returns {string} Formatted currency string
    */
   formatCurrency: (value) => {
-    if (value === null || value === undefined) return '$0.00';
-    return new Intl.NumberFormat('en-US', {
+    if (value === null || value === undefined) return '₹0.00';
+    return new Intl.NumberFormat('en-IN', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'INR',
       minimumFractionDigits: 2
     }).format(value);
   },
@@ -245,7 +245,7 @@ const reportsService = {
    */
   formatNumber: (value) => {
     if (value === null || value === undefined) return '0';
-    return new Intl.NumberFormat('en-US').format(value);
+    return new Intl.NumberFormat('en-IN').format(value);
   },
 
   /**

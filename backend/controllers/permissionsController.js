@@ -1,5 +1,6 @@
 const { pool } = require('../config/database');
 const PermissionManager = require('../utils/PermissionManager');
+const DateFormatUtils = require('../utils/dateFormatUtils');
 
 // Envelope
 const createResponse = (success, message, data = null, meta = null) => {
@@ -513,7 +514,22 @@ const permissionsController = {
         FROM roles 
         ORDER BY level DESC, name ASC
       `);
-      return res.status(200).json(createResponse(true, `Retrieved ${roles.length} roles`, roles));
+      
+      // Clean up role data to ensure proper display and format dates
+      const cleanRoles = roles.map(role => {
+        const originalName = role.name;
+        const trimmedName = role.name ? role.name.trim() : role.name;
+        
+        return {
+          ...role,
+          name: trimmedName,
+          role_name: trimmedName, // Add fallback field
+          created_at: role.created_at ? DateFormatUtils.formatToDDMMYYYYWithTime(role.created_at) : null,
+          updated_at: role.updated_at ? DateFormatUtils.formatToDDMMYYYYWithTime(role.updated_at) : null,
+        };
+      });
+      
+      return res.status(200).json(createResponse(true, `Retrieved ${cleanRoles.length} roles`, cleanRoles));
     } catch (error) {
       console.error('[Permissions] getAllRoles error:', error);
       return res.status(500).json(createResponse(false, 'Failed to get all roles', null, process.env.NODE_ENV === 'development' ? { error: error.message } : null));

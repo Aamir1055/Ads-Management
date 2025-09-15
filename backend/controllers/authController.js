@@ -49,6 +49,34 @@ exports.login = async (req, res, next) => {
 
     // Check if 2FA is enabled
     if (user.is_2fa_enabled) {
+      // Check if user needs to set up 2FA (first login)
+      const needs2FASetup = await User.needs2FASetup(user.id);
+      
+      if (needs2FASetup) {
+        // Generate 2FA setup for first login
+        try {
+          const setupData = await User.generate2FASetup(user.id);
+          return res.status(200).json(
+            createResponse(true, 'Password verified. Please set up 2FA by scanning the QR code.', {
+              user: {
+                id: user.id,
+                username: user.username,
+                is_2fa_enabled: true,
+                role_id: user.role_id
+              },
+              requires_2fa_setup: true,
+              qr_code: setupData.qrCode,
+              next_step: 'Scan the QR code with your authenticator app and enter the 6-digit code to complete setup'
+            })
+          );
+        } catch (setupError) {
+          console.error('2FA setup generation error:', setupError);
+          return res.status(500).json(
+            createResponse(false, 'Failed to generate 2FA setup', null, ['Internal server error'])
+          );
+        }
+      }
+      
       // Return partial success - user needs to provide 2FA token
       return res.status(200).json(
         createResponse(true, 'Password verified. 2FA token required.', {

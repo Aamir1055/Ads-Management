@@ -10,9 +10,10 @@ import {
   XCircle,
   RefreshCw,
   Calendar,
-  DollarSign
+  IndianRupee
 } from 'lucide-react'
 import campaignDataService from '../services/campaignDataService'
+import { formatDate, formatDateForInput, parseDateFromInput, getCurrentDate, formatDateForAPI, subtractDays } from '../utils/dateUtils'
 
 const CampaignData = () => {
   const [campaignData, setCampaignData] = useState([])
@@ -47,11 +48,11 @@ const CampaignData = () => {
     card_id: ''
   })
 
-  // Get yesterday's date in YYYY-MM-DD format
-  function getYesterday() {
+  // Get yesterday's date in yyyy-mm-dd format for HTML input
+  function getYesterdayForInput() {
     const yesterday = new Date()
     yesterday.setDate(yesterday.getDate() - 1)
-    return yesterday.toISOString().split('T')[0]
+    return yesterday.toISOString().split('T')[0] // Returns yyyy-mm-dd format
   }
 
   // Fetch campaign data
@@ -140,7 +141,7 @@ const CampaignData = () => {
         facebook_result: parseInt(formData.facebook_result) || 0,
         zoho_result: parseInt(formData.zoho_result) || 0,
         spent: parseFloat(formData.spent) || 0,
-        data_date: formData.data_date,
+        data_date: formData.data_date, // HTML date input provides yyyy-mm-dd format which the API expects
         card_id: parseInt(formData.card_id)
       }
       
@@ -214,7 +215,7 @@ const CampaignData = () => {
       facebook_result: item.facebook_result?.toString() || '',
       zoho_result: item.zoho_result?.toString() || '',
       spent: item.spent?.toString() || '',
-      data_date: item.data_date ? item.data_date.split('T')[0] : '',
+      data_date: item.data_date ? formatDateForInput(item.data_date) : '',
       card_id: item.card_id?.toString() || ''
     })
     // Refresh dropdown data when opening the form
@@ -231,7 +232,7 @@ const CampaignData = () => {
       facebook_result: '',
       zoho_result: '',
       spent: '',
-      data_date: '',
+      data_date: getYesterdayForInput(), // Automatically set yesterday's date
       card_id: ''
     })
     // Refresh dropdown data when opening the form
@@ -245,20 +246,19 @@ const CampaignData = () => {
     setShowDeleteConfirm(true)
   }
 
-  // Format date
-  const formatDate = (dateString) => {
+  // Format date for display
+  const formatDateForDisplay = (dateString) => {
     if (!dateString) return '-'
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    })
+    return formatDate(dateString)
   }
 
   // Format currency
   const formatCurrency = (amount) => {
-    if (!amount) return '$0.00'
-    return `$${parseFloat(amount).toFixed(2)}`
+    if (!amount) return '₹0.00'
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR'
+    }).format(parseFloat(amount))
   }
 
   // Get campaign name by ID
@@ -334,7 +334,7 @@ const CampaignData = () => {
         ) : campaignData.length === 0 ? (
           <div className="text-center py-12">
             <div className="text-gray-400 mb-4">
-              <DollarSign className="h-12 w-12 mx-auto" />
+              <IndianRupee className="h-12 w-12 mx-auto" />
             </div>
             <h3 className="text-lg font-medium text-gray-900 mb-2">No campaign data found</h3>
             <p className="text-gray-500 mb-4">Get started by adding your first campaign data entry.</p>
@@ -390,7 +390,7 @@ const CampaignData = () => {
                       <div className="text-sm font-medium text-green-600">{formatCurrency(item.spent)}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-700">{formatDate(item.data_date)}</div>
+                      <div className="text-sm text-gray-700">{formatDateForDisplay(item.data_date)}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-700">{item.card_display_name || item.card_name || getCardName(item.card_id)}</div>
@@ -498,7 +498,7 @@ const CampaignData = () => {
                 {/* Spent */}
                 <div>
                   <label htmlFor="spent" className="block text-sm font-medium text-gray-700">
-                    Spent ($)
+                    Spent (₹)
                   </label>
                   <input
                     type="number"
@@ -525,6 +525,7 @@ const CampaignData = () => {
                     onChange={handleInputChange}
                     required
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm py-2 px-3"
+                    placeholder="dd/mm/yyyy"
                   />
                 </div>
 

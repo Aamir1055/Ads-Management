@@ -75,51 +75,11 @@ class User {
       const saltRounds = 12;
       const hashed_password = await bcrypt.hash(password, saltRounds);
 
-      // Prepare 2FA if enabled
+      // 2FA will be enabled but secret will be generated during first login
       let auth_token = null;
-      let qrCodeUrl = null;
-
-      if (enable_2fa) {
-        // Check if we have a temporary 2FA key to use
-        if (temp_2fa_key) {
-          // Use the temporary 2FA secret from the controller
-          const twoFactorAuthController = require('../controllers/twoFactorAuthController');
-          const tempSecrets = twoFactorAuthController.getTemporarySecrets();
-          const tempData = tempSecrets.get(temp_2fa_key);
-          
-          if (tempData && tempData.username === username) {
-            auth_token = tempData.secret;
-            // Generate QR code for display purposes (if needed)
-            const secret = {
-              name: `AdsReporting - ${username}`,
-              issuer: 'Ads Reporting System',
-              base32: auth_token
-            };
-            const otpauthUrl = speakeasy.otpauthURL({
-              secret: auth_token,
-              label: `AdsReporting - ${username}`,
-              issuer: 'Ads Reporting System',
-              encoding: 'base32'
-            });
-            qrCodeUrl = await qrcode.toDataURL(otpauthUrl);
-            
-            // Clean up the temporary secret
-            twoFactorAuthController.removeTemporarySecret(temp_2fa_key);
-          } else {
-            throw new Error('Invalid or expired temporary 2FA key');
-          }
-        } else {
-          // Generate new 2FA secret
-          const secret = speakeasy.generateSecret({
-            name: `AdsReporting - ${username}`,
-            issuer: 'Ads Reporting System',
-            length: 20
-          });
-          
-          auth_token = secret.base32;
-          qrCodeUrl = await qrcode.toDataURL(secret.otpauth_url);
-        }
-      }
+      
+      // Do not generate 2FA secret during user creation
+      // It will be generated during the user's first login attempt
 
       // Insert user
       const [result] = await connection.query(
@@ -153,9 +113,7 @@ class User {
       const user = await User.findById(userId);
       
       return {
-        user,
-        qrCode: qrCodeUrl,
-        secret: enable_2fa ? auth_token : null
+        user
       };
 
     } catch (error) {
@@ -543,6 +501,67 @@ class User {
     } finally {
       connection.release();
     }
+  }
+
+  /**
+   * Generate 2FA secret for first-time setup during login
+   */
+  static async generate2FASetup(id) {
+    const connection = await pool.getConnection();
+    
+    try {
+      const user = await User.findById(id);
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      if (!user.is_2fa_enabled) {
+        throw new Error('2FA is not enabled for this user');
+      }
+
+      if (user.auth_token) {
+        throw new Error('2FA is already set up for this user');
+      }
+
+      // Generate new 2FA secret
+      const secret = speakeasy.generateSecret({
+        name: `AdsReporting - ${user.username}`,
+        issuer: 'Ads Reporting System',
+        length: 20
+      });
+
+      const qrCodeUrl = await qrcode.toDataURL(secret.otpauth_url);
+
+      await connection.beginTransaction();
+
+      // Store the secret in the database
+      await connection.query(
+        'UPDATE users SET auth_token = ?, updated_at = NOW() WHERE id = ?',
+        [secret.base32, id]
+      );
+
+      await connection.commit();
+
+      return {
+        qrCode: qrCodeUrl,
+        secret: secret.base32,
+        message: '2FA setup generated successfully'
+      };
+
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  /**
+   * Check if user needs 2FA setup (has 2FA enabled but no secret)
+   */
+  static async needs2FASetup(id) {
+    const user = await User.findByIdWithSecret(id);
+    return user && user.is_2fa_enabled && !user.auth_token;
   }
 
   /**

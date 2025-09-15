@@ -63,24 +63,81 @@ const Layout = ({ children }) => {
     Settings
   }
 
+  // Sort navigation items in the specified sidebar order
+  const sortNavigationItems = (items) => {
+    const sidebarOrder = [
+      'Dashboard',
+      'User Management', 
+      'Role Management',
+      'Campaign Type',
+      'Campaign',
+      'Campaign Data',
+      'Cards',
+      'Cards Users',
+      'Report',
+      'Report Analytics'
+    ];
+    
+    // Map backend names to our expected names
+    const nameMapping = {
+      'Campaign Types': 'Campaign Type',
+      'Campaigns': 'Campaign',
+      'Card Users': 'Cards Users',
+      'Reports': 'Report',
+      'Report Analytics': 'Report Analytics'
+    };
+    
+    const getOrderIndex = (name) => {
+      // Try direct match first
+      let index = sidebarOrder.indexOf(name);
+      if (index !== -1) return index;
+      
+      // Try mapped name
+      const mappedName = nameMapping[name];
+      if (mappedName) {
+        index = sidebarOrder.indexOf(mappedName);
+        if (index !== -1) return index;
+      }
+      
+      return -1;
+    };
+    
+    return items.sort((a, b) => {
+      const aIndex = getOrderIndex(a.name);
+      const bIndex = getOrderIndex(b.name);
+      
+      // If both items are in the order list, sort by their index
+      if (aIndex !== -1 && bIndex !== -1) {
+        return aIndex - bIndex;
+      }
+      
+      // If only one item is in the order list, it comes first
+      if (aIndex !== -1) return -1;
+      if (bIndex !== -1) return 1;
+      
+      // If neither is in the order list, sort alphabetically
+      return (a.name || '').localeCompare(b.name || '');
+    });
+  };
+
   // Use navigation from backend if available, otherwise show all (fallback)
-  const navigation = userAccess?.navigation?.map(item => ({
+  const baseNavigation = userAccess?.navigation?.map(item => ({
     ...item,
     icon: iconMap[item.icon] || Home // Map string to actual component
   })) || [
     { name: 'Dashboard', href: '/dashboard', icon: Home },
     { name: 'User Management', href: '/user-management', icon: Users },
     { name: 'Role Management', href: '/role-management', icon: Key },
-    { name: 'Campaign Types', href: '/campaign-types', icon: Tags },
+    { name: 'Campaign Type', href: '/campaign-types', icon: Tags },
+    { name: 'Campaign', href: '/campaigns', icon: Target },
     { name: 'Campaign Data', href: '/campaign-data', icon: Database },
     { name: 'Cards', href: '/cards', icon: CreditCard },
-    { name: 'Card Users', href: '/card-users', icon: UserCheck },
-    { name: 'Campaigns', href: '/campaigns', icon: Target },
-    { name: 'Analytics', href: '/analytics', icon: BarChart3 },
-    { name: 'Reports', href: '/reports-table', icon: FileText },
-    { name: 'Report Analytics', href: '/reports', icon: BarChart3 },
-    { name: 'Settings', href: '/settings', icon: Settings },
+    { name: 'Cards Users', href: '/card-users', icon: UserCheck },
+    { name: 'Report', href: '/reports-table', icon: FileText },
+    { name: 'Report Analytics', href: '/report-analytics', icon: BarChart3 },
   ]
+  
+  const navigation = sortNavigationItems(baseNavigation)
 
   const isActive = (href) => location.pathname === href
 

@@ -222,7 +222,7 @@ const CardForm = ({ isOpen, onClose, onSubmit, editData = null, isLoading = fals
               Current Balance <span className="text-red-500">*</span>
             </label>
             <div className="relative">
-              <span className="absolute left-3 top-2 text-gray-500">$</span>
+              <span className="absolute left-3 top-2 text-gray-500">₹</span>
               <input
                 type="text"
                 id="current_balance"

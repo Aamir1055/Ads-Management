@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Role Display Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; }
+        .result { background: #f5f5f5; padding: 10px; margin: 10px 0; }
+        .success { color: green; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <h1>Role Display Test</h1>
+    <p>This test simulates how role names are processed and displayed in your frontend application.</p>
+
+    <div class="test-section">
+        <h2>Test 1: Basic Role Display</h2>
+        <p>Testing how role names are displayed in various scenarios:</p>
+        <div id="test1-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 2: API Response Simulation</h2>
+        <p>Simulating the actual API response structure:</p>
+        <div id="test2-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 3: Frontend Processing Test</h2>
+        <p>Testing the actual frontend role display logic:</p>
+        <div id="test3-results"></div>
+    </div>
+
+    <script>
+        // Test data simulating actual API responses
+        const testRoles = [
+            {
+                id: 12,
+                name: "Super Admin",
+                description: "Full system access with all permissions",
+                level: 10,
+                is_active: 1,
+                is_system_role: 1,
+                role_name: "Super Admin"
+            },
+            {
+                id: 13,
+                name: "Test Manager",
+                description: "Test description",
+                level: 1,
+                is_active: 1,
+                is_system_role: 0,
+                role_name: "Test Manager"
+            }
+        ];
+
+        function runTest1() {
+            const results = document.getElementById('test1-results');
+            let html = '<h3>Basic Display Tests:</h3>';
+            
+            testRoles.forEach(role => {
+                // Simulate the display logic from RoleManagementInterface.jsx
+                const displayName = role.name || role.role_name || role.display_name || 'Unknown Role';
+                
+                html += `<div class="result">`;
+                html += `<strong>Role ID ${role.id}:</strong><br>`;
+                html += `Raw name: "${role.name}"<br>`;
+                html += `Display name: "${displayName}"<br>`;
+                html += `Length: ${displayName.length}<br>`;
+                
+                if (displayName.includes('()')) {
+                    html += `<span class="error">❌ ERROR: Contains "()"</span><br>`;
+                } else {
+                    html += `<span class="success">✅ Clean display name</span><br>`;
+                }
+                html += `</div>`;
+            });
+            
+            results.innerHTML = html;
+        }
+
+        function runTest2() {
+            const results = document.getElementById('test2-results');
+            let html = '<h3>API Response Processing:</h3>';
+            
+            // Simulate the API response processing from getAllRoles
+            const processedRoles = testRoles.map(role => ({
+                ...role,
+                name: role.name ? role.name.trim() : role.name,
+                role_name: role.name ? role.name.trim() : role.name,
+            }));
+            
+            processedRoles.forEach(role => {
+                html += `<div class="result">`;
+                html += `<strong>Processed Role ID ${role.id}:</strong><br>`;
+                html += `name: "${role.name}"<br>`;
+                html += `role_name: "${role.role_name}"<br>`;
+                
+                const hasIssue = role.name.includes('()') || role.role_name.includes('()');
+                if (hasIssue) {
+                    html += `<span class="error">❌ ERROR: Contains "()"</span><br>`;
+                } else {
+                    html += `<span class="success">✅ Clean processed data</span><br>`;
+                }
+                html += `</div>`;
+            });
+            
+            results.innerHTML = html;
+        }
+
+        function runTest3() {
+            const results = document.getElementById('test3-results');
+            let html = '<h3>Frontend Logic Test:</h3>';
+            
+            // Create a test role with potential edge cases
+            const edgeCaseRoles = [
+                ...testRoles,
+                { id: 99, name: "", role_name: "Empty Name Test", description: "Test" },
+                { id: 100, name: "  Trimmed  ", role_name: "  Trimmed  ", description: "Test" },
+                { id: 101, name: null, role_name: null, display_name: "Display Name Test", description: "Test" }
+            ];
+            
+            edgeCaseRoles.forEach(role => {
+                // This is the exact logic from your RoleManagementInterface.jsx
+                const displayName = role.name || role.role_name || role.display_name || 'Unknown Role';
+                
+                html += `<div class="result">`;
+                html += `<strong>Edge Case ID ${role.id}:</strong><br>`;
+                html += `name: ${JSON.stringify(role.name)}<br>`;
+                html += `role_name: ${JSON.stringify(role.role_name)}<br>`;
+                html += `display_name: ${JSON.stringify(role.display_name)}<br>`;
+                html += `Final display: "${displayName}"<br>`;
+                
+                if (displayName.includes('()')) {
+                    html += `<span class="error">❌ ERROR: Contains "()"</span><br>`;
+                } else {
+                    html += `<span class="success">✅ Clean display</span><br>`;
+                }
+                html += `</div>`;
+            });
+            
+            results.innerHTML = html;
+        }
+
+        // Function to test role creation (simulated)
+        function testRoleCreation() {
+            console.log('🧪 Testing Role Creation Process');
+            
+            const newRoleName = 'Test New Role';
+            const newRoleDescription = 'Test Description';
+            
+            // Simulate the role creation data that would be sent to API
+            const roleData = {
+                name: newRoleName,
+                description: newRoleDescription
+            };
+            
+            console.log('Role data to be sent:', roleData);
+            
+            // Simulate the response that would come back
+            const mockResponse = {
+                success: true,
+                message: 'Role created',
+                data: {
+                    id: 999,
+                    name: roleData.name,
+                    description: roleData.description,
+                    level: 1,
+                    is_active: 1,
+                    is_system_role: 0,
+                    role_name: roleData.name
+                }
+            };
+            
+            console.log('Simulated API response:', mockResponse);
+            
+            // Test how it would be displayed
+            const displayName = mockResponse.data.name || mockResponse.data.role_name || 'Unknown Role';
+            console.log('Display name would be:', JSON.stringify(displayName));
+            
+            if (displayName.includes('()')) {
+                console.error('❌ ERROR: Display name contains "()"');
+                return false;
+            } else {
+                console.log('✅ Display name is clean');
+                return true;
+            }
+        }
+
+        // Run all tests
+        function runAllTests() {
+            console.log('Running Role Display Tests...');
+            runTest1();
+            runTest2();
+            runTest3();
+            
+            const creationResult = testRoleCreation();
+            
+            console.log('Tests completed. Check the page and console for results.');
+        }
+
+        // Run tests when page loads
+        document.addEventListener('DOMContentLoaded', runAllTests);
+    </script>
+</body>
+</html>

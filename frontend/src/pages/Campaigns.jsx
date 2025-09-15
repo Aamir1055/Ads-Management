@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Plus, Edit2, Trash2, Eye, Search, Filter, MoreVertical, AlertTriangle, X } from 'lucide-react'
 import CampaignForm from '../components/campaigns/CampaignForm'
 import campaignService from '../services/campaignService'
+import { formatDate, formatDateTime } from '../utils/dateUtils'
 
 const Campaigns = () => {
   const [campaigns, setCampaigns] = useState([])
@@ -379,7 +380,7 @@ const Campaigns = () => {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-500">
-                        {new Date(campaign.created_at).toLocaleDateString()}
+                        {formatDate(campaign.created_at)}
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end space-x-2">
@@ -527,7 +528,7 @@ const Campaigns = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-500">Created</label>
-                <p className="mt-1 text-sm text-gray-900">{new Date(viewingCampaign.created_at).toLocaleString()}</p>
+                <p className="mt-1 text-sm text-gray-900">{formatDateTime(viewingCampaign.created_at)}</p>
               </div>
             </div>
           </div>

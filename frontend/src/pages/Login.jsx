@@ -13,7 +13,9 @@ const Login = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [requires2FA, setRequires2FA] = useState(false)
-  const [currentStep, setCurrentStep] = useState('credentials') // 'credentials' or '2fa'
+  const [requires2FASetup, setRequires2FASetup] = useState(false)
+  const [qrCode, setQrCode] = useState('')
+  const [currentStep, setCurrentStep] = useState('credentials') // 'credentials', '2fa', or '2fa_setup'
   const [userId, setUserId] = useState(null) // Store user_id for 2FA step
   const navigate = useNavigate()
 
@@ -78,8 +80,15 @@ const Login = () => {
           console.log('API response data:', data)
 
           if (data.success) {
-            // Check if user requires 2FA
-            if (data.data.requires_2fa) {
+            // Check if user requires 2FA setup (first login)
+            if (data.data.requires_2fa_setup) {
+              setRequires2FASetup(true)
+              setUserId(data.data.user.id)
+              setQrCode(data.data.qr_code)
+              setCurrentStep('2fa_setup')
+              console.log('2FA setup required for user:', data.data.user.username)
+            } else if (data.data.requires_2fa) {
+              // User needs to provide 2FA token
               setRequires2FA(true)
               setUserId(data.data.user.id) // Store user_id for 2FA step
               setCurrentStep('2fa')
@@ -194,6 +203,46 @@ const Login = () => {
             setFormData({ ...formData, twofa_code: '' })
           }
         }
+      } else if (currentStep === '2fa_setup') {
+        // Third step - complete 2FA setup with initial verification
+        try {
+          console.log('Completing 2FA setup with user ID:', userId, 'token:', formData.twofa_code)
+          
+          const response = await fetch('http://localhost:5000/api/auth/login-2fa', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              user_id: userId,
+              token: formData.twofa_code
+            })
+          })
+          
+          const data = await response.json()
+          console.log('2FA setup completion API response:', data)
+
+          if (data.success) {
+            const { access_token, user } = data.data
+            
+            // Store tokens with consistent keys
+            localStorage.setItem('access_token', access_token)
+            localStorage.setItem('authToken', access_token)
+            localStorage.setItem('user', JSON.stringify(user))
+            
+            console.log('2FA setup completed successfully, navigating to dashboard')
+            navigate('/dashboard')
+          } else {
+            const errorMsg = data.message || 'Invalid 2FA code. Please try again.'
+            console.error('2FA setup failed:', errorMsg)
+            setError(errorMsg)
+            setFormData({ ...formData, twofa_code: '' })
+          }
+        } catch (apiError) {
+          console.error('2FA setup API error:', apiError)
+          setError('Failed to complete 2FA setup. Please try again.')
+          setFormData({ ...formData, twofa_code: '' })
+        }
       }
     } catch (error) {
       console.error('Login error:', error)
@@ -212,6 +261,8 @@ const Login = () => {
   const handleBackToCredentials = () => {
     setCurrentStep('credentials')
     setRequires2FA(false)
+    setRequires2FASetup(false)
+    setQrCode('')
     setUserId(null) // Clear stored user_id
     setFormData({ ...formData, twofa_code: '' })
     setError('')
@@ -230,7 +281,9 @@ const Login = () => {
           </h2>
           <p className="mt-2 text-sm text-purple-100">
             {currentStep === 'credentials' 
-              ? 'Sign in to your Ads Reporter account' 
+              ? 'Sign in to your Ads Reporter account'
+              : currentStep === '2fa_setup'
+              ? 'Set up two-factor authentication'
               : 'Enter your 2FA code to complete login'
             }
           </p>
@@ -294,8 +347,67 @@ const Login = () => {
                   </div>
                 </div>
               </>
+            ) : currentStep === '2fa_setup' ? (
+              /* 2FA Setup Step */
+              <div>
+                <div className="text-center mb-6">
+                  <div className="mx-auto h-12 w-12 bg-blue-100 rounded-full flex items-center justify-center mb-3">
+                    <Shield className="h-8 w-8 text-blue-600" />
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Set up Two-Factor Authentication</h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)
+                  </p>
+                  
+                  {/* QR Code Display */}
+                  <div className="bg-white p-4 rounded-lg border-2 border-gray-200 inline-block mb-4">
+                    {qrCode ? (
+                      <img 
+                        src={qrCode} 
+                        alt="2FA QR Code" 
+                        className="w-40 h-40 mx-auto"
+                      />
+                    ) : (
+                      <div className="w-40 h-40 bg-gray-100 flex items-center justify-center">
+                        <span className="text-gray-500 text-sm">Loading QR Code...</span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <p className="text-sm text-gray-600 mb-4">
+                    After scanning, enter the 6-digit code from your app to complete setup
+                  </p>
+                </div>
+                
+                <label htmlFor="twofa_code" className="block text-sm font-medium text-gray-700 mb-1">
+                  Verification Code
+                </label>
+                <input
+                  id="twofa_code"
+                  name="twofa_code"
+                  type="text"
+                  required
+                  maxLength="6"
+                  value={formData.twofa_code}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, '').substring(0, 6)
+                    setFormData({ ...formData, twofa_code: value })
+                    setError('')
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-center text-lg tracking-widest"
+                  placeholder="000000"
+                />
+                
+                <button
+                  type="button"
+                  onClick={handleBackToCredentials}
+                  className="mt-3 text-sm text-purple-600 hover:text-purple-800"
+                >
+                  ← Back to login
+                </button>
+              </div>
             ) : (
-              /* 2FA Step */
+              /* Regular 2FA Step */
               <div>
                 <div className="text-center mb-4">
                   <div className="mx-auto h-12 w-12 bg-green-100 rounded-full flex items-center justify-center mb-2">
@@ -347,7 +459,11 @@ const Login = () => {
                   Signing in...
                 </div>
               ) : (
-                currentStep === 'credentials' ? 'Sign In' : 'Verify & Continue'
+                currentStep === 'credentials' 
+                  ? 'Sign In' 
+                  : currentStep === '2fa_setup'
+                  ? 'Complete Setup'
+                  : 'Verify & Continue'
               )}
             </button>
           </form>

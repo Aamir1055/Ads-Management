@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import cardUsersService from '../services/cardUsersService'
 import CardUsersForm from '../components/CardUsersForm'
+import { formatDate } from '../utils/dateUtils'
 
 const CardUsers = () => {
   const [assignments, setAssignments] = useState([])
@@ -329,7 +330,7 @@ const CardUsers = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {assignment.assigned_date ? 
-                        new Date(assignment.assigned_date).toLocaleDateString() : 'N/A'
+                        formatDate(assignment.assigned_date) : 'N/A'
                       }
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

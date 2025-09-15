@@ -1,0 +1,37 @@
+/* Role name display cleanup - prevents rendering artifacts */
+.role-name-display {
+  font-variant-numeric: normal;
+  font-feature-settings: normal;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: normal;
+  word-spacing: normal;
+}
+
+/* Ensure consistent font rendering */
+.role-name-display::after {
+  content: "";
+}
+
+.role-name-display::before {
+  content: "";
+}
+
+/* Prevent any unwanted character appending */
+.role-name-display {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Additional safety for webkit browsers */
+.role-name-display {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+.role-name-display {
+  user-select: text; /* Re-enable text selection for actual content */
+}
