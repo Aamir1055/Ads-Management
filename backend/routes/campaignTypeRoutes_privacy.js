@@ -7,31 +7,28 @@ const { authenticateToken } = require('../middleware/authMiddleware');
 // Data privacy middleware
 const { 
   dataPrivacyMiddleware, 
-  campaignDataPrivacy, 
   ensureOwnership,
   validateOwnership 
 } = require('../middleware/dataPrivacy');
 
-// Controllers (privacy-enabled - now the main controller with all functions)
+// Controller (we'll create privacy-enabled version)
 const {
-  createCampaignData,
-  getAllCampaignData,
-  getCampaignDataById,
-  updateCampaignData,
-  deleteCampaignData,
-  getCampaignsForDropdown,
-  getCardsForDropdown
-} = require('../controllers/campaignDataController');
+  createCampaignType,
+  getAllCampaignTypes,
+  getCampaignTypeById,
+  updateCampaignType,
+  deleteCampaignType
+} = require('../controllers/campaignTypeController_privacy');
 
-// Validation
+// Validation middleware
 const {
   validators: {
-    validateCreateCampaignData,
-    validateUpdateCampaignData,
+    validateCreateCampaignType,
+    validateUpdateCampaignType,
     validateIdParam,
     validateQueryParams
   }
-} = require('../utils/campaignDataValidation');
+} = require('../utils/campaignTypeValidation');
 
 // =============================================================================
 // MIDDLEWARE
@@ -41,12 +38,13 @@ const {
 const requestLogger = (req, res, next) => {
   const ts = new Date().toISOString();
   const userInfo = req.user ? `User: ${req.user.username} (ID: ${req.user.id})` : 'Unauthenticated';
-  console.log(`[${ts}] ${req.method} ${req.originalUrl} - Campaign Data API - ${userInfo}`);
+  console.log(`[${ts}] ${req.method} ${req.originalUrl} - Campaign Types API - ${userInfo}`);
   next();
 };
+
 router.use(requestLogger);
 
-// Basic in-memory rate limiter
+// Rate limiter
 const createRateLimit = (windowMs = 15 * 60 * 1000, max = 100) => {
   const requests = new Map();
 
@@ -56,6 +54,7 @@ const createRateLimit = (windowMs = 15 * 60 * 1000, max = 100) => {
       if (now > val.resetTime) requests.delete(key);
     }
   };
+
   const interval = setInterval(cleanup, Math.min(windowMs, 5 * 60 * 1000));
   interval.unref?.();
 
@@ -94,126 +93,79 @@ const createRateLimit = (windowMs = 15 * 60 * 1000, max = 100) => {
 // Rate limiter instances
 const listLimiter = createRateLimit(5 * 60 * 1000, 100);
 const getOneLimiter = createRateLimit(5 * 60 * 1000, 200);
-const createLimiter = createRateLimit(15 * 60 * 1000, 30);
-const updateLimiter = createRateLimit(15 * 60 * 1000, 50);
-const deleteLimiter = createRateLimit(60 * 60 * 1000, 10);
-const helperLimiter = createRateLimit(5 * 60 * 1000, 200);
-
-// =============================================================================
-// PUBLIC HELPER ROUTES (no authentication needed for dropdowns)
-// =============================================================================
-
-// Returns active campaigns for dropdowns (helper routes before auth)
-router.get('/campaigns', helperLimiter, getCampaignsForDropdown);
-
-// Returns active cards for dropdowns  
-router.get('/cards', helperLimiter, getCardsForDropdown);
+const createLimiter = createRateLimit(15 * 60 * 1000, 10);
+const updateLimiter = createRateLimit(15 * 60 * 1000, 20);
+const deleteLimiter = createRateLimit(60 * 60 * 1000, 5);
 
 // =============================================================================
 // AUTHENTICATION REQUIRED FOR ALL DATA OPERATIONS
 // =============================================================================
 
-// Apply authentication to all routes below this point
+// Apply authentication to all routes
 router.use(authenticateToken);
 
 // Apply data privacy middleware
 router.use(dataPrivacyMiddleware);
-router.use(campaignDataPrivacy);
 
 // =============================================================================
 // DATA PRIVACY ENABLED ROUTES
 // =============================================================================
 
 /**
- * GET /api/campaign-data
- * Lists campaign data with user-based filtering
- * - Admins see all data
- * - Regular users see only their own data
+ * GET /api/campaign-types
+ * Lists campaign types with user-based filtering
+ * - Admins see all campaign types
+ * - Regular users see only their own campaign types
  */
 router.get('/', 
   listLimiter, 
   validateQueryParams, 
-  getAllCampaignData
+  getAllCampaignTypes
 );
 
 /**
- * GET /api/campaign-data/:id
- * Gets single campaign data with ownership validation
+ * GET /api/campaign-types/:id
+ * Gets single campaign type with ownership validation
  */
 router.get('/:id', 
   getOneLimiter, 
   validateIdParam, 
-  getCampaignDataById
+  getCampaignTypeById
 );
 
 /**
- * POST /api/campaign-data
- * Creates campaign data with automatic user ownership
- * - Automatically sets created_by to current user
+ * POST /api/campaign-types
+ * Creates campaign type with automatic user ownership
  */
 router.post('/', 
   createLimiter, 
   ensureOwnership, // Automatically adds created_by
-  validateCreateCampaignData, 
-  createCampaignData
+  validateCreateCampaignType, 
+  createCampaignType
 );
 
 /**
- * PUT /api/campaign-data/:id
- * Updates campaign data with ownership validation
- * - Users can only update their own data
- * - Admins can update any data
+ * PUT /api/campaign-types/:id
+ * Updates campaign type with ownership validation
  */
 router.put('/:id', 
   updateLimiter, 
   validateIdParam, 
-  validateUpdateCampaignData, 
-  validateOwnership('campaign_data', 'created_by', 'id'), // Validates ownership before update
-  updateCampaignData
+  validateUpdateCampaignType,
+  validateOwnership('campaign_types', 'created_by', 'id'), 
+  updateCampaignType
 );
 
 /**
- * DELETE /api/campaign-data/:id
- * Deletes campaign data with ownership validation
- * - Users can only delete their own data
- * - Admins can delete any data
+ * DELETE /api/campaign-types/:id
+ * Deletes campaign type with ownership validation
  */
 router.delete('/:id', 
   deleteLimiter, 
   validateIdParam, 
-  validateOwnership('campaign_data', 'created_by', 'id'), // Validates ownership before delete
-  deleteCampaignData
+  validateOwnership('campaign_types', 'created_by', 'id'), 
+  deleteCampaignType
 );
-
-// =============================================================================
-// DATA PRIVACY INFO ENDPOINT
-// =============================================================================
-
-/**
- * GET /api/campaign-data/privacy/info
- * Returns information about current user's data privacy context
- */
-router.get('/privacy/info', (req, res) => {
-  const userContext = {
-    userId: req.user?.id,
-    username: req.user?.username,
-    isAdmin: req.userContext?.isAdmin || false,
-    canSeeAllData: req.userContext?.isAdmin || false,
-    dataFiltering: {
-      enabled: !req.userContext?.isAdmin,
-      filterBy: 'created_by',
-      description: req.userContext?.isAdmin 
-        ? 'Admin user - can see all campaign data'
-        : 'Regular user - can only see own created data'
-    }
-  };
-
-  res.json({
-    success: true,
-    message: 'Data privacy context retrieved',
-    data: userContext
-  });
-});
 
 // =============================================================================
 // ERROR HANDLING
@@ -225,38 +177,34 @@ router.use((req, res) => {
     success: false,
     message: `Route ${req.method} ${req.originalUrl} not found`,
     availableRoutes: {
-      'GET /campaign-data': 'Get all campaign data (filtered by user)',
-      'POST /campaign-data': 'Create new campaign data entry (auto-assigned to user)',
-      'GET /campaign-data/:id': 'Get campaign data by ID (ownership validated)',
-      'PUT /campaign-data/:id': 'Update campaign data (ownership validated)',
-      'DELETE /campaign-data/:id': 'Delete campaign data (ownership validated)',
-      'GET /campaign-data/campaigns': 'Get campaigns for dropdown (public)',
-      'GET /campaign-data/cards': 'Get cards for dropdown (public)',
-      'GET /campaign-data/privacy/info': 'Get user privacy context'
+      'GET /campaign-types': 'Get all campaign types (filtered by user)',
+      'POST /campaign-types': 'Create new campaign type (auto-assigned to user)',
+      'GET /campaign-types/:id': 'Get campaign type by ID (ownership validated)',
+      'PUT /campaign-types/:id': 'Update campaign type (ownership validated)',
+      'DELETE /campaign-types/:id': 'Delete campaign type (ownership validated)'
     }
   });
 });
 
-// Final error handler
+// Error handler
 router.use((error, req, res, next) => {
   const ts = new Date().toISOString();
   const userInfo = req.user ? `User: ${req.user.username} (ID: ${req.user.id})` : 'Unknown user';
   
-  console.error(`[${ts}] Campaign Data routes error for ${userInfo}:`, {
+  console.error(`[${ts}] Campaign Types routes error for ${userInfo}:`, {
     error: error.message,
     stack: error.stack,
     url: req.originalUrl,
     method: req.method
   });
 
-  // Don't expose sensitive error details in production
   const isDevelopment = process.env.NODE_ENV === 'development';
   
   res.status(error.statusCode || 500).json({
     success: false,
     message: isDevelopment 
       ? error.message 
-      : 'Internal server error in campaign data management',
+      : 'Internal server error in campaign types management',
     timestamp: ts,
     ...(isDevelopment && { 
       error: error.message, 

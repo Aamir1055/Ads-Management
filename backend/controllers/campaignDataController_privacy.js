@@ -594,85 +594,10 @@ const deleteCampaignData = async (req, res) => {
   }
 };
 
-// =============================================================================
-// HELPER ENDPOINTS (no privacy filtering needed for dropdowns)
-// =============================================================================
-
-const getCampaignsForDropdown = async (req, res) => {
-  try {
-    console.log('[CampaignDataController] Fetching campaigns for dropdown');
-
-    // Since campaigns is the master for Campaign Data now, expose it
-    const [campaigns] = await pool.execute(
-      `
-      SELECT id, name
-      FROM campaigns
-      WHERE is_enabled = 1
-      ORDER BY name
-      `
-    );
-
-    return res.status(200).json(createResponse(true, 'Campaigns retrieved successfully', campaigns || []));
-  } catch (error) {
-    const { statusCode, response } = handleDatabaseError(error, 'campaigns retrieval');
-    return res.status(statusCode).json(response);
-  }
-};
-
-const getCardsForDropdown = async (req, res) => {
-  try {
-    console.log('[CampaignDataController] Fetching cards for dropdown');
-    
-    // Check if user is authenticated for privacy filtering
-    const userId = req.user?.id;
-    const userIsAdmin = isAdmin(req.user);
-    
-    let query;
-    let queryParams;
-    
-    if (!userId) {
-      // If no authentication, return empty array
-      console.log('[CampaignDataController] No authenticated user - returning empty cards list');
-      return res.status(200).json(createResponse(true, 'Cards retrieved successfully', []));
-    }
-    
-    if (userIsAdmin) {
-      // Admins can see all active cards
-      query = `
-        SELECT id, card_name
-        FROM cards
-        WHERE is_active = 1
-        ORDER BY card_name
-      `;
-      queryParams = [];
-    } else {
-      // Regular users can only see cards they created
-      query = `
-        SELECT id, card_name
-        FROM cards
-        WHERE is_active = 1 AND created_by = ?
-        ORDER BY card_name
-      `;
-      queryParams = [userId];
-    }
-    
-    const [cards] = await pool.execute(query, queryParams);
-    
-    console.log(`[CampaignDataController] Retrieved ${cards.length} cards for user ${userId} (${userIsAdmin ? 'admin' : 'regular user'})`);
-    
-    return res.status(200).json(createResponse(true, 'Cards retrieved successfully', cards || []));
-  } catch (error) {
-    const { statusCode, response } = handleDatabaseError(error, 'cards retrieval');
-    return res.status(statusCode).json(response);
-  }
-};
-
 module.exports = {
   createCampaignData,
   getAllCampaignData,
   getCampaignDataById,
   updateCampaignData,
-  deleteCampaignData,
-  getCampaignsForDropdown,
-  getCardsForDropdown
+  deleteCampaignData
 };

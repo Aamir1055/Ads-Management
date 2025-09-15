@@ -1,5 +1,4 @@
 const { pool } = require('../config/database');
-const { isAdmin } = require('../middleware/dataPrivacy');
 
 // =============================================================================
 // HELPERS
@@ -83,29 +82,7 @@ const mapDatabaseToFrontend = (data) => {
   return mapped;
 };
 
-// Add user-based filtering to WHERE clause
-const addUserFilter = (whereClause, queryParams, userId, userIsAdmin) => {
-  if (userIsAdmin) {
-    // Admins see all data
-    return { whereClause, queryParams };
-  }
-
-  // Add user filtering for regular users
-  const userFilter = 'cd.created_by = ?';
-  
-  if (whereClause && whereClause.includes('WHERE')) {
-    // Already has WHERE clause, add AND condition
-    whereClause += ` AND ${userFilter}`;
-  } else {
-    // No WHERE clause, add one
-    whereClause = `WHERE ${userFilter}`;
-  }
-  
-  queryParams.push(userId);
-  return { whereClause, queryParams };
-};
-
-const buildSearchConditions = (filters, userId, userIsAdmin) => {
+const buildSearchConditions = (filters) => {
   const whereConditions = [];
   const queryParams = [];
 
@@ -145,43 +122,26 @@ const buildSearchConditions = (filters, userId, userIsAdmin) => {
     queryParams.push(term, term);
   }
 
-  // Add user-based filtering for non-admin users
-  if (!userIsAdmin && userId) {
-    whereConditions.push('cd.created_by = ?');
-    queryParams.push(userId);
-  }
-
   const whereClause = whereConditions.length ? `WHERE ${whereConditions.join(' AND ')}` : '';
   return { whereClause, queryParams };
 };
 
 // =============================================================================
-// CRUD WITH DATA PRIVACY
+// CRUD
 // =============================================================================
 
 /**
  * POST /api/campaign-data
- * Creates campaign data with automatic user ownership
+ * campaign_id here means campaigns.id (master)
  */
 const createCampaignData = async (req, res) => {
   const connection = await pool.getConnection();
   try {
     console.log('[CampaignDataController] Creating new campaign data:', req.body);
-    console.log('[CampaignDataController] User context:', {
-      userId: req.user?.id,
-      username: req.user?.username,
-      isAdmin: isAdmin(req.user)
-    });
 
     await connection.beginTransaction();
 
-    // Automatically set created_by from token
-    const userId = req.user?.id;
-    if (!userId) {
-      await connection.rollback();
-      return res.status(401).json(createResponse(false, 'User authentication required'));
-    }
-
+    const userId = req.user?.id || null;
     const {
       campaign_id,
       facebook_result = 0,
@@ -189,11 +149,15 @@ const createCampaignData = async (req, res) => {
       spent = 0.00,
       data_date,
       card_id = null,
-      card_name = ''
+      card_name = '',
+      created_by = userId
     } = req.body || {};
     
     // Map zoho_result to xoho_result for database compatibility
     const xoho_result = zoho_result;
+
+    // Note: campaign_id validation is handled by database foreign key constraints
+    // The foreign key references campaigns table
 
     // Resolve card_name when card_id present and card_name blank
     let finalCardName = card_name;
@@ -203,15 +167,15 @@ const createCampaignData = async (req, res) => {
         [Number(card_id)]
       );
       if (cardInfo && cardInfo.length > 0) {
-        finalCardName = cardInfo[0].card_name;
+        finalCardName = cardInfo.card_name;
       }
     }
 
     const dateForInsert = data_date ? toMysqlDate(data_date) : null;
 
-    // Build columns with automatic user ownership
+    // Build columns to allow DB default for data_date when null
     const cols = ['campaign_id', 'facebook_result', 'xoho_result', 'spent', 'card_id', 'card_name', 'created_by'];
-    const vals = [Number(campaign_id), Number(facebook_result), Number(xoho_result), Number(spent), card_id ? Number(card_id) : null, finalCardName || null, userId];
+    const vals = [Number(campaign_id), Number(facebook_result), Number(xoho_result), Number(spent), card_id ? Number(card_id) : null, finalCardName || null, created_by ? Number(created_by) : null];
 
     if (dateForInsert) {
       cols.splice(4, 0, 'data_date');
@@ -229,40 +193,23 @@ const createCampaignData = async (req, res) => {
       return res.status(500).json(createResponse(false, 'Failed to create campaign data'));
     }
 
-    // Retrieve the created record with user-based filtering
-    let fetchQuery = `
+    const [createdRows] = await connection.execute(
+      `
       SELECT 
         cd.*,
         c.name as campaign_name,
-        cards.card_name as card_display_name,
-        users.username as created_by_user
+        cards.card_name as card_display_name
       FROM campaign_data cd
       LEFT JOIN campaigns c ON cd.campaign_id = c.id
       LEFT JOIN cards ON cd.card_id = cards.id
-      LEFT JOIN users ON cd.created_by = users.id
       WHERE cd.id = ?
-    `;
-    
-    // Add user filtering for non-admins
-    const queryParams = [Number(result.insertId)];
-    if (!isAdmin(req.user)) {
-      fetchQuery += ` AND cd.created_by = ?`;
-      queryParams.push(userId);
-    }
-
-    const [createdRows] = await connection.execute(fetchQuery, queryParams);
+      `,
+      [Number(result.insertId)]
+    );
 
     await connection.commit();
-    
-    const row = Array.isArray(createdRows) && createdRows.length > 0 ? createdRows[0] : null;
-    
-    console.log('[CampaignDataController] Campaign data created successfully by user:', userId);
-    return res.status(201).json(createResponse(
-      true, 
-      'Campaign data created successfully', 
-      mapDatabaseToFrontend(row)
-    ));
-    
+  const row = Array.isArray(createdRows) && createdRows.length > 0 ? createdRows[0] : null;
+    return res.status(201).json(createResponse(true, 'Campaign data created successfully', mapDatabaseToFrontend(row)));
   } catch (error) {
     try { await connection.rollback(); } catch {}
     const { statusCode, response } = handleDatabaseError(error, 'campaign data creation', req);
@@ -274,19 +221,10 @@ const createCampaignData = async (req, res) => {
 
 /**
  * GET /api/campaign-data
- * Retrieves campaign data with user-based filtering
  */
 const getAllCampaignData = async (req, res) => {
   try {
-    const userId = req.user?.id;
-    const userIsAdmin = isAdmin(req.user);
-    
     console.log('[CampaignDataController] Fetching campaign data with filters:', req.query);
-    console.log('[CampaignDataController] User context:', {
-      userId,
-      username: req.user?.username,
-      isAdmin: userIsAdmin
-    });
 
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
@@ -296,8 +234,7 @@ const getAllCampaignData = async (req, res) => {
 
     const offset = (page - 1) * limit;
 
-    // Build search conditions with user filtering
-    const { whereClause, queryParams } = buildSearchConditions(filters, userId, userIsAdmin);
+    const { whereClause, queryParams } = buildSearchConditions(filters);
 
     const countQuery = `
       SELECT COUNT(*) AS total
@@ -306,7 +243,7 @@ const getAllCampaignData = async (req, res) => {
       ${whereClause}
     `;
     const [countRows] = await pool.execute(countQuery, queryParams);
-    const totalCount = Number((Array.isArray(countRows) && countRows.length > 0 && countRows[0].total !== undefined) ? countRows[0].total : 0);
+  const totalCount = Number((Array.isArray(countRows) && countRows.length > 0 && countRows[0].total !== undefined) ? countRows[0].total : 0);
 
     const dataQuery = `
       SELECT 
@@ -334,16 +271,9 @@ const getAllCampaignData = async (req, res) => {
         hasNext: page < totalPages,
         hasPrev: page > 1
       },
-      filters,
-      userContext: {
-        isAdmin: userIsAdmin,
-        showingAllData: userIsAdmin,
-        filteredByUser: !userIsAdmin
-      }
+      filters
     };
 
-    console.log(`[CampaignDataController] Retrieved ${Array.isArray(campaignData) ? campaignData.length : 0} records for user ${userId} (${userIsAdmin ? 'admin' : 'regular user'})`);
-    
     return res.status(200).json(
       createResponse(
         true,
@@ -360,17 +290,14 @@ const getAllCampaignData = async (req, res) => {
 
 /**
  * GET /api/campaign-data/:id
- * Retrieves single campaign data with ownership validation
  */
 const getCampaignDataById = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user?.id;
-    const userIsAdmin = isAdmin(req.user);
-    
-    console.log('[CampaignDataController] Fetching campaign data by ID:', id, 'for user:', userId);
+    console.log('[CampaignDataController] Fetching campaign data by ID:', id);
 
-    let query = `
+    const [rows] = await pool.execute(
+      `
       SELECT 
         cd.*,
         c.name as campaign_name,
@@ -381,29 +308,15 @@ const getCampaignDataById = async (req, res) => {
       LEFT JOIN cards ON cd.card_id = cards.id
       LEFT JOIN users ON cd.created_by = users.id
       WHERE cd.id = ?
-    `;
-    
-    const queryParams = [Number(id)];
-    
-    // Add user filtering for non-admins
-    if (!userIsAdmin) {
-      query += ` AND cd.created_by = ?`;
-      queryParams.push(userId);
-    }
-
-    const [rows] = await pool.execute(query, queryParams);
+      `,
+      [Number(id)]
+    );
 
     if (!rows || rows.length === 0) {
-      console.log(`[CampaignDataController] Campaign data ${id} not found or access denied for user ${userId}`);
-      return res.status(404).json(createResponse(false, 'Campaign data not found or access denied'));
+      return res.status(404).json(createResponse(false, 'Campaign data not found'));
     }
 
-    console.log(`[CampaignDataController] Campaign data ${id} retrieved successfully for user ${userId}`);
-    return res.status(200).json(createResponse(
-      true, 
-      'Campaign data retrieved successfully', 
-      mapDatabaseToFrontend(rows[0])
-    ));
+    return res.status(200).json(createResponse(true, 'Campaign data retrieved successfully', mapDatabaseToFrontend(rows)));
   } catch (error) {
     const { statusCode, response } = handleDatabaseError(error, 'campaign data retrieval');
     return res.status(statusCode).json(response);
@@ -412,38 +325,23 @@ const getCampaignDataById = async (req, res) => {
 
 /**
  * PUT /api/campaign-data/:id
- * Updates campaign data with ownership validation
  */
 const updateCampaignData = async (req, res) => {
   const connection = await pool.getConnection();
   try {
     const { id } = req.params;
     const updateData = { ...req.body };
-    const userId = req.user?.id;
-    const userIsAdmin = isAdmin(req.user);
 
-    console.log('[CampaignDataController] Updating campaign data:', id, 'by user:', userId);
+    console.log('[CampaignDataController] Updating campaign data:', id, updateData);
 
     await connection.beginTransaction();
 
-    // Check if record exists and validate ownership
-    let checkQuery = 'SELECT * FROM campaign_data WHERE id = ?';
-    const checkParams = [Number(id)];
-    
-    if (!userIsAdmin) {
-      checkQuery += ' AND created_by = ?';
-      checkParams.push(userId);
-    }
-
-    const [existingRows] = await connection.execute(checkQuery, checkParams);
-    
+    const [existingRows] = await connection.execute('SELECT * FROM campaign_data WHERE id = ?', [Number(id)]);
     if (!existingRows || existingRows.length === 0) {
       await connection.rollback();
-      console.log(`[CampaignDataController] Campaign data ${id} not found or access denied for user ${userId}`);
-      return res.status(404).json(createResponse(false, 'Campaign data not found or access denied'));
+      return res.status(404).json(createResponse(false, 'Campaign data not found'));
     }
-    
-    const existing = existingRows[0];
+    const existing = existingRows;
 
     // Validate new campaign if changing
     if (updateData.campaign_id && Number(updateData.campaign_id) !== Number(existing.campaign_id)) {
@@ -452,7 +350,7 @@ const updateCampaignData = async (req, res) => {
         await connection.rollback();
         return res.status(404).json(createResponse(false, 'New campaign not found'));
       }
-      if (campaignInfo[0].is_enabled === 0) {
+      if (campaignInfo.is_enabled === 0) {
         await connection.rollback();
         return res.status(400).json(createResponse(false, 'Cannot assign inactive campaign'));
       }
@@ -461,14 +359,14 @@ const updateCampaignData = async (req, res) => {
     // Map zoho_result to xoho_result for database compatibility
     if ('zoho_result' in updateData) {
       updateData.xoho_result = updateData.zoho_result;
-      delete updateData.zoho_result;
+      delete updateData.zoho_result; // Remove the original key
     }
     
     // Resolve card_name if card_id provided without card_name
     if (updateData.card_id && !updateData.card_name) {
       const [cardInfo] = await connection.execute('SELECT card_name FROM cards WHERE id = ?', [Number(updateData.card_id)]);
       if (cardInfo && cardInfo.length > 0) {
-        updateData.card_name = cardInfo[0].card_name;
+        updateData.card_name = cardInfo.card_name;
       }
     }
 
@@ -477,9 +375,6 @@ const updateCampaignData = async (req, res) => {
       const nd = toMysqlDate(updateData.data_date);
       if (nd) updateData.data_date = nd; else delete updateData.data_date;
     }
-
-    // Remove created_by from update data - users shouldn't be able to change ownership
-    delete updateData.created_by;
 
     // Build dynamic SET list, filtering out undefined values
     const fields = Object.keys(updateData).filter(key => updateData[key] !== undefined);
@@ -494,6 +389,7 @@ const updateCampaignData = async (req, res) => {
       const value = updateData[key];
       if (value !== undefined) {
         setParts.push(`${key} = ?`);
+        // Handle null values explicitly
         values.push(value === null ? null : value);
       }
     }
@@ -501,22 +397,20 @@ const updateCampaignData = async (req, res) => {
 
     values.push(Number(id));
     
-    // Add user filter for non-admins
-    let updateQuery = `UPDATE campaign_data SET ${setParts.join(', ')} WHERE id = ?`;
-    if (!userIsAdmin) {
-      updateQuery = updateQuery.replace('WHERE id = ?', 'WHERE id = ? AND created_by = ?');
-      values.push(userId);
-    }
+    console.log('[CampaignDataController] Update SQL:', setParts.join(', '));
+    console.log('[CampaignDataController] Update values:', values);
 
-    const [updateResult] = await connection.execute(updateQuery, values);
-
-    if (updateResult.affectedRows === 0) {
+    const [result] = await connection.execute(
+      `UPDATE campaign_data SET ${setParts.join(', ')} WHERE id = ?`,
+      values
+    );
+    if (!result || result.affectedRows === 0) {
       await connection.rollback();
-      return res.status(404).json(createResponse(false, 'Campaign data not found or access denied'));
+      return res.status(500).json(createResponse(false, 'Failed to update campaign data'));
     }
 
-    // Fetch updated record with user filtering
-    let fetchQuery = `
+    const [updatedRows] = await connection.execute(
+      `
       SELECT 
         cd.*,
         c.name as campaign_name,
@@ -527,30 +421,16 @@ const updateCampaignData = async (req, res) => {
       LEFT JOIN cards ON cd.card_id = cards.id
       LEFT JOIN users ON cd.created_by = users.id
       WHERE cd.id = ?
-    `;
-    
-    const fetchParams = [Number(id)];
-    if (!userIsAdmin) {
-      fetchQuery += ` AND cd.created_by = ?`;
-      fetchParams.push(userId);
-    }
-
-    const [updatedRows] = await connection.execute(fetchQuery, fetchParams);
+      `,
+      [Number(id)]
+    );
 
     await connection.commit();
-    
-    const updatedRow = updatedRows && updatedRows.length > 0 ? updatedRows[0] : null;
-    
-    console.log(`[CampaignDataController] Campaign data ${id} updated successfully by user ${userId}`);
-    return res.status(200).json(createResponse(
-      true, 
-      'Campaign data updated successfully', 
-      mapDatabaseToFrontend(updatedRow)
-    ));
-    
+
+  return res.status(200).json(createResponse(true, 'Campaign data updated successfully', mapDatabaseToFrontend(Array.isArray(updatedRows) && updatedRows.length > 0 ? updatedRows[0] : null)));
   } catch (error) {
     try { await connection.rollback(); } catch {}
-    const { statusCode, response } = handleDatabaseError(error, 'campaign data update', req);
+    const { statusCode, response } = handleDatabaseError(error, 'campaign data update');
     return res.status(statusCode).json(response);
   } finally {
     connection.release();
@@ -559,43 +439,58 @@ const updateCampaignData = async (req, res) => {
 
 /**
  * DELETE /api/campaign-data/:id
- * Deletes campaign data with ownership validation
  */
 const deleteCampaignData = async (req, res) => {
+  const connection = await pool.getConnection();
   try {
     const { id } = req.params;
-    const userId = req.user?.id;
-    const userIsAdmin = isAdmin(req.user);
+    console.log('[CampaignDataController] Deleting campaign data:', id);
 
-    console.log('[CampaignDataController] Deleting campaign data:', id, 'by user:', userId);
+    await connection.beginTransaction();
 
-    // Build delete query with user filtering for non-admins
-    let deleteQuery = 'DELETE FROM campaign_data WHERE id = ?';
-    const deleteParams = [Number(id)];
-    
-    if (!userIsAdmin) {
-      deleteQuery = 'DELETE FROM campaign_data WHERE id = ? AND created_by = ?';
-      deleteParams.push(userId);
+    const [existingRows] = await connection.execute(
+      `
+      SELECT cd.*, c.name as campaign_name
+      FROM campaign_data cd
+      LEFT JOIN campaigns c ON cd.campaign_id = c.id
+      WHERE cd.id = ?
+      `,
+      [Number(id)]
+    );
+    if (!existingRows || existingRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json(createResponse(false, 'Campaign data not found'));
     }
 
-    const [result] = await pool.execute(deleteQuery, deleteParams);
+    const row = existingRows;
 
-    if (result.affectedRows === 0) {
-      console.log(`[CampaignDataController] Campaign data ${id} not found or access denied for user ${userId}`);
-      return res.status(404).json(createResponse(false, 'Campaign data not found or access denied'));
+    const [result] = await connection.execute('DELETE FROM campaign_data WHERE id = ?', [Number(id)]);
+    if (!result || result.affectedRows === 0) {
+      await connection.rollback();
+      return res.status(500).json(createResponse(false, 'Failed to delete campaign data'));
     }
 
-    console.log(`[CampaignDataController] Campaign data ${id} deleted successfully by user ${userId}`);
-    return res.status(200).json(createResponse(true, 'Campaign data deleted successfully'));
-    
+    await connection.commit();
+
+    return res.status(200).json(
+      createResponse(true, 'Campaign data deleted successfully', {
+        id: Number(id),
+        campaign_name: row.campaign_name,
+        data_date: row.data_date,
+        deleted_at: new Date().toISOString()
+      })
+    );
   } catch (error) {
+    try { await connection.rollback(); } catch {}
     const { statusCode, response } = handleDatabaseError(error, 'campaign data deletion');
     return res.status(statusCode).json(response);
+  } finally {
+    connection.release();
   }
 };
 
 // =============================================================================
-// HELPER ENDPOINTS (no privacy filtering needed for dropdowns)
+// HELPER ENDPOINTS
 // =============================================================================
 
 const getCampaignsForDropdown = async (req, res) => {
@@ -622,44 +517,16 @@ const getCampaignsForDropdown = async (req, res) => {
 const getCardsForDropdown = async (req, res) => {
   try {
     console.log('[CampaignDataController] Fetching cards for dropdown');
-    
-    // Check if user is authenticated for privacy filtering
-    const userId = req.user?.id;
-    const userIsAdmin = isAdmin(req.user);
-    
-    let query;
-    let queryParams;
-    
-    if (!userId) {
-      // If no authentication, return empty array
-      console.log('[CampaignDataController] No authenticated user - returning empty cards list');
-      return res.status(200).json(createResponse(true, 'Cards retrieved successfully', []));
-    }
-    
-    if (userIsAdmin) {
-      // Admins can see all active cards
-      query = `
-        SELECT id, card_name
-        FROM cards
-        WHERE is_active = 1
-        ORDER BY card_name
-      `;
-      queryParams = [];
-    } else {
-      // Regular users can only see cards they created
-      query = `
-        SELECT id, card_name
-        FROM cards
-        WHERE is_active = 1 AND created_by = ?
-        ORDER BY card_name
-      `;
-      queryParams = [userId];
-    }
-    
-    const [cards] = await pool.execute(query, queryParams);
-    
-    console.log(`[CampaignDataController] Retrieved ${cards.length} cards for user ${userId} (${userIsAdmin ? 'admin' : 'regular user'})`);
-    
+
+    const [cards] = await pool.execute(
+      `
+      SELECT id, card_name
+      FROM cards
+      WHERE is_active = 1
+      ORDER BY card_name
+      `
+    );
+
     return res.status(200).json(createResponse(true, 'Cards retrieved successfully', cards || []));
   } catch (error) {
     const { statusCode, response } = handleDatabaseError(error, 'cards retrieval');

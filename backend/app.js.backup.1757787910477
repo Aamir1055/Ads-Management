@@ -21,16 +21,16 @@ const logger = {
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/securedUserRoutes');
 const twoFactorAuthRoutes = require('./routes/twoFactorAuthRoutes');
-const campaignTypeRoutes = require('./routes/campaignTypeRoutes_privacy');
-const campaignDataRoutes = require('./routes/campaignDataRoutes_privacy');
+const campaignTypeRoutes = require('./routes/campaignTypeRoutes');
+const campaignDataRoutes = require('./routes/campaignDataRoutes');
 const adsRoutes = require('./routes/adsRoutes');
-const reportRoutes = require('./routes/reportRoutes_privacy');
-const cardsRoutes = require('./routes/cardsRoutes_privacy');
-const cardUsersRoutes = require('./routes/cardUsers_privacy');
-const campaignRoutes = require('./routes/campaignRoutes_privacy');
+const reportRoutes = require('./routes/reportRoutes');
+const cardsRoutes = require('./routes/cardsRoutes');
+const cardUsersRoutes = require('./routes/cardUsersRoutes');
+const campaignRoutes = require('./routes/campaignRoutes');
 const permissionsRoutes = require('./routes/permissionsRoutes');
 const modulesRoutes = require('./routes/modulesRoutes');
-const userManagementRoutes = require('./routes/userManagementRoutes_privacy');
+const userManagementRoutes = require('./routes/userManagementRoutes');
 const userAccessRoutes = require('./routes/userAccessRoutes');
 
 const app = express();
@@ -193,7 +193,7 @@ app.get('/api/health', async (req, res) => {
 
 // Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/users', userManagementRoutes);
+app.use('/api/users', userRoutes);
 app.use('/api/2fa', twoFactorAuthRoutes);
 app.use('/api/campaign-types', campaignTypeRoutes);
 app.use('/api/campaign-data', campaignDataRoutes);

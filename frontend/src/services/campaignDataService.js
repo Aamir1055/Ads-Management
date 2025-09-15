@@ -56,11 +56,16 @@ const campaignDataService = {
     }
   },
 
-  // Get campaigns for dropdown (only enabled ones)
+  // Get campaigns for dropdown (only enabled ones) - now with privacy filtering
   getCampaignsForDropdown: async () => {
     try {
-      const response = await api.get('/campaign-data/campaigns');
-      return response.data;
+      // Use the main campaigns endpoint which has privacy filtering
+      const response = await api.get('/campaigns', { params: { is_enabled: true, limit: 1000 } });
+      return {
+        success: response.data.success,
+        data: response.data.data?.campaigns || response.data.data || [],
+        message: response.data.message
+      };
     } catch (error) {
       console.error('API getCampaignsForDropdown error:', error.response?.data || error.message);
       throw error;

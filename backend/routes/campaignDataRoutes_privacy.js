@@ -12,13 +12,17 @@ const {
   validateOwnership 
 } = require('../middleware/dataPrivacy');
 
-// Controllers (privacy-enabled - now the main controller with all functions)
+// Controllers (privacy-enabled)
 const {
   createCampaignData,
   getAllCampaignData,
   getCampaignDataById,
   updateCampaignData,
-  deleteCampaignData,
+  deleteCampaignData
+} = require('../controllers/campaignDataController_privacy');
+
+// Original controller for helper functions (these don't need privacy filtering)
+const {
   getCampaignsForDropdown,
   getCardsForDropdown
 } = require('../controllers/campaignDataController');
@@ -106,9 +110,6 @@ const helperLimiter = createRateLimit(5 * 60 * 1000, 200);
 // Returns active campaigns for dropdowns (helper routes before auth)
 router.get('/campaigns', helperLimiter, getCampaignsForDropdown);
 
-// Returns active cards for dropdowns  
-router.get('/cards', helperLimiter, getCardsForDropdown);
-
 // =============================================================================
 // AUTHENTICATION REQUIRED FOR ALL DATA OPERATIONS
 // =============================================================================
@@ -119,6 +120,13 @@ router.use(authenticateToken);
 // Apply data privacy middleware
 router.use(dataPrivacyMiddleware);
 router.use(campaignDataPrivacy);
+
+// =============================================================================
+// AUTHENTICATED HELPER ROUTES (require authentication for user filtering)
+// =============================================================================
+
+// Returns user's active cards for dropdowns (user-filtered)
+router.get('/cards', helperLimiter, getCardsForDropdown);
 
 // =============================================================================
 // DATA PRIVACY ENABLED ROUTES

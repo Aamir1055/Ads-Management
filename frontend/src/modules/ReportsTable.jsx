@@ -379,9 +379,6 @@ const ReportsTable = () => {
                         Date
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Spent
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Facebook Results
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -415,9 +412,6 @@ const ReportsTable = () => {
                             {formatDateToDisplay(report.report_date)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {reportsService.formatCurrency(report.spent)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             {reportsService.formatNumber(report.facebook_result || 0)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -427,7 +421,7 @@ const ReportsTable = () => {
                             {reportsService.formatNumber(report.total_results || 0)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {reportsService.formatCurrency(report.total_campaign_spent || 0)}
+                            {reportsService.formatCurrency(report.spent)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${

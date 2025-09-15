@@ -382,79 +382,64 @@ const Campaigns = () => {
                         {new Date(campaign.created_at).toLocaleDateString()}
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <div className="relative inline-block text-left">
+                        <div className="flex items-center justify-end space-x-2">
+                          {/* View Button */}
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation()
-                              setActiveDropdown(activeDropdown === campaign.id ? null : campaign.id)
+                              handleViewCampaign(campaign)
                             }}
-                            className="text-gray-400 hover:text-gray-600 p-1 rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                            aria-expanded={activeDropdown === campaign.id}
-                            aria-haspopup="true"
+                            className="text-blue-500 hover:text-blue-700 p-1 rounded-md hover:bg-blue-50 transition-colors"
+                            title="View Details"
                           >
-                            <MoreVertical className="h-5 w-5" />
+                            <Eye className="h-4 w-4" />
                           </button>
                           
-                          {activeDropdown === campaign.id && (
-                            <div 
-                              className="absolute right-0 z-50 mt-2 w-48 origin-top-right bg-white border border-gray-200 rounded-md shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"
-                              role="menu"
-                              aria-orientation="vertical"
-                            >
-                              <div className="py-1" role="none">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleViewCampaign(campaign)
-                                  }}
-                                  className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 focus:outline-none focus:bg-gray-50"
-                                  role="menuitem"
-                                >
-                                  <Eye className="h-4 w-4 mr-3" />
-                                  View Details
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleEditCampaign(campaign)
-                                  }}
-                                  className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 focus:outline-none focus:bg-gray-50"
-                                  role="menuitem"
-                                >
-                                  <Edit2 className="h-4 w-4 mr-3" />
-                                  Edit Campaign
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleToggleStatus(campaign)
-                                  }}
-                                  className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 focus:outline-none focus:bg-gray-50"
-                                  role="menuitem"
-                                >
-                                  <div className={`h-4 w-4 mr-3 rounded-full ${campaign.is_enabled ? 'bg-red-500' : 'bg-green-500'}`}></div>
-                                  {campaign.is_enabled ? 'Disable' : 'Enable'}
-                                </button>
-                                <div className="border-t border-gray-100 my-1"></div>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleDeleteCampaign(campaign)
-                                  }}
-                                  className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 focus:outline-none focus:bg-red-50"
-                                  role="menuitem"
-                                >
-                                  <Trash2 className="h-4 w-4 mr-3" />
-                                  Delete
-                                </button>
-                              </div>
-                            </div>
-                          )}
+                          {/* Edit Button */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleEditCampaign(campaign)
+                            }}
+                            className="text-yellow-500 hover:text-yellow-700 p-1 rounded-md hover:bg-yellow-50 transition-colors"
+                            title="Edit Campaign"
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </button>
+                          
+                          {/* Toggle Status Button */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleToggleStatus(campaign)
+                            }}
+                            className={`p-1 rounded-md transition-colors ${
+                              campaign.is_enabled 
+                                ? 'text-red-500 hover:text-red-700 hover:bg-red-50' 
+                                : 'text-green-500 hover:text-green-700 hover:bg-green-50'
+                            }`}
+                            title={campaign.is_enabled ? 'Disable Campaign' : 'Enable Campaign'}
+                          >
+                            <div className={`h-4 w-4 rounded-full ${
+                              campaign.is_enabled ? 'bg-red-500' : 'bg-green-500'
+                            }`}></div>
+                          </button>
+                          
+                          {/* Delete Button */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDeleteCampaign(campaign)
+                            }}
+                            className="text-red-500 hover:text-red-700 p-1 rounded-md hover:bg-red-50 transition-colors"
+                            title="Delete Campaign"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
                         </div>
                       </td>
                     </tr>
