@@ -279,7 +279,7 @@ class User {
       await connection.beginTransaction();
       
       // Build update fields (only allow specific fields to be updated)
-      const allowedFields = ['username', 'role_id', 'is_active', 'password'];
+      const allowedFields = ['username', 'role_id', 'is_active', 'password', 'enable_2fa'];
       const fieldsToUpdate = {};
       
       for (const field of allowedFields) {
@@ -288,6 +288,9 @@ class User {
             // Hash the new password if provided
             const saltRounds = 12;
             fieldsToUpdate['hashed_password'] = await bcrypt.hash(updateData[field], saltRounds);
+          } else if (field === 'enable_2fa') {
+            // Map enable_2fa to is_2fa_enabled column name
+            fieldsToUpdate['is_2fa_enabled'] = updateData[field];
           } else {
             fieldsToUpdate[field] = updateData[field];
           }
