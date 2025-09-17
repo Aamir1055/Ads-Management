@@ -87,7 +87,7 @@ async function debugActual2FA() {
         console.log(`✅ FOUND PASSWORD: "${password}"`);
         
         console.log(`\n📋 Complete Login Instructions:`);
-        console.log(`1. Go to: http://localhost:3001/`);
+        console.log(`1. Go to: http://localhost:5000/`);
         console.log(`2. Username: ${user.username}`);
         console.log(`3. Password: ${password}`);
         console.log(`4. 2FA Token: ${currentToken} (or from your Google Authenticator)`);

@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Plus, Edit2, Trash2, Eye, Search, Filter, MoreVertical, AlertTriangle, X } from 'lucide-react'
 import CampaignForm from '../components/campaigns/CampaignForm'
 import campaignService from '../services/campaignService'
 import { formatDate, formatDateTime } from '../utils/dateUtils'
 
 const Campaigns = () => {
+  const navigate = useNavigate()
+  
   const [campaigns, setCampaigns] = useState([])
   const [campaignTypes, setCampaignTypes] = useState([])
   const [loading, setLoading] = useState(true)
@@ -39,7 +42,9 @@ const Campaigns = () => {
       setError('')
       const response = await campaignService.getCampaigns()
       if (response.success) {
-        setCampaigns(response.data || [])
+        // Handle privacy controller format - data.campaigns vs just data
+        const campaignsData = response.data?.campaigns || response.data || []
+        setCampaigns(campaignsData)
       } else {
         setError(response.message || 'Failed to load campaigns')
       }
@@ -82,7 +87,7 @@ const Campaigns = () => {
     try {
       const response = await campaignService.deleteCampaign(deletingCampaign.id)
       if (response.success) {
-        setCampaigns(prev => prev.filter(c => c.id !== deletingCampaign.id))
+        setCampaigns(prev => (Array.isArray(prev) ? prev : []).filter(c => c.id !== deletingCampaign.id))
         setDeletingCampaign(null)
       } else {
         setError(response.message || 'Failed to delete campaign')
@@ -95,10 +100,10 @@ const Campaigns = () => {
 
   const handleToggleStatus = async (campaign) => {
     try {
-      const response = await campaignService.toggleCampaignStatus(campaign.id)
+      const response = await campaignService.toggleCampaignEnabled(campaign.id)
       if (response.success) {
         setCampaigns(prev => 
-          prev.map(c => 
+          (Array.isArray(prev) ? prev : []).map(c => 
             c.id === campaign.id 
               ? { ...c, is_enabled: !c.is_enabled }
               : c
@@ -118,23 +123,24 @@ const Campaigns = () => {
     if (editingCampaign) {
       // Update existing campaign
       setCampaigns(prev => 
-        prev.map(c => c.id === savedCampaign.id ? savedCampaign : c)
+        (Array.isArray(prev) ? prev : []).map(c => c.id === savedCampaign.id ? savedCampaign : c)
       )
     } else {
       // Add new campaign
-      setCampaigns(prev => [savedCampaign, ...prev])
+      setCampaigns(prev => [savedCampaign, ...(Array.isArray(prev) ? prev : [])])
     }
   }
 
   const handleViewCampaign = (campaign) => {
-    setViewingCampaign(campaign)
-    setActiveDropdown(null)
+    // Navigate to the campaign detail page instead of showing modal
+    navigate(`/campaigns/${campaign.id}`)
   }
 
   // Filter campaigns based on search and filters
-  const filteredCampaigns = campaigns.filter(campaign => {
+  const filteredCampaigns = (Array.isArray(campaigns) ? campaigns : []).filter(campaign => {
+    const brandName = campaign.brand?.name || ''
     const matchesSearch = campaign.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (campaign.brand && campaign.brand.toLowerCase().includes(searchTerm.toLowerCase()))
+                         brandName.toLowerCase().includes(searchTerm.toLowerCase())
     
     const matchesType = !selectedCampaignType || 
                         campaign.campaign_type_id === parseInt(selectedCampaignType)
@@ -146,8 +152,13 @@ const Campaigns = () => {
     return matchesSearch && matchesType && matchesStatus
   })
 
-  const getCampaignTypeName = (typeId) => {
-    const type = campaignTypes.find(t => t.id === typeId)
+  const getCampaignTypeName = (campaign) => {
+    // Use the campaignType object from the response if available
+    if (campaign.campaignType?.name) {
+      return campaign.campaignType.name
+    }
+    // Fallback to finding from campaignTypes array
+    const type = (Array.isArray(campaignTypes) ? campaignTypes : []).find(t => t.id === campaign.campaign_type_id)
     return type ? type.type_name : 'Unknown'
   }
 
@@ -161,10 +172,41 @@ const Campaigns = () => {
     }
   }
 
-  // Helper function to display persona as text (no parsing needed now)
+  // Helper function to display persona as tags
+  const displayPersonaTags = (persona) => {
+    if (!persona) return []
+    if (Array.isArray(persona)) return persona
+    try {
+      const parsed = JSON.parse(persona)
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      // Fallback to comma-separated string
+      return persona.split(',').map(p => p.trim()).filter(p => p)
+    }
+  }
+
+  // Helper function to display location as tags
+  const displayLocationTags = (location) => {
+    if (!location) return []
+    if (Array.isArray(location)) return location
+    try {
+      const parsed = JSON.parse(location)
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      // Fallback to comma-separated string
+      return location.split(',').map(l => l.trim()).filter(l => l)
+    }
+  }
+
+  // Helper function for text display (fallback)
   const displayPersona = (persona) => {
     if (!persona) return 'N/A'
-    return persona // Persona is now stored as plain text
+    return persona
+  }
+
+  const displayLocation = (location) => {
+    if (!location) return 'N/A'
+    return location
   }
 
   if (loading) {
@@ -230,7 +272,7 @@ const Campaigns = () => {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
               >
                 <option value="">All Campaign Types</option>
-                {campaignTypes.map(type => (
+                {(Array.isArray(campaignTypes) ? campaignTypes : []).map(type => (
                   <option key={type.id} value={type.id}>
                     {type.type_name}
                   </option>
@@ -294,12 +336,12 @@ const Campaigns = () => {
               </div>
               <h3 className="text-lg font-medium text-gray-900 mb-2">No campaigns found</h3>
               <p className="text-gray-600 mb-4">
-                {campaigns.length === 0 
+                {(Array.isArray(campaigns) ? campaigns : []).length === 0 
                   ? "Get started by creating your first campaign."
                   : "Try adjusting your search or filter criteria."
                 }
               </p>
-              {campaigns.length === 0 && (
+              {(Array.isArray(campaigns) ? campaigns : []).length === 0 && (
                 <button
                   onClick={handleCreateCampaign}
                   className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors"
@@ -320,9 +362,6 @@ const Campaigns = () => {
                       Type
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Targeting
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Creative
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -338,29 +377,18 @@ const Campaigns = () => {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredCampaigns.map((campaign) => (
-                    <tr key={campaign.id} className="hover:bg-gray-50">
+                    <tr key={campaign.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/campaigns/${campaign.id}`)}>
                       <td className="px-6 py-4">
                         <div>
                           <div className="text-sm font-medium text-gray-900">{campaign.name}</div>
-                          {campaign.brand && (
-                            <div className="text-sm text-gray-500">{campaign.brand}</div>
+                          {campaign.brand?.name && (
+                            <div className="text-sm text-gray-500">{campaign.brand.name}</div>
                           )}
                         </div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-sm text-gray-900">
-                          {getCampaignTypeName(campaign.campaign_type_id)}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900">
-                          {campaign.age && <div>Age: {campaign.age}</div>}
-                          <div className="text-xs text-gray-500">
-                            Gender: {parseJsonField(campaign.gender).join(', ') || 'N/A'}
-                          </div>
-                          <div className="text-xs text-gray-500 truncate max-w-xs">
-                            {campaign.location || 'N/A'}
-                          </div>
+                          {getCampaignTypeName(campaign)}
                         </div>
                       </td>
                       <td className="px-6 py-4">
@@ -454,7 +482,7 @@ const Campaigns = () => {
         {/* Results Summary */}
         {filteredCampaigns.length > 0 && (
           <div className="mt-4 text-sm text-gray-600 text-center">
-            Showing {filteredCampaigns.length} of {campaigns.length} campaigns
+            Showing {filteredCampaigns.length} of {(Array.isArray(campaigns) ? campaigns : []).length} campaigns
           </div>
         )}
       </div>
@@ -488,33 +516,53 @@ const Campaigns = () => {
                 <label className="block text-sm font-medium text-gray-500">Campaign Name</label>
                 <p className="mt-1 text-sm text-gray-900">{viewingCampaign.name}</p>
               </div>
-              {viewingCampaign.brand && (
+              {viewingCampaign.brand?.name && (
                 <div>
                   <label className="block text-sm font-medium text-gray-500">Brand</label>
-                  <p className="mt-1 text-sm text-gray-900">{viewingCampaign.brand}</p>
+                  <p className="mt-1 text-sm text-gray-900">{viewingCampaign.brand.name}</p>
                 </div>
               )}
               <div>
                 <label className="block text-sm font-medium text-gray-500">Campaign Type</label>
-                <p className="mt-1 text-sm text-gray-900">{getCampaignTypeName(viewingCampaign.campaign_type_id)}</p>
+                <p className="mt-1 text-sm text-gray-900">{getCampaignTypeName(viewingCampaign)}</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-500">Persona</label>
-                <p className="mt-1 text-sm text-gray-900">{displayPersona(viewingCampaign.persona)}</p>
+                <div className="mt-1 flex flex-wrap gap-2">
+                  {displayPersonaTags(viewingCampaign.persona).length > 0 ? (
+                    displayPersonaTags(viewingCampaign.persona).map((persona, index) => (
+                      <span
+                        key={index}
+                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm bg-purple-100 text-purple-800"
+                      >
+                        {persona}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-sm text-gray-500">N/A</span>
+                  )}
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-500">Gender</label>
                 <p className="mt-1 text-sm text-gray-900">{parseJsonField(viewingCampaign.gender).join(', ') || 'N/A'}</p>
               </div>
-              {viewingCampaign.age && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-500">Target Age</label>
-                  <p className="mt-1 text-sm text-gray-900">{viewingCampaign.age}</p>
-                </div>
-              )}
               <div>
                 <label className="block text-sm font-medium text-gray-500">Locations</label>
-                <p className="mt-1 text-sm text-gray-900">{viewingCampaign.location || 'N/A'}</p>
+                <div className="mt-1 flex flex-wrap gap-2">
+                  {displayLocationTags(viewingCampaign.location).length > 0 ? (
+                    displayLocationTags(viewingCampaign.location).map((location, index) => (
+                      <span
+                        key={index}
+                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm bg-blue-100 text-blue-800"
+                      >
+                        {location}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-sm text-gray-500">N/A</span>
+                  )}
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-500">Creatives</label>

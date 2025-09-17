@@ -3,6 +3,7 @@ const router = express.Router();
 
 // Authentication middleware
 const { authenticateToken } = require('../middleware/authMiddleware');
+const { attachUserPermissions, modulePermissions } = require('../middleware/rbacMiddleware');
 
 // Data privacy middleware
 const { 
@@ -116,6 +117,9 @@ router.get('/cards', helperLimiter, getCardsForDropdown);
 // Apply authentication to all routes below this point
 router.use(authenticateToken);
 
+// Apply permission middleware
+router.use(attachUserPermissions);
+
 // Apply data privacy middleware
 router.use(dataPrivacyMiddleware);
 router.use(campaignDataPrivacy);
@@ -131,7 +135,8 @@ router.use(campaignDataPrivacy);
  * - Regular users see only their own data
  */
 router.get('/', 
-  listLimiter, 
+  listLimiter,
+  modulePermissions.campaign_data.read,
   validateQueryParams, 
   getAllCampaignData
 );
@@ -141,7 +146,8 @@ router.get('/',
  * Gets single campaign data with ownership validation
  */
 router.get('/:id', 
-  getOneLimiter, 
+  getOneLimiter,
+  modulePermissions.campaign_data.read,
   validateIdParam, 
   getCampaignDataById
 );
@@ -152,7 +158,8 @@ router.get('/:id',
  * - Automatically sets created_by to current user
  */
 router.post('/', 
-  createLimiter, 
+  createLimiter,
+  modulePermissions.campaign_data.create,
   ensureOwnership, // Automatically adds created_by
   validateCreateCampaignData, 
   createCampaignData
@@ -165,7 +172,8 @@ router.post('/',
  * - Admins can update any data
  */
 router.put('/:id', 
-  updateLimiter, 
+  updateLimiter,
+  modulePermissions.campaign_data.update,
   validateIdParam, 
   validateUpdateCampaignData, 
   validateOwnership('campaign_data', 'created_by', 'id'), // Validates ownership before update
@@ -179,7 +187,8 @@ router.put('/:id',
  * - Admins can delete any data
  */
 router.delete('/:id', 
-  deleteLimiter, 
+  deleteLimiter,
+  modulePermissions.campaign_data.delete,
   validateIdParam, 
   validateOwnership('campaign_data', 'created_by', 'id'), // Validates ownership before delete
   deleteCampaignData

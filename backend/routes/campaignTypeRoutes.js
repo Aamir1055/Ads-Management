@@ -1,6 +1,10 @@
 const express = require('express');
 const router = express.Router();
 
+// Authentication and RBAC middleware
+const { authenticateToken } = require('../middleware/authMiddleware');
+const { requireSuperAdmin, attachUserPermissions } = require('../middleware/rbacMiddleware');
+
 // Controller
 const {
   createCampaignType,
@@ -89,28 +93,33 @@ const updateLimiter = createRateLimit(15 * 60 * 1000, 20);
 const deleteLimiter = createRateLimit(60 * 60 * 1000, 5);
 
 // =============================================================================
-// PUBLIC ROUTES
+// PUBLIC ROUTES (Available to all authenticated users for master data usage)
 // =============================================================================
 
-// List campaign types
+// Apply authentication to all routes
+router.use(authenticateToken);
+router.use(attachUserPermissions);
+
+// List campaign types (Available to all authenticated users)
+// This allows all roles to use campaign types in the Campaign module
 router.get('/', listLimiter, validateQueryParams, getAllCampaignTypes);
 
-// Get one campaign type
+// Get one campaign type (Available to all authenticated users)
 router.get('/:id', getOneLimiter, validateIdParam, getCampaignTypeById);
 
+
 // =============================================================================
-// PROTECTED ROUTES (Uncomment auth/authorize when ready)
+// SUPERADMIN ONLY ROUTES (Master Data Management)
 // =============================================================================
-// router.use(authenticate);
 
-// Create
-router.post('/', createLimiter, validateCreateCampaignType, /* authorize(['admin','manager']), */ createCampaignType);
+// Create campaign type (SuperAdmin only)
+router.post('/', createLimiter, requireSuperAdmin, validateCreateCampaignType, createCampaignType);
 
-// Update
-router.put('/:id', updateLimiter, validateIdParam, /* validateUpdateCampaignType, */ /* authorize(['admin','manager']), */ updateCampaignType);
+// Update campaign type (SuperAdmin only)
+router.put('/:id', updateLimiter, requireSuperAdmin, validateIdParam, validateUpdateCampaignType, updateCampaignType);
 
-// Delete (soft)
-router.delete('/:id', deleteLimiter, validateIdParam, /* authorize(['admin']), */ deleteCampaignType);
+// Delete campaign type (SuperAdmin only)
+router.delete('/:id', deleteLimiter, requireSuperAdmin, validateIdParam, deleteCampaignType);
 
 // =============================================================================
 // ERROR HANDLING (order matters)
@@ -122,11 +131,11 @@ router.use((req, res) => {
     success: false,
     message: `Route ${req.method} ${req.originalUrl} not found`,
     availableRoutes: {
-      'GET /api/campaign-types': 'Get all campaign types (with pagination and search)',
-      'POST /api/campaign-types': 'Create new campaign type',
-      'GET /api/campaign-types/:id': 'Get campaign type by ID',
-      'PUT /api/campaign-types/:id': 'Update campaign type',
-      'DELETE /api/campaign-types/:id': 'Delete campaign type (soft delete)'
+      'GET /api/campaign-types': 'Get all campaign types (available to all authenticated users)',
+      'GET /api/campaign-types/:id': 'Get campaign type by ID (available to all authenticated users)',
+      'POST /api/campaign-types': 'Create new campaign type (SuperAdmin only)',
+      'PUT /api/campaign-types/:id': 'Update campaign type (SuperAdmin only)',
+      'DELETE /api/campaign-types/:id': 'Delete campaign type (SuperAdmin only)'
     }
   });
 });

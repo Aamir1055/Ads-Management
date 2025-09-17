@@ -4,6 +4,9 @@ const router = express.Router();
 // Authentication middleware
 const { authenticateToken } = require('../middleware/authMiddleware');
 
+// RBAC middleware
+const { createPermissionMiddleware } = require('../config/rbacRouteMapping');
+
 // Data privacy middleware
 const { 
   dataPrivacyMiddleware, 
@@ -116,9 +119,59 @@ router.use(dataPrivacyMiddleware);
  * Lists campaign types with user-based filtering
  * - Admins see all campaign types
  * - Regular users see only their own campaign types
+ * - RBAC: Requires campaign_types_read permission
  */
+
+// =============================================================================
+// MASTER DATA ROUTES (NO USER FILTERING)
+// =============================================================================
+
+/**
+ * GET /api/campaign-types/master
+ * Gets ALL campaign types without user filtering (for dropdowns)
+ * Campaign types are master data that should be visible to all campaign users
+ * - RBAC: Requires campaigns_read permission (like brands for brand users)
+ */
+router.get('/master', 
+  listLimiter,
+  createPermissionMiddleware.campaigns.read(), // 🔒 RBAC: campaigns_read required (master data)
+  async (req, res) => {
+    try {
+      const { pool } = require('../config/database');
+      
+      // Get ALL campaign types without user filtering
+      const [campaignTypes] = await pool.query(`
+        SELECT 
+          id,
+          type_name,
+          description,
+          is_active,
+          created_at
+        FROM campaign_types 
+        WHERE is_active = 1
+        ORDER BY type_name ASC
+      `);
+      
+      res.json({
+        success: true,
+        message: `Retrieved ${campaignTypes.length} campaign type(s)`,
+        timestamp: new Date().toISOString(),
+        data: campaignTypes
+      });
+    } catch (error) {
+      console.error('Error fetching master campaign types:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch campaign types',
+        error: error.message
+      });
+    }
+  }
+);
+
 router.get('/', 
-  listLimiter, 
+  listLimiter,
+  createPermissionMiddleware.campaignTypes.read(), // 🔒 RBAC: campaign_types_read required
   validateQueryParams, 
   getAllCampaignTypes
 );
@@ -126,9 +179,11 @@ router.get('/',
 /**
  * GET /api/campaign-types/:id
  * Gets single campaign type with ownership validation
+ * - RBAC: Requires campaign_types_read permission
  */
 router.get('/:id', 
-  getOneLimiter, 
+  getOneLimiter,
+  createPermissionMiddleware.campaignTypes.read(), // 🔒 RBAC: campaign_types_read required
   validateIdParam, 
   getCampaignTypeById
 );
@@ -136,9 +191,11 @@ router.get('/:id',
 /**
  * POST /api/campaign-types
  * Creates campaign type with automatic user ownership
+ * - RBAC: Requires campaign_types_create permission
  */
 router.post('/', 
-  createLimiter, 
+  createLimiter,
+  createPermissionMiddleware.campaignTypes.create(), // 🔒 RBAC: campaign_types_create required
   ensureOwnership, // Automatically adds created_by
   validateCreateCampaignType, 
   createCampaignType
@@ -147,9 +204,11 @@ router.post('/',
 /**
  * PUT /api/campaign-types/:id
  * Updates campaign type with ownership validation
+ * - RBAC: Requires campaign_types_update permission
  */
 router.put('/:id', 
-  updateLimiter, 
+  updateLimiter,
+  createPermissionMiddleware.campaignTypes.update(), // 🔒 RBAC: campaign_types_update required
   validateIdParam, 
   validateUpdateCampaignType,
   validateOwnership('campaign_types', 'created_by', 'id'), 
@@ -159,9 +218,11 @@ router.put('/:id',
 /**
  * DELETE /api/campaign-types/:id
  * Deletes campaign type with ownership validation
+ * - RBAC: Requires campaign_types_delete permission
  */
 router.delete('/:id', 
-  deleteLimiter, 
+  deleteLimiter,
+  createPermissionMiddleware.campaignTypes.delete(), // 🔒 RBAC: campaign_types_delete required
   validateIdParam, 
   validateOwnership('campaign_types', 'created_by', 'id'), 
   deleteCampaignType

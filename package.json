@@ -5,6 +5,8 @@
     "@syncfusion/ej2-react-grids": "^31.1.17",
     "@syncfusion/ej2-react-inputs": "^31.1.17",
     "@syncfusion/ej2-react-popups": "^31.1.17",
-    "chart.js": "^4.5.0"
+    "axios": "^1.12.2",
+    "chart.js": "^4.5.0",
+    "mysql2": "^3.15.0"
   }
 }

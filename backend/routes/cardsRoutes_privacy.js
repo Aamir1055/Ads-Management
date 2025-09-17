@@ -4,6 +4,9 @@ const router = express.Router();
 // Authentication middleware
 const { authenticateToken } = require('../middleware/authMiddleware');
 
+// RBAC middleware
+const { createPermissionMiddleware } = require('../config/rbacRouteMapping');
+
 // Data privacy middleware
 const { 
   dataPrivacyMiddleware, 
@@ -15,6 +18,7 @@ const {
 const {
   createCard,
   getAllCards,
+  getActiveCards,
   getCardById,
   updateCard,
   deleteCard,
@@ -118,18 +122,35 @@ router.use(dataPrivacyMiddleware);
  * Lists cards with user-based filtering
  * - Admins see all cards
  * - Regular users see only their own cards
+ * - RBAC: Requires cards_read permission
  */
 router.get('/', 
-  listLimiter, 
+  listLimiter,
+  createPermissionMiddleware.cards.read(), // 🔒 RBAC: cards_read required
   getAllCards
+);
+
+/**
+ * GET /api/cards/active
+ * Lists only active cards for assignment dropdowns
+ * - Admins see all active cards
+ * - Regular users see only their own active cards
+ * - RBAC: Requires cards_read permission
+ */
+router.get('/active', 
+  listLimiter,
+  createPermissionMiddleware.cards.read(), // 🔒 RBAC: cards_read required
+  getActiveCards
 );
 
 /**
  * GET /api/cards/:id
  * Gets single card with ownership validation
+ * - RBAC: Requires cards_read permission
  */
 router.get('/:id', 
-  getOneLimiter, 
+  getOneLimiter,
+  createPermissionMiddleware.cards.read(), // 🔒 RBAC: cards_read required
   getCardById
 );
 
@@ -137,9 +158,11 @@ router.get('/:id',
  * POST /api/cards
  * Creates card with automatic user ownership
  * Note: Cards table doesn't have created_by column yet, needs to be added
+ * - RBAC: Requires cards_create permission
  */
 router.post('/', 
-  createLimiter, 
+  createLimiter,
+  createPermissionMiddleware.cards.create(), // 🔒 RBAC: cards_create required
   ensureOwnership, // Will add created_by if column exists
   createCard
 );
@@ -147,9 +170,11 @@ router.post('/',
 /**
  * PUT /api/cards/:id
  * Updates card with ownership validation
+ * - RBAC: Requires cards_update permission
  */
 router.put('/:id', 
-  updateLimiter, 
+  updateLimiter,
+  createPermissionMiddleware.cards.update(), // 🔒 RBAC: cards_update required
   validateOwnership('cards', 'created_by', 'id'), 
   updateCard
 );
@@ -157,9 +182,11 @@ router.put('/:id',
 /**
  * POST /api/cards/:id/add-balance
  * Adds balance to card with ownership validation
+ * - RBAC: Requires cards_create permission (balance addition treated as creation action)
  */
 router.post('/:id/add-balance', 
-  addBalanceLimiter, 
+  addBalanceLimiter,
+  createPermissionMiddleware.cards.create(), // 🔒 RBAC: cards_create required (balance addition)
   validateOwnership('cards', 'created_by', 'id'), 
   addBalance
 );
@@ -167,9 +194,11 @@ router.post('/:id/add-balance',
 /**
  * DELETE /api/cards/:id
  * Deletes card with ownership validation
+ * - RBAC: Requires cards_delete permission
  */
 router.delete('/:id', 
-  deleteLimiter, 
+  deleteLimiter,
+  createPermissionMiddleware.cards.delete(), // 🔒 RBAC: cards_delete required
   validateOwnership('cards', 'created_by', 'id'), 
   deleteCard
 );
@@ -185,6 +214,7 @@ router.use((req, res) => {
     message: `Route ${req.method} ${req.originalUrl} not found`,
     availableRoutes: {
       'GET /cards': 'Get all cards (filtered by user)',
+      'GET /cards/active': 'Get only active cards for assignment dropdowns (filtered by user)',
       'POST /cards': 'Create new card (auto-assigned to user)',
       'GET /cards/:id': 'Get card by ID (ownership validated)',
       'PUT /cards/:id': 'Update card (ownership validated)',

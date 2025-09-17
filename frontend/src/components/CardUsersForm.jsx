@@ -1,14 +1,77 @@
 import React, { useEffect, useState } from 'react'
-import { X, AlertCircle } from 'lucide-react'
+import { X, AlertCircle, Calendar } from 'lucide-react'
 import cardsService from '../services/cardsService'
 import cardUsersService from '../services/cardUsersService'
 import usersService from '../services/usersService'
+import { formatDate, getCurrentDate, isValidDateFormat, formatDateForAPI, formatDateForInput, parseDateFromInput } from '../utils/dateUtils'
+
+// Helper function to get today's date in DD/MM/YYYY format for display
+const getTodayForInput = () => {
+  const today = new Date()
+  const year = today.getFullYear()
+  const month = String(today.getMonth() + 1).padStart(2, '0')
+  const day = String(today.getDate()).padStart(2, '0')
+  return `${day}/${month}/${year}`
+}
+
+// Convert YYYY-MM-DD or ISO datetime to DD/MM/YYYY
+const formatToDisplayDate = (dateStr) => {
+  if (!dateStr) return ''
+  
+  // Handle ISO datetime strings (e.g., "2025-09-17T18:30:00.000Z")
+  if (dateStr.includes('T')) {
+    const date = new Date(dateStr)
+    if (!isNaN(date.getTime())) {
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      return `${day}/${month}/${year}`
+    }
+  }
+  
+  // Handle simple YYYY-MM-DD format
+  const [year, month, day] = dateStr.split('-')
+  if (year && month && day) {
+    return `${day}/${month}/${year}`
+  }
+  
+  return ''
+}
+
+// Convert DD/MM/YYYY to YYYY-MM-DD for API
+const formatToAPIDate = (dateStr) => {
+  if (!dateStr) return ''
+  const [day, month, year] = dateStr.split('/')
+  return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+}
+
+// Validate date format DD/MM/YYYY
+const isValidDate = (dateStr) => {
+  if (!dateStr) return false
+  const parts = dateStr.split('/')
+  if (parts.length !== 3) return false
+  const [day, month, year] = parts
+  const dayNum = parseInt(day, 10)
+  const monthNum = parseInt(month, 10)
+  const yearNum = parseInt(year, 10)
+  
+  if (isNaN(dayNum) || isNaN(monthNum) || isNaN(yearNum)) return false
+  if (dayNum < 1 || dayNum > 31) return false
+  if (monthNum < 1 || monthNum > 12) return false
+  if (yearNum < 1900 || yearNum > 2100) return false
+  
+  // Check if date is valid
+  const date = new Date(yearNum, monthNum - 1, dayNum)
+  return date.getFullYear() === yearNum && 
+         date.getMonth() === monthNum - 1 && 
+         date.getDate() === dayNum
+}
 
 const CardUsersForm = ({ isOpen, onClose, onSubmit, editData, isLoading }) => {
   const [formData, setFormData] = useState({
     card_id: '',
     user_id: '',
-    assigned_date: new Date().toISOString().split('T')[0], // Today's date
+    assigned_date: getTodayForInput(), // Today's date in yyyy-mm-dd format for date input
     is_primary: false
   })
   
@@ -24,16 +87,14 @@ const CardUsersForm = ({ isOpen, onClose, onSubmit, editData, isLoading }) => {
         setFormData({
           card_id: editData.card_id?.toString() || '',
           user_id: editData.user_id?.toString() || '',
-          assigned_date: editData.assigned_date ? 
-            new Date(editData.assigned_date).toISOString().split('T')[0] : 
-            new Date().toISOString().split('T')[0],
+          assigned_date: editData.assigned_date ? formatToDisplayDate(editData.assigned_date) : getTodayForInput(),
           is_primary: Boolean(editData.is_primary)
         })
       } else {
         setFormData({
           card_id: '',
           user_id: '',
-          assigned_date: new Date().toISOString().split('T')[0],
+          assigned_date: getTodayForInput(),
           is_primary: false
         })
       }
@@ -51,8 +112,8 @@ const CardUsersForm = ({ isOpen, onClose, onSubmit, editData, isLoading }) => {
   const loadOptions = async () => {
     setLoadingOptions(true)
     try {
-      // Load cards
-      const cardsResponse = await cardsService.getAll({ limit: 100 })
+      // Load only active cards for assignment dropdown
+      const cardsResponse = await cardsService.getActive({ limit: 100 })
       const cardsList = cardsResponse?.data?.cards || cardsResponse?.data || []
       setCards(Array.isArray(cardsList) ? cardsList : [])
 
@@ -71,10 +132,42 @@ const CardUsersForm = ({ isOpen, onClose, onSubmit, editData, isLoading }) => {
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }))
+    
+    // Handle date field with special formatting
+    if (name === 'assigned_date') {
+      // Remove any non-numeric characters except /
+      let cleaned = value.replace(/[^0-9/]/g, '')
+      
+      // Auto-format as user types
+      if (cleaned.length >= 2 && cleaned.charAt(2) !== '/') {
+        if (cleaned.length === 2) {
+          cleaned = cleaned + '/'
+        } else if (cleaned.length > 2 && cleaned.length <= 4) {
+          cleaned = cleaned.substring(0, 2) + '/' + cleaned.substring(2)
+        }
+      }
+      
+      if (cleaned.length >= 5 && cleaned.charAt(5) !== '/') {
+        if (cleaned.length === 5) {
+          cleaned = cleaned + '/'
+        } else if (cleaned.length > 5) {
+          const parts = cleaned.split('/')
+          if (parts.length === 2) {
+            cleaned = parts[0] + '/' + parts[1].substring(0, 2) + '/' + parts[1].substring(2)
+          }
+        }
+      }
+      
+      // Limit to dd/mm/yyyy format (10 characters)
+      if (cleaned.length <= 10) {
+        setFormData(prev => ({ ...prev, [name]: cleaned }))
+      }
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: type === 'checkbox' ? checked : value
+      }))
+    }
     
     // Clear error for this field
     if (errors[name]) {
@@ -110,7 +203,8 @@ const CardUsersForm = ({ isOpen, onClose, onSubmit, editData, isLoading }) => {
       const submitData = {
         ...formData,
         card_id: parseInt(formData.card_id),
-        user_id: parseInt(formData.user_id)
+        user_id: parseInt(formData.user_id),
+        assigned_date: formatToAPIDate(formData.assigned_date) // Convert DD/MM/YYYY to YYYY-MM-DD for API
       }
       
       await onSubmit(submitData)
@@ -122,11 +216,18 @@ const CardUsersForm = ({ isOpen, onClose, onSubmit, editData, isLoading }) => {
     }
   }
 
+  // Handle date picker change (when user clicks calendar icon)
+  const handleDatePickerChange = (value) => {
+    if (value) {
+      setFormData(prev => ({ ...prev, assigned_date: formatToDisplayDate(value) }))
+    }
+  }
+
   const handleClose = () => {
     setFormData({
       card_id: '',
       user_id: '',
-      assigned_date: new Date().toISOString().split('T')[0],
+      assigned_date: getTodayForInput(),
       is_primary: false
     })
     setErrors({})
@@ -227,19 +328,34 @@ const CardUsersForm = ({ isOpen, onClose, onSubmit, editData, isLoading }) => {
                 {/* Assigned Date */}
                 <div>
                   <label htmlFor="assigned_date" className="block text-sm font-medium text-gray-700">
-                    Assigned Date *
+                    Assigned Date * (DD/MM/YYYY)
                   </label>
-                  <input
-                    type="date"
-                    id="assigned_date"
-                    name="assigned_date"
-                    value={formData.assigned_date}
-                    onChange={handleInputChange}
-                    disabled={isLoading}
-                    className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${
-                      errors.assigned_date ? 'border-red-300' : 'border-gray-300'
-                    }`}
-                  />
+                  <div className="relative">
+                    <Calendar
+                      className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 cursor-pointer z-10"
+                      onClick={() => document.getElementById('assigned_date_picker').showPicker && document.getElementById('assigned_date_picker').showPicker()}
+                    />
+                    <input
+                      type="text"
+                      id="assigned_date"
+                      name="assigned_date"
+                      value={formData.assigned_date}
+                      onChange={handleInputChange}
+                      placeholder="DD/MM/YYYY"
+                      disabled={isLoading}
+                      required
+                      className={`pl-10 mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${
+                        errors.assigned_date ? 'border-red-300' : 'border-gray-300'
+                      }`}
+                    />
+                    <input
+                      type="date"
+                      id="assigned_date_picker"
+                      className="absolute opacity-0 pointer-events-none"
+                      onChange={(e) => handleDatePickerChange(e.target.value)}
+                      tabIndex={-1}
+                    />
+                  </div>
                   {errors.assigned_date && (
                     <p className="mt-1 text-xs text-red-600">{errors.assigned_date}</p>
                   )}

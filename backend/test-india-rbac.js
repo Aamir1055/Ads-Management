@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 // Test configuration  
-const BASE_URL = 'http://localhost:3001/api'; // Adjust port if needed
+const BASE_URL = 'http://localhost:5000/api'; // Updated to match server port
 
 async function testIndiaUserRBAC() {
   console.log('🧪 TESTING INDIA USER RBAC FIX');

@@ -10,7 +10,8 @@ const {
   addBalance
 } = require('../controllers/cardsController');
 
-// const { authenticate, authorize } = require('../middleware/auth');
+const { authenticateToken } = require('../middleware/authMiddleware');
+const { attachUserPermissions, modulePermissions } = require('../middleware/rbacMiddleware');
 
 // Request logging (sanitized)
 const requestLogger = (req, res, next) => {
@@ -24,6 +25,10 @@ const requestLogger = (req, res, next) => {
 };
 
 router.use(requestLogger);
+
+// Apply authentication and permission middleware to all routes
+router.use(authenticateToken);
+router.use(attachUserPermissions);
 
 // Basic in-memory rate limiter with cleanup (single instances)
 const createRateLimit = (windowMs = 15 * 60 * 1000, max = 100) => {
@@ -80,21 +85,15 @@ const deleteLimiter = createRateLimit(60 * 60 * 1000, 5);
 const addBalanceLimiter = createRateLimit(15 * 60 * 1000, 30);
 
 // =============================================================================
-// PUBLIC ROUTES
+// PROTECTED ROUTES WITH RBAC
 // =============================================================================
 
-router.post('/', createLimiter, createCard);
-
-// =============================================================================
-// PROTECTED ROUTES (enable auth when ready)
-// =============================================================================
-// router.use(authenticate);
-
-router.get('/', listLimiter, getAllCards);
-router.get('/:id', getOneLimiter, getCardById);
-router.put('/:id', updateLimiter, /* authorize(['admin','manager']), */ updateCard);
-router.post('/:id/add-balance', addBalanceLimiter, /* authorize(['admin','manager']), */ addBalance);
-router.delete('/:id', deleteLimiter, /* authorize(['admin']), */ deleteCard);
+router.post('/', createLimiter, modulePermissions.cards.create, createCard);
+router.get('/', listLimiter, modulePermissions.cards.read, getAllCards);
+router.get('/:id', getOneLimiter, modulePermissions.cards.read, getCardById);
+router.put('/:id', updateLimiter, modulePermissions.cards.update, updateCard);
+router.post('/:id/add-balance', addBalanceLimiter, modulePermissions.cards.update, addBalance);
+router.delete('/:id', deleteLimiter, modulePermissions.cards.delete, deleteCard);
 
 // =============================================================================
 // ERROR HANDLING

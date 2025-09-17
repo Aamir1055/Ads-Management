@@ -4,6 +4,9 @@ const router = express.Router();
 // Authentication middleware
 const { authenticateToken } = require('../middleware/authMiddleware');
 
+// RBAC middleware
+const { createPermissionMiddleware } = require('../config/rbacRouteMapping');
+
 // Data privacy middleware
 const { 
   dataPrivacyMiddleware, 
@@ -11,7 +14,7 @@ const {
   validateOwnership 
 } = require('../middleware/dataPrivacy');
 
-// Controller
+// Controller - Privacy enabled
 const {
   getAllCampaigns,
   getCampaignById,
@@ -110,27 +113,33 @@ router.use(dataPrivacyMiddleware);
  * Lists campaigns with user-based filtering
  * - Admins see all campaigns
  * - Regular users see only their own campaigns
+ * - RBAC: Requires campaigns_read permission
  */
 router.get('/', 
-  listLimiter, 
+  listLimiter,
+  createPermissionMiddleware.campaigns.read(), // 🔒 RBAC: campaigns_read required
   getAllCampaigns
 );
 
 /**
  * GET /api/campaigns/:id
  * Gets single campaign with ownership validation
+ * - RBAC: Requires campaigns_read permission
  */
 router.get('/:id', 
-  listLimiter, 
+  listLimiter,
+  createPermissionMiddleware.campaigns.read(), // 🔒 RBAC: campaigns_read required
   getCampaignById
 );
 
 /**
  * POST /api/campaigns
  * Creates campaign with automatic user ownership
+ * - RBAC: Requires campaigns_create permission
  */
 router.post('/', 
-  createLimiter, 
+  createLimiter,
+  createPermissionMiddleware.campaigns.create(), // 🔒 RBAC: campaigns_create required
   ensureOwnership, // Will add created_by
   createCampaign
 );
@@ -138,9 +147,11 @@ router.post('/',
 /**
  * PUT /api/campaigns/:id
  * Updates campaign with ownership validation
+ * - RBAC: Requires campaigns_update permission
  */
 router.put('/:id', 
-  updateLimiter, 
+  updateLimiter,
+  createPermissionMiddleware.campaigns.update(), // 🔒 RBAC: campaigns_update required
   validateOwnership('campaigns', 'created_by', 'id'), 
   updateCampaign
 );
@@ -148,9 +159,11 @@ router.put('/:id',
 /**
  * DELETE /api/campaigns/:id
  * Deletes campaign with ownership validation
+ * - RBAC: Requires campaigns_delete permission
  */
 router.delete('/:id', 
-  deleteLimiter, 
+  deleteLimiter,
+  createPermissionMiddleware.campaigns.delete(), // 🔒 RBAC: campaigns_delete required
   validateOwnership('campaigns', 'created_by', 'id'), 
   deleteCampaign
 );
@@ -158,11 +171,26 @@ router.delete('/:id',
 /**
  * PATCH /api/campaigns/:id/toggle-status
  * Toggles campaign status with ownership validation
+ * - RBAC: Requires campaigns_update permission
  */
 router.patch('/:id/toggle-status', 
-  updateLimiter, 
+  updateLimiter,
+  createPermissionMiddleware.campaigns.update(), // 🔒 RBAC: campaigns_update required
   validateOwnership('campaigns', 'created_by', 'id'), 
   toggleCampaignStatus
+);
+
+/**
+ * PUT /api/campaigns/:id/toggle-enabled
+ * Toggles campaign enabled/disabled status with ownership validation
+ * - RBAC: Requires campaigns_update permission
+ * - Alias for toggle-status but matches frontend expectations
+ */
+router.put('/:id/toggle-enabled', 
+  updateLimiter,
+  createPermissionMiddleware.campaigns.update(), // 🔒 RBAC: campaigns_update required
+  validateOwnership('campaigns', 'created_by', 'id'), 
+  toggleCampaignStatus // Uses same controller method
 );
 
 // =============================================================================
@@ -180,7 +208,8 @@ router.use((req, res) => {
       'GET /campaigns/:id': 'Get campaign by ID (ownership validated)',
       'PUT /campaigns/:id': 'Update campaign (ownership validated)',
       'DELETE /campaigns/:id': 'Delete campaign (ownership validated)',
-      'PATCH /campaigns/:id/toggle-status': 'Toggle campaign status (ownership validated)'
+      'PATCH /campaigns/:id/toggle-status': 'Toggle campaign status (ownership validated)',
+      'PUT /campaigns/:id/toggle-enabled': 'Toggle campaign enabled/disabled status (ownership validated)'
     }
   });
 });

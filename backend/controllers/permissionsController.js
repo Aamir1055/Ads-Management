@@ -557,7 +557,75 @@ const permissionsController = {
   // Compatibility function for existing database structure
   getModulesWithPermissions: async (req, res) => {
     try {
-      // Get all permissions and group them by category (simulate modules)
+      // Define SuperAdmin-only permissions that should NOT appear in Role Management
+      const superAdminOnlyPermissions = [
+        'campaign_types_create',
+        'campaign_types_update', 
+        'campaign_types_delete',
+        'brands_create',
+        'brands_update',
+        'brands_delete'
+      ];
+
+      // Define the desired module structure and order
+      const moduleStructure = [
+        {
+          name: 'User Management',
+          categories: ['users'],
+          description: 'User management related permissions'
+        },
+        {
+          name: 'Role Management', 
+          categories: ['permissions', 'system'],
+          description: 'Role and permission management',
+          filterPermissions: ['role_management', 'permissions_create', 'permissions_read', 'permissions_update', 'permissions_delete', 'role_assign', 'role_revoke'],
+          permissionNameOverrides: {
+            'role_management': 'Manage Roles & Permissions'
+          }
+        },
+        {
+          name: 'Brand',
+          categories: ['brands'],
+          description: 'Brand management permissions'
+        },
+        {
+          name: 'Campaign Types',
+          categories: ['campaign_types'],
+          description: 'Campaign type management permissions'
+        },
+        {
+          name: 'Campaigns',
+          categories: ['campaigns'],
+          description: 'Campaign management permissions'
+        },
+        {
+          name: 'Campaign Data',
+          categories: ['Campaign Data'],
+          description: 'Campaign data management permissions'
+        },
+        {
+          name: 'Cards',
+          categories: ['cards'],
+          description: 'Card management permissions'
+        },
+        {
+          name: 'Card Users',
+          categories: ['card_users'],
+          description: 'Card user management permissions'
+        },
+        {
+          name: 'Report Analytics',
+          categories: ['analytics', 'report_analytics'],
+          description: 'Report analytics permissions'
+        },
+        {
+          name: 'Reports',
+          categories: ['reports'],
+          description: 'Report management permissions'
+        }
+      ];
+
+      // Get all permissions
       const [permissions] = await pool.query(`
         SELECT 
           id,
@@ -570,30 +638,61 @@ const permissionsController = {
         ORDER BY category, display_name ASC
       `);
       
-      // Group permissions by category (treating categories as modules)
-      const categoriesMap = {};
-      permissions.forEach(permission => {
-        const category = permission.category || 'General';
-        if (!categoriesMap[category]) {
-          categoriesMap[category] = {
-            id: Object.keys(categoriesMap).length + 1,
-            name: category,
-            description: `${category} related permissions`,
-            permissions: []
-          };
-        }
-        
-        categoriesMap[category].permissions.push({
-          id: permission.id,
-          name: permission.display_name || permission.name,
-          key: permission.name, // Use the actual permission name as key
-          description: permission.display_name || permission.name,
-          http_method: 'GET,POST,PUT,DELETE',
-          api_endpoint: `/${category.toLowerCase()}`
-        });
-      });
+      // Create modules with permissions based on the defined structure
+      const modulesWithPermissions = [];
       
-      const modulesWithPermissions = Object.values(categoriesMap);
+      moduleStructure.forEach((moduleConfig, index) => {
+        const modulePermissions = [];
+        
+        // Get permissions for this module
+        permissions.forEach(permission => {
+          // Skip SuperAdmin-only permissions from appearing in Role Management
+          if (superAdminOnlyPermissions.includes(permission.name)) {
+            return; // Skip this permission
+          }
+          
+          // Check if this permission belongs to this module
+          const belongsToModule = moduleConfig.categories.includes(permission.category);
+          
+          // For Role Management module, also check specific permission filter
+          if (moduleConfig.filterPermissions) {
+            const isFilteredPermission = moduleConfig.filterPermissions.includes(permission.name);
+            if (belongsToModule && isFilteredPermission) {
+              // Apply permission name override if specified
+              const overrideName = moduleConfig.permissionNameOverrides?.[permission.name];
+              const displayName = overrideName || permission.display_name || permission.name;
+              
+              modulePermissions.push({
+                id: permission.id,
+                name: displayName,
+                key: permission.name,
+                description: displayName,
+                http_method: 'GET,POST,PUT,DELETE',
+                api_endpoint: `/${permission.category}`
+              });
+            }
+          } else if (belongsToModule) {
+            modulePermissions.push({
+              id: permission.id,
+              name: permission.display_name || permission.name,
+              key: permission.name,
+              description: permission.display_name || permission.name,
+              http_method: 'GET,POST,PUT,DELETE',
+              api_endpoint: `/${permission.category}`
+            });
+          }
+        });
+        
+        // Only add module if it has permissions
+        if (modulePermissions.length > 0) {
+          modulesWithPermissions.push({
+            id: index + 1,
+            name: moduleConfig.name,
+            description: moduleConfig.description,
+            permissions: modulePermissions
+          });
+        }
+      });
       
       return res.status(200).json(createResponse(true, `Retrieved ${modulesWithPermissions.length} modules with permissions`, modulesWithPermissions));
     } catch (error) {

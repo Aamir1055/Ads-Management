@@ -261,6 +261,85 @@ const cardsController = {
     }
   },
 
+  // Get active cards for assignment dropdowns - with ownership validation
+  getActiveCards: async (req, res) => {
+    try {
+      const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
+      const offset = (page - 1) * limit;
+
+      const searchTerm = (req.query.search || '').trim();
+      const search = searchTerm ? `%${searchTerm}%` : null;
+
+      let countQuery = 'SELECT COUNT(*) AS total FROM cards WHERE is_active = 1';
+      let cardsQuery = `
+        SELECT 
+          id,
+          card_name,
+          card_number_last4,
+          card_type,
+          current_balance,
+          credit_limit,
+          is_active,
+          created_by,
+          created_at,
+          updated_at
+        FROM cards WHERE is_active = 1`;
+
+      const queryParams = [];
+      const where = [];
+
+      // Add privacy filtering for non-admins
+      const isAdmin = req.user.role && (req.user.role.level >= 8 || req.user.role.name === 'super_admin' || req.user.role.name === 'admin');
+      if (!isAdmin) {
+        where.push('created_by = ?');
+        queryParams.push(req.user.id);
+      }
+
+      if (search) {
+        where.push('(card_name LIKE ? OR card_type LIKE ?)');
+        queryParams.push(search, search);
+      }
+
+      if (where.length) {
+        const wc = ` AND ${where.join(' AND ')}`;
+        countQuery += wc;
+        cardsQuery += wc;
+      }
+
+      cardsQuery += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+
+      // totals
+      const [countRows] = await pool.query(countQuery, queryParams);
+      const totalCards = Number((Array.isArray(countRows) ? countRows[0]?.total : countRows?.total) || 0);
+
+      // page rows
+      const [cards] = await pool.query(cardsQuery, [...queryParams, Number(limit), Number(offset)]);
+
+      const totalPages = Math.max(1, Math.ceil(totalCards / limit));
+      const hasNextPage = page < totalPages;
+      const hasPrevPage = page > 1;
+
+      return res.status(200).json(
+        createResponse(true, 'Active cards fetched successfully', {
+          cards,
+          pagination: {
+            currentPage: page,
+            totalPages,
+            totalCards,
+            limit,
+            hasNextPage,
+            hasPrevPage,
+            ...(searchTerm && { searchTerm }),
+            activeFilter: true, // Always true for this endpoint
+          },
+        })
+      );
+    } catch (error) {
+      return handleDatabaseError(error, 'fetch active cards', res);
+    }
+  },
+
   // Get by id - with ownership validation
   getCardById: async (req, res) => {
     try {

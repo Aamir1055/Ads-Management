@@ -30,14 +30,16 @@ router.get('/modules', async (req, res) => {
     // Define which frontend routes correspond to which backend modules
     const moduleRouteMap = {
       'users': '/user-management',
-      'campaign_data': '/campaign-data',
+      'brands': '/brands',
       'campaign_types': '/campaign-types',
       'campaigns': '/campaigns',
+      'campaign_data': '/campaign-data',
       'cards': '/cards',
       'card_users': '/card-users',
       'reports': '/reports-table',
-      'analytics': '/analytics',
-      'permissions': '/role-management',
+      'analytics': '/report-analytics',
+      'roles': '/role-management', // Fixed: was 'permissions', should be 'roles'
+      'permissions': '/role-management', // Keep both for compatibility
       'settings': '/settings'
     };
 
@@ -72,16 +74,15 @@ router.get('/modules', async (req, res) => {
         navigation: [
           { name: 'Dashboard', href: '/dashboard', icon: 'Home', allowed: true },
           { name: 'User Management', href: '/user-management', icon: 'Users', allowed: allowedModules.includes('users') },
-          { name: 'Campaign Data', href: '/campaign-data', icon: 'Database', allowed: allowedModules.includes('campaign_data') },
-          { name: 'Role Management', href: '/role-management', icon: 'Key', allowed: allowedModules.includes('permissions') },
+          { name: 'Role Management', href: '/role-management', icon: 'Key', allowed: allowedModules.includes('roles') || allowedModules.includes('permissions') },
+          { name: 'Brand Management', href: '/brands', icon: 'Tags', allowed: allowedModules.includes('brands') },
           { name: 'Campaign Types', href: '/campaign-types', icon: 'Tags', allowed: allowedModules.includes('campaign_types') },
+          { name: 'Campaigns', href: '/campaigns', icon: 'Target', allowed: allowedModules.includes('campaigns') },
+          { name: 'Campaign Data', href: '/campaign-data', icon: 'Database', allowed: allowedModules.includes('campaign_data') },
           { name: 'Cards', href: '/cards', icon: 'CreditCard', allowed: allowedModules.includes('cards') },
           { name: 'Card Users', href: '/card-users', icon: 'UserCheck', allowed: allowedModules.includes('card_users') },
-          { name: 'Campaigns', href: '/campaigns', icon: 'Target', allowed: allowedModules.includes('campaigns') },
-          { name: 'Analytics', href: '/analytics', icon: 'BarChart3', allowed: allowedModules.includes('analytics') },
           { name: 'Reports', href: '/reports-table', icon: 'FileText', allowed: allowedModules.includes('reports') },
-          { name: 'Report Analytics', href: '/report-analytics', icon: 'BarChart3', allowed: allowedModules.includes('reports') },
-          { name: 'Settings', href: '/settings', icon: 'Settings', allowed: allowedModules.includes('settings') }
+          { name: 'Report Analytics', href: '/report-analytics', icon: 'BarChart3', allowed: allowedModules.includes('analytics') || allowedModules.includes('reports') }
         ].filter(item => item.allowed) // Only return allowed navigation items
       }
     });

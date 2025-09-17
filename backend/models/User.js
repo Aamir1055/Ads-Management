@@ -14,6 +14,8 @@ class User {
   this.username = data.username;
   this.hashed_password = data.hashed_password;
   this.role_id = data.role_id;
+  this.role_name = data.role_name;
+  this.role_description = data.role_description;
   this.auth_token = data.auth_token;
   this.is_2fa_enabled = data.is_2fa_enabled;
   this.twofa_enabled = data.twofa_enabled;

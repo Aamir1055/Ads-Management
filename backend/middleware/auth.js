@@ -40,7 +40,7 @@ const protect = async (req, res, next) => {
     // Fetch minimal user profile; ensure active
     const [rows] = await pool.query(
       'SELECT id, username, role_id FROM users WHERE id = ? AND is_active = 1 LIMIT 1',
-      [decoded.id]
+      [decoded.userId]
     );
 
     if (!rows || rows.length === 0) {

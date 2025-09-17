@@ -14,6 +14,17 @@ const cardsService = {
     }
   },
 
+  // Get only active cards for assignment dropdowns
+  getActive: async (params = {}) => {
+    try {
+      const response = await api.get(`${ENDPOINT}/active`, { params });
+      return response.data;
+    } catch (error) {
+      console.error('API get active cards error:', error.response?.data || error);
+      throw error;
+    }
+  },
+
   // Get single card by ID
   getById: async (id) => {
     try {

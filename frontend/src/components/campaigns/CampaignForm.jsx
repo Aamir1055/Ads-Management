@@ -1,92 +1,125 @@
 import React, { useState, useEffect } from 'react'
-import { X, Save, AlertCircle } from 'lucide-react'
+import { X, Save, AlertCircle, Plus } from 'lucide-react'
 import campaignService from '../../services/campaignService'
 
 const CampaignForm = ({ campaign = null, isOpen, onClose, onSave }) => {
   const [formData, setFormData] = useState({
     name: '',
-    persona: '', // Changed to string for comma-separated values
-    gender: [],
-    age: '',
-    location: '',
-    creatives: 'image',
-    campaign_type_id: '',
-    brand: '',
-    is_enabled: true
+    persona: [], // Array for multiple values stored as JSON
+    gender: [], // Array for multiple values stored as JSON
+    min_age: '', // Integer field for minimum age
+    max_age: '', // Integer field for maximum age
+    location: [], // Array for multiple values stored as JSON
+    creatives: 'image', // Enum dropdown
+    is_enabled: true, // Toggle
+    campaign_type_id: '', // Foreign key to campaign_types
+    brand: '' // Foreign key to brands (store ID, display name)
   })
 
+  const [personaInput, setPersonaInput] = useState('')
+  const [genderInput, setGenderInput] = useState('')
+  const [locationInput, setLocationInput] = useState('')
+
   const [campaignTypes, setCampaignTypes] = useState([])
+  const [brands, setBrands] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [validationErrors, setValidationErrors] = useState({})
 
-  const personaOptions = [
-    'Young Adults (18-25)',
-    'Professionals (26-35)',
-    'Parents (30-45)', 
-    'Seniors (45+)',
-    'Students',
-    'Entrepreneurs',
-    'Homemakers',
-    'Tech Enthusiasts'
-  ]
-
-  const genderOptions = [
-    { id: 'male', label: 'Male' },
-    { id: 'female', label: 'Female' },
-    { id: 'other', label: 'Other' }
-  ]
-
   const creativeOptions = [
-    { value: 'image', label: 'Images' },
-    { value: 'video', label: 'Videos' },
+    { value: 'video', label: 'Video' },
+    { value: 'image', label: 'Image' },
     { value: 'carousel', label: 'Carousel' },
     { value: 'collection', label: 'Collection' }
   ]
 
   useEffect(() => {
     if (isOpen) {
-      loadCampaignTypes()
+      loadDropdownData()
       if (campaign) {
+        console.log('🔧 Initializing form with campaign data:', campaign)
+        const brandId = (typeof campaign.brand === 'object' && campaign.brand?.id) ? campaign.brand.id.toString() : (campaign.brand ? campaign.brand.toString() : '')
+        console.log('🔧 Extracted brand ID:', brandId, 'from brand:', campaign.brand)
+        
+        // Parse existing campaign data
         setFormData({
           name: campaign.name || '',
-          persona: campaign.persona || '', // Handle persona as text
-          gender: Array.isArray(campaign.gender) ? campaign.gender : 
-                  (campaign.gender ? JSON.parse(campaign.gender) : []),
-          age: campaign.age || '',
-          location: campaign.location || '',
+          persona: parseJsonArray(campaign.persona),
+          gender: parseJsonArray(campaign.gender),
+          min_age: campaign.min_age ? campaign.min_age.toString() : '',
+          max_age: campaign.max_age ? campaign.max_age.toString() : '',
+          location: parseJsonArray(campaign.location),
           creatives: campaign.creatives || 'image',
+          is_enabled: campaign.is_enabled !== undefined ? !!campaign.is_enabled : true,
           campaign_type_id: campaign.campaign_type_id || '',
-          brand: campaign.brand || '',
-          is_enabled: campaign.is_enabled !== undefined ? !!campaign.is_enabled : true
+          brand: brandId
         })
       } else {
         // Reset form for new campaign
         setFormData({
           name: '',
-          persona: '', // Reset persona as empty string
+          persona: [],
           gender: [],
-          age: '',
-          location: '',
+          min_age: '',
+          max_age: '',
+          location: [],
           creatives: 'image',
+          is_enabled: true,
           campaign_type_id: '',
-          brand: '',
-          is_enabled: true
+          brand: ''
         })
       }
+      resetInputs()
       setError('')
       setValidationErrors({})
     }
   }, [isOpen, campaign])
 
-  const loadCampaignTypes = async () => {
+  // Re-set brand if campaign and brands are loaded (timing fix)
+  useEffect(() => {
+    if (campaign && brands.length > 0) {
+      const brandId = (typeof campaign.brand === 'object' && campaign.brand?.id) ? campaign.brand.id.toString() : (campaign.brand ? campaign.brand.toString() : '')
+      console.log('🔧 Re-setting brand after brands loaded. Brand ID:', brandId, 'Available brands:', brands.length)
+      setFormData(prev => ({
+        ...prev,
+        brand: brandId
+      }))
+    }
+  }, [campaign, brands])
+
+  const parseJsonArray = (value) => {
+    if (!value) return []
+    if (Array.isArray(value)) return value
     try {
-      const response = await campaignService.getCampaignTypes()
-      if (response.success) {
-        setCampaignTypes(response.data || [])
+      const parsed = JSON.parse(value)
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return []
+    }
+  }
+
+  const resetInputs = () => {
+    setPersonaInput('')
+    setGenderInput('')
+    setLocationInput('')
+  }
+
+  const loadDropdownData = async () => {
+    try {
+      // Load campaign types
+      const campaignTypesResponse = await campaignService.getCampaignTypes()
+      if (campaignTypesResponse.success) {
+        setCampaignTypes(campaignTypesResponse.data || [])
+      }
+
+      // Load brands
+      const brandsResponse = await campaignService.getBrands()
+      if (brandsResponse.success) {
+        console.log('🏢 Loaded brands:', brandsResponse.data)
+        setBrands(brandsResponse.data || [])
       }
     } catch (error) {
-      console.error('Error loading campaign types:', error)
+      console.error('Error loading dropdown data:', error)
     }
   }
 
@@ -106,21 +139,29 @@ const CampaignForm = ({ campaign = null, isOpen, onClose, onSave }) => {
     }
   }
 
-  const handleCheckboxChange = (field, value) => {
+  const addToArray = (field, value, inputSetter) => {
+    const trimmedValue = value.trim()
+    if (trimmedValue && !formData[field].includes(trimmedValue)) {
+      setFormData(prev => ({
+        ...prev,
+        [field]: [...prev[field], trimmedValue]
+      }))
+      inputSetter('')
+    }
+  }
+
+  const removeFromArray = (field, index) => {
     setFormData(prev => ({
       ...prev,
-      [field]: prev[field].includes(value)
-        ? prev[field].filter(item => item !== value)
-        : [...prev[field], value]
+      [field]: prev[field].filter((_, i) => i !== index)
     }))
   }
 
-  const handleLocationChange = (e) => {
-    const value = e.target.value
-    setFormData(prev => ({
-      ...prev,
-      location: value
-    }))
+  const handleKeyPress = (e, field, value, inputSetter) => {
+    if (e.key === 'Enter' && value.trim()) {
+      e.preventDefault()
+      addToArray(field, value, inputSetter)
+    }
   }
 
   const validateForm = () => {
@@ -134,20 +175,21 @@ const CampaignForm = ({ campaign = null, isOpen, onClose, onSave }) => {
       errors.campaign_type_id = 'Campaign type is required'
     }
 
-    if (!formData.persona.trim()) {
-      errors.persona = 'Persona is required'
+    if (!formData.brand) {
+      errors.brand = 'Brand is required'
     }
 
-    if (formData.gender.length === 0) {
-      errors.gender = 'At least one gender must be selected'
+    // Validate min and max age
+    if (formData.min_age && (isNaN(formData.min_age) || formData.min_age < 0 || formData.min_age > 100)) {
+      errors.min_age = 'Minimum age must be a number between 0 and 100'
     }
 
-    if (!formData.location.trim()) {
-      errors.location = 'Location is required'
+    if (formData.max_age && (isNaN(formData.max_age) || formData.max_age < 0 || formData.max_age > 100)) {
+      errors.max_age = 'Maximum age must be a number between 0 and 100'
     }
 
-    if (formData.age && (isNaN(formData.age) || formData.age < 1 || formData.age > 120)) {
-      errors.age = 'Please enter a valid age (1-120)'
+    if (formData.min_age && formData.max_age && parseInt(formData.min_age) > parseInt(formData.max_age)) {
+      errors.min_age = 'Minimum age cannot be greater than maximum age'
     }
 
     setValidationErrors(errors)
@@ -166,11 +208,16 @@ const CampaignForm = ({ campaign = null, isOpen, onClose, onSave }) => {
 
     try {
       const submitData = {
-        ...formData,
-        persona: formData.persona.trim(), // Send persona as plain text
-        gender: JSON.stringify(formData.gender),
-        age: formData.age ? parseInt(formData.age) : null,
-        campaign_type_id: parseInt(formData.campaign_type_id)
+        name: formData.name.trim(),
+        persona: formData.persona, // Send as array, backend will handle JSON conversion
+        gender: formData.gender, // Send as array, backend will handle JSON conversion
+        min_age: formData.min_age ? parseInt(formData.min_age) : null,
+        max_age: formData.max_age ? parseInt(formData.max_age) : null,
+        location: formData.location, // Send as array, backend will handle JSON conversion
+        creatives: formData.creatives,
+        is_enabled: formData.is_enabled,
+        campaign_type_id: parseInt(formData.campaign_type_id),
+        brand: parseInt(formData.brand) // Send brand ID
       }
 
       let response
@@ -245,23 +292,7 @@ const CampaignForm = ({ campaign = null, isOpen, onClose, onSave }) => {
               )}
             </div>
 
-            {/* Brand */}
-            <div>
-              <label htmlFor="brand" className="block text-sm font-medium text-gray-700 mb-1">
-                Brand
-              </label>
-              <input
-                type="text"
-                id="brand"
-                name="brand"
-                value={formData.brand}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                placeholder="Enter brand name"
-              />
-            </div>
-
-            {/* Campaign Type */}
+            {/* Campaign Type Dropdown */}
             <div>
               <label htmlFor="campaign_type_id" className="block text-sm font-medium text-gray-700 mb-1">
                 Campaign Type *
@@ -287,33 +318,82 @@ const CampaignForm = ({ campaign = null, isOpen, onClose, onSave }) => {
               )}
             </div>
 
-            {/* Age */}
+            {/* Brand Dropdown */}
             <div>
-              <label htmlFor="age" className="block text-sm font-medium text-gray-700 mb-1">
-                Target Age
+              <label htmlFor="brand" className="block text-sm font-medium text-gray-700 mb-1">
+                Brand *
               </label>
-              <input
-                type="number"
-                id="age"
-                name="age"
-                value={formData.age}
+              <select
+                id="brand"
+                name="brand"
+                value={formData.brand}
                 onChange={handleInputChange}
-                min="1"
-                max="120"
                 className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 ${
-                  validationErrors.age ? 'border-red-300 focus:border-red-500' : 'border-gray-300 focus:border-purple-500'
+                  validationErrors.brand ? 'border-red-300 focus:border-red-500' : 'border-gray-300 focus:border-purple-500'
                 }`}
-                placeholder="Enter target age"
-              />
-              {validationErrors.age && (
-                <p className="mt-1 text-sm text-red-600">{validationErrors.age}</p>
+              >
+                <option value="">Select Brand</option>
+                {brands.map((brand) => (
+                  <option key={brand.id} value={brand.id}>
+                    {brand.name}
+                  </option>
+                ))}
+              </select>
+              {validationErrors.brand && (
+                <p className="mt-1 text-sm text-red-600">{validationErrors.brand}</p>
               )}
             </div>
 
-            {/* Creatives */}
+            {/* Min Age */}
+            <div>
+              <label htmlFor="min_age" className="block text-sm font-medium text-gray-700 mb-1">
+                Minimum Age
+              </label>
+              <input
+                type="number"
+                id="min_age"
+                name="min_age"
+                min="0"
+                max="100"
+                value={formData.min_age}
+                onChange={handleInputChange}
+                className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                  validationErrors.min_age ? 'border-red-300 focus:border-red-500' : 'border-gray-300 focus:border-purple-500'
+                }`}
+                placeholder="Enter minimum age"
+              />
+              {validationErrors.min_age && (
+                <p className="mt-1 text-sm text-red-600">{validationErrors.min_age}</p>
+              )}
+            </div>
+
+            {/* Max Age */}
+            <div>
+              <label htmlFor="max_age" className="block text-sm font-medium text-gray-700 mb-1">
+                Maximum Age
+              </label>
+              <input
+                type="number"
+                id="max_age"
+                name="max_age"
+                min="0"
+                max="100"
+                value={formData.max_age}
+                onChange={handleInputChange}
+                className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                  validationErrors.max_age ? 'border-red-300 focus:border-red-500' : 'border-gray-300 focus:border-purple-500'
+                }`}
+                placeholder="Enter maximum age"
+              />
+              {validationErrors.max_age && (
+                <p className="mt-1 text-sm text-red-600">{validationErrors.max_age}</p>
+              )}
+            </div>
+
+            {/* Creatives Dropdown */}
             <div>
               <label htmlFor="creatives" className="block text-sm font-medium text-gray-700 mb-1">
-                Creatives
+                Creative Type
               </label>
               <select
                 id="creatives"
@@ -330,75 +410,145 @@ const CampaignForm = ({ campaign = null, isOpen, onClose, onSave }) => {
               </select>
             </div>
 
-            {/* Persona */}
+            {/* Persona Multi-Value Input */}
             <div className="md:col-span-2">
-              <label htmlFor="persona" className="block text-sm font-medium text-gray-700 mb-1">
-                Persona * <span className="text-sm text-gray-500">(separate multiple values with commas)</span>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Persona (Multiple Values)
               </label>
-              <input
-                type="text"
-                id="persona"
-                name="persona"
-                value={formData.persona}
-                onChange={handleInputChange}
-                className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 ${
-                  validationErrors.persona ? 'border-red-300 focus:border-red-500' : 'border-gray-300 focus:border-purple-500'
-                }`}
-                placeholder="Young Adults (18-25), Professionals (26-35), Parents (30-45)..."
-              />
-              <div className="mt-2 text-xs text-gray-500">
-                <strong>Suggested values:</strong> {personaOptions.join(', ')}
-              </div>
-              {validationErrors.persona && (
-                <p className="mt-1 text-sm text-red-600">{validationErrors.persona}</p>
-              )}
-            </div>
-
-            {/* Gender */}
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Gender *
-              </label>
-              <div className="flex space-x-6">
-                {genderOptions.map((gender) => (
-                  <label key={gender.id} className="flex items-center space-x-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.gender.includes(gender.id)}
-                      onChange={() => handleCheckboxChange('gender', gender.id)}
-                      className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                    />
-                    <span className="text-sm text-gray-700">{gender.label}</span>
-                  </label>
+              
+              {/* Display selected personas */}
+              <div className="mb-2 flex flex-wrap gap-2">
+                {formData.persona.map((persona, index) => (
+                  <div
+                    key={index}
+                    className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-purple-100 text-purple-800 border border-purple-200"
+                  >
+                    <span>{persona}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeFromArray('persona', index)}
+                      className="ml-2 text-purple-600 hover:text-purple-800"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
                 ))}
               </div>
-              {validationErrors.gender && (
-                <p className="mt-1 text-sm text-red-600">{validationErrors.gender}</p>
-              )}
+              
+              {/* Input for new persona */}
+              <div className="flex space-x-2">
+                <input
+                  type="text"
+                  value={personaInput}
+                  onChange={(e) => setPersonaInput(e.target.value)}
+                  onKeyDown={(e) => handleKeyPress(e, 'persona', personaInput, setPersonaInput)}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  placeholder="Type persona and press Enter"
+                />
+                <button
+                  type="button"
+                  onClick={() => addToArray('persona', personaInput, setPersonaInput)}
+                  disabled={!personaInput.trim()}
+                  className="px-3 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
             </div>
 
-            {/* Location */}
+            {/* Gender Multi-Value Input */}
             <div className="md:col-span-2">
-              <label htmlFor="location" className="block text-sm font-medium text-gray-700 mb-1">
-                Locations * <span className="text-sm text-gray-500">(separate multiple locations with commas)</span>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Gender (Multiple Values)
               </label>
-              <input
-                type="text"
-                id="location"
-                name="location"
-                value={formData.location}
-                onChange={handleLocationChange}
-                className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 ${
-                  validationErrors.location ? 'border-red-300 focus:border-red-500' : 'border-gray-300 focus:border-purple-500'
-                }`}
-                placeholder="Delhi, Mumbai, Bangalore, Chennai..."
-              />
-              {validationErrors.location && (
-                <p className="mt-1 text-sm text-red-600">{validationErrors.location}</p>
-              )}
+              
+              {/* Display selected genders */}
+              <div className="mb-2 flex flex-wrap gap-2">
+                {formData.gender.map((gender, index) => (
+                  <div
+                    key={index}
+                    className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800 border border-blue-200"
+                  >
+                    <span>{gender}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeFromArray('gender', index)}
+                      className="ml-2 text-blue-600 hover:text-blue-800"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              
+              {/* Input for new gender */}
+              <div className="flex space-x-2">
+                <input
+                  type="text"
+                  value={genderInput}
+                  onChange={(e) => setGenderInput(e.target.value)}
+                  onKeyDown={(e) => handleKeyPress(e, 'gender', genderInput, setGenderInput)}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  placeholder="Type gender and press Enter"
+                />
+                <button
+                  type="button"
+                  onClick={() => addToArray('gender', genderInput, setGenderInput)}
+                  disabled={!genderInput.trim()}
+                  className="px-3 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
             </div>
 
-            {/* Enable/Disable Toggle */}
+            {/* Location Multi-Value Input */}
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Location (Multiple Values)
+              </label>
+              
+              {/* Display selected locations */}
+              <div className="mb-2 flex flex-wrap gap-2">
+                {formData.location.map((location, index) => (
+                  <div
+                    key={index}
+                    className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-green-100 text-green-800 border border-green-200"
+                  >
+                    <span>{location}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeFromArray('location', index)}
+                      className="ml-2 text-green-600 hover:text-green-800"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              
+              {/* Input for new location */}
+              <div className="flex space-x-2">
+                <input
+                  type="text"
+                  value={locationInput}
+                  onChange={(e) => setLocationInput(e.target.value)}
+                  onKeyDown={(e) => handleKeyPress(e, 'location', locationInput, setLocationInput)}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  placeholder="Type location and press Enter"
+                />
+                <button
+                  type="button"
+                  onClick={() => addToArray('location', locationInput, setLocationInput)}
+                  disabled={!locationInput.trim()}
+                  className="px-3 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Is Enabled Toggle */}
             <div className="md:col-span-2">
               <div className="flex items-center justify-between">
                 <label htmlFor="is_enabled" className="block text-sm font-medium text-gray-700">

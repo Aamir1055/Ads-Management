@@ -7,7 +7,6 @@ import {
   Eye, 
   EyeOff, 
   Shield,
-  QrCode,
   X,
   Save,
   AlertCircle,
@@ -50,35 +49,6 @@ const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
   );
 };
 
-// QR Code Modal
-const QRCodeModal = ({ isOpen, onClose, qrCode, secret, message }) => (
-  <Modal isOpen={isOpen} onClose={onClose} title="Setup Two-Factor Authentication">
-    <div className="text-center">
-      {qrCode && (
-        <div className="mb-6">
-          <div className="inline-block p-4 bg-white border-2 border-gray-200 rounded-lg shadow-sm">
-            <img src={qrCode} alt="QR Code" className="mx-auto" />
-          </div>
-          <p className="text-sm text-gray-600 mt-4">{message}</p>
-        </div>
-      )}
-      {secret && (
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
-          <p className="text-sm text-gray-600 mb-2">Secret Key (save this securely):</p>
-          <div className="bg-white border rounded-md p-3">
-            <code className="text-sm font-mono text-gray-800 break-all">{secret}</code>
-          </div>
-        </div>
-      )}
-      <button
-        onClick={onClose}
-        className="px-6 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
-      >
-        Got it!
-      </button>
-    </div>
-  </Modal>
-);
 
 // Create/Edit User Modal
 const UserFormModal = ({ isOpen, onClose, user, roles, onSubmit, isLoading }) => {
@@ -296,9 +266,7 @@ const UserManagement = () => {
   
   // Modals
   const [showUserModal, setShowUserModal] = useState(false);
-  const [showQRModal, setShowQRModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
-  const [qrData, setQrData] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState({ type: '', content: '' });
 
@@ -437,34 +405,31 @@ const UserManagement = () => {
     }
   };
 
-  const handleGenerate2FA = async (userId) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/user-management/${userId}/generate-2fa`, {
-        method: 'POST',
-        headers: getAuthHeader()
-      });
 
-      const data = await response.json();
-      
-      if (data.success) {
-        setQrData(data.data);
-        setShowQRModal(true);
-      } else {
-        setMessage({ type: 'error', content: data.message || 'Failed to generate 2FA QR code' });
-      }
-    } catch (error) {
-      console.error('Error generating 2FA:', error);
-      setMessage({ type: 'error', content: 'Failed to generate 2FA QR code' });
-    }
-  };
-
-  // Search functionality
+  // Search functionality with error handling
   useEffect(() => {
-    const filtered = users.filter(user =>
-      user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.role_name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    setFilteredUsers(filtered);
+    try {
+      if (!Array.isArray(users)) {
+        setFilteredUsers([]);
+        return;
+      }
+      
+      const filtered = users.filter(user => {
+        if (!user) return false;
+        
+        const username = user.username || '';
+        const roleName = user.role_name || '';
+        const search = searchTerm.toLowerCase();
+        
+        return username.toLowerCase().includes(search) ||
+               roleName.toLowerCase().includes(search);
+      });
+      
+      setFilteredUsers(filtered);
+    } catch (error) {
+      console.error('Error filtering users:', error);
+      setFilteredUsers([]);
+    }
   }, [searchTerm, users]);
 
   // Effects
@@ -578,21 +543,27 @@ const UserManagement = () => {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {filteredUsers.map((user) => (
-              <tr key={user.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center">
-                    <div className="h-10 w-10 bg-blue-500 rounded-full flex items-center justify-center">
-                      <span className="text-sm font-medium text-white">
-                        {user.username[0].toUpperCase()}
-                      </span>
+            {filteredUsers.map((user) => {
+              // Add safety checks for user data
+              if (!user || !user.id || !user.username) {
+                return null;
+              }
+              
+              return (
+                <tr key={user.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                      <div className="h-10 w-10 bg-blue-500 rounded-full flex items-center justify-center">
+                        <span className="text-sm font-medium text-white">
+                          {user.username ? user.username[0].toUpperCase() : '?'}
+                        </span>
+                      </div>
+                      <div className="ml-4">
+                        <div className="text-sm font-medium text-gray-900">{user.username || 'Unknown'}</div>
+                        <div className="text-sm text-gray-500">ID: {user.id || 'N/A'}</div>
+                      </div>
                     </div>
-                    <div className="ml-4">
-                      <div className="text-sm font-medium text-gray-900">{user.username}</div>
-                      <div className="text-sm text-gray-500">ID: {user.id}</div>
-                    </div>
-                  </div>
-                </td>
+                  </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
                     {user.role_name}
@@ -629,13 +600,6 @@ const UserManagement = () => {
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <div className="flex items-center justify-end space-x-2">
                     <button
-                      onClick={() => handleGenerate2FA(user.id)}
-                      className="text-green-600 hover:text-green-900 p-1"
-                      title="Generate 2FA QR Code"
-                    >
-                      <QrCode className="h-4 w-4" />
-                    </button>
-                    <button
                       onClick={() => {
                         setSelectedUser(user);
                         setShowUserModal(true);
@@ -655,7 +619,8 @@ const UserManagement = () => {
                   </div>
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
 
@@ -698,17 +663,6 @@ const UserManagement = () => {
         roles={roles}
         onSubmit={selectedUser ? handleUpdateUser : handleCreateUser}
         isLoading={isSubmitting}
-      />
-
-      <QRCodeModal
-        isOpen={showQRModal}
-        onClose={() => {
-          setShowQRModal(false);
-          setQrData({});
-        }}
-        qrCode={qrData.qrCode}
-        secret={qrData.secret}
-        message={qrData.message}
       />
     </div>
   );

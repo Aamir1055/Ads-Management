@@ -86,9 +86,27 @@ export const AuthProvider = ({ children }) => {
   }
 
   const hasPermission = (permission) => {
-    // This would need to be implemented based on your permission system
-    // For now, return true for authenticated users
-    return isAuthenticated()
+    if (!isAuthenticated()) {
+      return false
+    }
+    
+    // Super admin has all permissions
+    if (user?.role_name === 'super_admin' || user?.role?.name === 'super_admin') {
+      return true
+    }
+    
+    // Check user permissions array
+    if (user?.permissions && Array.isArray(user.permissions)) {
+      return user.permissions.includes(permission)
+    }
+    
+    // Check permissions object format
+    if (user?.permissions && typeof user.permissions === 'object') {
+      return Boolean(user.permissions[permission])
+    }
+    
+    // For now, return true for authenticated users if no specific permission system
+    return true
   }
 
   const value = {

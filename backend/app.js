@@ -33,6 +33,8 @@ const permissionsRoutes = require('./routes/permissionsRoutes');
 const modulesRoutes = require('./routes/modulesRoutes');
 const userManagementRoutes = require('./routes/userManagementRoutes_privacy');
 const userAccessRoutes = require('./routes/userAccessRoutes');
+const brandRoutes = require('./routes/brandRoutes');
+const roleRoutes = require('./routes/roleRoutes');
 
 const app = express();
 
@@ -192,6 +194,10 @@ app.get('/api/health', async (req, res) => {
   res.status(200).json(healthCheck);
 });
 
+// Test route for debugging blank modules issue
+const testRoutes = require('./routes/testRoutes');
+app.use('/api/test', testRoutes);
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userManagementRoutes);
@@ -208,6 +214,8 @@ app.use('/api/permissions', permissionsRoutes);
 app.use('/api/modules', modulesRoutes);
 app.use('/api/user-management', userManagementRoutes);
 app.use('/api/user-access', userAccessRoutes);
+app.use('/api/brands', brandRoutes);
+app.use('/api/roles', roleRoutes);
 // Root
 app.get('/', (req, res) => {
   res.json({
@@ -228,7 +236,8 @@ app.get('/', (req, res) => {
       reports: '/api/reports',
       analytics: '/api/analytics',
       cards: '/api/cards',
-      cardUsers: '/api/card-users'
+      cardUsers: '/api/card-users',
+      brands: '/api/brands'
     },
     support: {
       documentation: '/api/docs',

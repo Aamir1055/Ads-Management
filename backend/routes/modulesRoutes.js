@@ -2,8 +2,8 @@ const express = require('express');
 const router = express.Router();
 
 const modulesController = require('../controllers/modulesController');
-// const { authenticate } = require('../middleware/auth');
-// const { enforcePermission } = require('../middleware/enforcePermission'); // optional guard
+const { authenticateToken } = require('../middleware/authMiddleware');
+const { attachUserPermissions, modulePermissions } = require('../middleware/rbacMiddleware');
 
 // ----------------------------------------------------------------------------
 // Middleware
@@ -19,6 +19,10 @@ const requestLogger = (req, res, next) => {
 };
 
 router.use(requestLogger);
+
+// Apply authentication and permission middleware to all routes
+router.use(authenticateToken);
+router.use(attachUserPermissions);
 
 // Simple in-memory rate limiter (single instances)
 const createRateLimit = (windowMs = 15 * 60 * 1000, max = 200) => {
@@ -47,26 +51,21 @@ const createRateLimit = (windowMs = 15 * 60 * 1000, max = 200) => {
 const rlRead = createRateLimit(5 * 60 * 1000, 300);
 const rlWrite = createRateLimit(15 * 60 * 1000, 120);
 
-// router.use(authenticate);
-// Optionally enforce RBAC against a registered "Modules" resource
-// router.use(enforcePermission('Modules'));
-
 // ----------------------------------------------------------------------------
-// CRUD
+// CRUD with RBAC permissions
 // ----------------------------------------------------------------------------
 
-// Create a module
-router.post('/', rlWrite, modulesController.create);
+// Create a module (requires create permission)
+router.post('/', rlWrite, modulePermissions.modules.create, modulesController.create);
 
-// List modules (search, pagination, active filter)
-// Query: page, limit, search, active=true|false
-router.get('/', rlRead, modulesController.list);
+// List modules (requires read permission)
+router.get('/', rlRead, modulePermissions.modules.read, modulesController.list);
 
-// Get a module by id
-router.get('/:id', rlRead, modulesController.getById);
+// Get a module by id (requires read permission)
+router.get('/:id', rlRead, modulePermissions.modules.read, modulesController.getById);
 
-// Update a module by id
-router.put('/:id', rlWrite, modulesController.update);
+// Update a module by id (requires update permission)
+router.put('/:id', rlWrite, modulePermissions.modules.update, modulesController.update);
 
 // ----------------------------------------------------------------------------
 // 404 and error handling (keep last)

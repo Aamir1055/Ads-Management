@@ -1,494 +1,625 @@
-const { pool } = require('../config/database')
+const Campaign = require('../models/Campaign');
 
-// Helper function to create standard API response
-const createResponse = (success, message, data = null, errors = null) => ({
-  success,
-  message,
-  timestamp: new Date().toISOString(),
-  ...(data && { data }),
-  ...(errors && { errors })
-})
-
-// Helper to parse JSON fields safely
-const parseJsonField = (value) => {
-  if (!value) return null
-  if (typeof value === 'string') {
+class CampaignController {
+  // GET /api/campaigns - Get all campaigns
+  static async getAllCampaigns(req, res) {
     try {
-      return JSON.parse(value)
-    } catch {
-      return null
-    }
-  }
-  return value
-}
-
-// Helper to format campaign data for response
-const formatCampaignData = (campaign) => {
-  if (!campaign) return null
-  
-  return {
-    ...campaign,
-    persona: campaign.persona || null, // Keep persona as text
-    gender: parseJsonField(campaign.gender),
-    is_enabled: Boolean(campaign.is_enabled)
-  }
-}
-
-const campaignController = {
-  // Get all campaigns
-  getAllCampaigns: async (req, res) => {
-    try {
-      const { page = 1, limit = 50, search = '', campaign_type_id = null, is_enabled = null } = req.query
-
-      let whereClause = 'WHERE 1=1'
-      const params = []
-
-      if (search) {
-        whereClause += ' AND (c.name LIKE ? OR c.brand LIKE ?)'
-        params.push(`%${search}%`, `%${search}%`)
-      }
-
-      if (campaign_type_id) {
-        whereClause += ' AND c.campaign_type_id = ?'
-        params.push(campaign_type_id)
-      }
-
-      if (is_enabled !== null) {
-        whereClause += ' AND c.is_enabled = ?'
-        params.push(is_enabled === 'true' ? 1 : 0)
-      }
-
-      const offset = (page - 1) * limit
-
-      const query = `
-        SELECT c.*, ct.type_name as campaign_type_name
-        FROM campaigns c
-        LEFT JOIN campaign_types ct ON c.campaign_type_id = ct.id
-        ${whereClause}
-        ORDER BY c.created_at DESC
-        LIMIT ? OFFSET ?
-      `
-
-      params.push(parseInt(limit), parseInt(offset))
-
-      const [campaigns] = await pool.execute(query, params)
-
-      // Format the data
-      const formattedCampaigns = campaigns.map(formatCampaignData)
-
-      // Get total count for pagination
-      const countQuery = `
-        SELECT COUNT(*) as total
-        FROM campaigns c
-        LEFT JOIN campaign_types ct ON c.campaign_type_id = ct.id
-        ${whereClause}
-      `
+      console.log('🚀 CampaignController.getAllCampaigns - User:', req.user?.id);
       
-      const [countResult] = await pool.execute(countQuery, params.slice(0, -2)) // Remove limit and offset params
-      const total = countResult[0].total
-
-      res.status(200).json(
-        createResponse(true, 'Campaigns retrieved successfully', {
-          campaigns: formattedCampaigns,
-          pagination: {
-            page: parseInt(page),
-            limit: parseInt(limit),
-            total,
-            totalPages: Math.ceil(total / limit)
-          }
-        })
-      )
-    } catch (error) {
-      console.error('Get campaigns error:', error)
-      res.status(500).json(
-        createResponse(false, 'Failed to retrieve campaigns', null, ['Internal server error'])
-      )
-    }
-  },
-
-  // Get campaign by ID
-  getCampaignById: async (req, res) => {
-    try {
-      const { id } = req.params
-
-      if (!id || isNaN(id)) {
-        return res.status(400).json(
-          createResponse(false, 'Invalid campaign ID')
-        )
+      const { 
+        search, 
+        status, 
+        enabled, 
+        brand_id, 
+        campaign_type_id, 
+        creatives,
+        page = 1,
+        limit = 10
+      } = req.query;
+      
+      const filters = {};
+      
+      // Parse status filter
+      if (status && ['active', 'inactive'].includes(status)) {
+        filters.status = status;
+      }
+      
+      // Parse enabled filter
+      if (enabled === 'true') {
+        filters.isEnabled = 1;
+      } else if (enabled === 'false') {
+        filters.isEnabled = 0;
+      }
+      
+      // Parse brand filter
+      if (brand_id && !isNaN(parseInt(brand_id))) {
+        filters.brandId = parseInt(brand_id);
+      }
+      
+      // Parse campaign type filter
+      if (campaign_type_id && !isNaN(parseInt(campaign_type_id))) {
+        filters.campaignTypeId = parseInt(campaign_type_id);
+      }
+      
+      // Parse creatives filter
+      if (creatives && ['video', 'image', 'carousel', 'collection'].includes(creatives)) {
+        filters.creatives = creatives;
+      }
+      
+      // Add search filter
+      if (search && search.trim()) {
+        filters.search = search.trim();
       }
 
-      const query = `
-        SELECT c.*, ct.type_name as campaign_type_name
-        FROM campaigns c
-        LEFT JOIN campaign_types ct ON c.campaign_type_id = ct.id
-        WHERE c.id = ?
-      `
+      console.log('🚀 Applied filters:', filters);
 
-      const [campaigns] = await pool.execute(query, [id])
+      const campaigns = await Campaign.findAll(filters);
 
-      if (campaigns.length === 0) {
-        return res.status(404).json(
-          createResponse(false, 'Campaign not found')
-        )
+      // Simple pagination (if needed)
+      const pageNum = Math.max(1, parseInt(page));
+      const limitNum = Math.max(1, Math.min(100, parseInt(limit)));
+      const startIndex = (pageNum - 1) * limitNum;
+      const endIndex = startIndex + limitNum;
+      const paginatedCampaigns = campaigns.slice(startIndex, endIndex);
+
+      console.log(`🚀 Found ${campaigns.length} campaigns (showing ${paginatedCampaigns.length})`);
+
+      return res.status(200).json({
+        success: true,
+        data: paginatedCampaigns,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total: campaigns.length,
+          totalPages: Math.ceil(campaigns.length / limitNum)
+        },
+        message: campaigns.length === 0 ? 'No campaigns found' : `Found ${campaigns.length} campaigns`
+      });
+    } catch (error) {
+      console.error('❌ Error in CampaignController.getAllCampaigns:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to fetch campaigns',
+        error: error.message
+      });
+    }
+  }
+
+  // GET /api/campaigns/:id - Get single campaign
+  static async getCampaignById(req, res) {
+    try {
+      console.log('🚀 CampaignController.getCampaignById - User:', req.user?.id);
+      
+      const { id } = req.params;
+
+      if (!id || isNaN(parseInt(id))) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid campaign ID'
+        });
       }
 
-      const formattedCampaign = formatCampaignData(campaigns[0])
+      const campaign = await Campaign.findById(parseInt(id));
 
-      res.status(200).json(
-        createResponse(true, 'Campaign retrieved successfully', formattedCampaign)
-      )
+      if (!campaign) {
+        return res.status(404).json({
+          success: false,
+          message: 'Campaign not found'
+        });
+      }
+
+      console.log(`🚀 Found campaign: ${campaign.name}`);
+
+      return res.status(200).json({
+        success: true,
+        data: campaign,
+        message: 'Campaign retrieved successfully'
+      });
     } catch (error) {
-      console.error('Get campaign by ID error:', error)
-      res.status(500).json(
-        createResponse(false, 'Failed to retrieve campaign', null, ['Internal server error'])
-      )
+      console.error('❌ Error in CampaignController.getCampaignById:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to fetch campaign',
+        error: error.message
+      });
     }
-  },
+  }
 
-  // Create new campaign
-  createCampaign: async (req, res) => {
+  // POST /api/campaigns - Create new campaign
+  static async createCampaign(req, res) {
     try {
+      console.log('🚀 CampaignController.createCampaign - User:', req.user?.id);
+      
       const {
         name,
         persona,
         gender,
-        age,
+        min_age,
+        max_age,
         location,
         creatives,
         campaign_type_id,
-        brand,
-        is_enabled = true
-      } = req.body
+        brand
+      } = req.body;
+      
+      const userId = req.user?.id;
 
-      // Validation
+      // Basic validation
       if (!name || !name.trim()) {
-        return res.status(400).json(
-          createResponse(false, 'Campaign name is required')
-        )
+        return res.status(400).json({
+          success: false,
+          message: 'Campaign name is required'
+        });
       }
 
-      if (!campaign_type_id) {
-        return res.status(400).json(
-          createResponse(false, 'Campaign type is required')
-        )
+      // Validate input data
+      const campaignData = {
+        name: name.trim(),
+        persona: persona || null,
+        gender: gender || null,
+        min_age: min_age || null,
+        max_age: max_age || null,
+        location: location || null,
+        creatives: creatives || 'image',
+        campaign_type_id: campaign_type_id || null,
+        brand: brand || null,
+        created_by: userId
+      };
+
+      // Server-side validation
+      const validationErrors = Campaign.validate(campaignData);
+      if (validationErrors.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: validationErrors
+        });
       }
 
-      // Check if campaign type exists
-      const [typeCheck] = await pool.execute(
-        'SELECT id FROM campaign_types WHERE id = ? AND is_active = 1',
-        [campaign_type_id]
-      )
-
-      if (typeCheck.length === 0) {
-        return res.status(400).json(
-          createResponse(false, 'Invalid campaign type')
-        )
+      // Check if name already exists
+      const nameValid = await Campaign.validateName(campaignData.name);
+      if (!nameValid) {
+        return res.status(400).json({
+          success: false,
+          message: 'A campaign with this name already exists'
+        });
       }
 
-      // Get current user ID from auth (you may need to implement this based on your auth system)
-      const created_by = req.user?.id
+      console.log('🚀 Creating campaign with data:', campaignData);
 
-      let query, params
-      
-      if (created_by) {
-        query = `
-          INSERT INTO campaigns (
-            name, persona, gender, age, location, creatives,
-            campaign_type_id, brand, is_enabled, created_by,
-            created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-        `
-        params = [
-          name.trim(),
-          persona?.trim() || null, // Store persona as plain text
-          gender ? JSON.stringify(gender) : null,
-          age ? parseInt(age) : null,
-          location?.trim() || null,
-          creatives || 'image',
-          parseInt(campaign_type_id),
-          brand?.trim() || null,
-          Boolean(is_enabled),
-          created_by
-        ]
-      } else {
-        query = `
-          INSERT INTO campaigns (
-            name, persona, gender, age, location, creatives,
-            campaign_type_id, brand, is_enabled,
-            created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-        `
-        params = [
-          name.trim(),
-          persona?.trim() || null, // Store persona as plain text
-          gender ? JSON.stringify(gender) : null,
-          age ? parseInt(age) : null,
-          location?.trim() || null,
-          creatives || 'image',
-          parseInt(campaign_type_id),
-          brand?.trim() || null,
-          Boolean(is_enabled)
-        ]
-      }
+      const campaign = await Campaign.create(campaignData);
 
-      const [result] = await pool.execute(query, params)
+      console.log(`✅ Created campaign: ${campaign.name}`);
 
-      // Get the created campaign
-      const [newCampaign] = await pool.execute(`
-        SELECT c.*, ct.type_name as campaign_type_name
-        FROM campaigns c
-        LEFT JOIN campaign_types ct ON c.campaign_type_id = ct.id
-        WHERE c.id = ?
-      `, [result.insertId])
-
-      const formattedCampaign = formatCampaignData(newCampaign[0])
-
-      res.status(201).json(
-        createResponse(true, 'Campaign created successfully', formattedCampaign)
-      )
+      return res.status(201).json({
+        success: true,
+        data: campaign,
+        message: 'Campaign created successfully'
+      });
     } catch (error) {
-      console.error('Create campaign error:', error)
-      
-      if (error.code === 'ER_DUP_ENTRY') {
-        return res.status(400).json(
-          createResponse(false, 'Campaign name already exists')
-        )
-      }
-
-      res.status(500).json(
-        createResponse(false, 'Failed to create campaign', null, ['Internal server error'])
-      )
+      console.error('❌ Error in CampaignController.createCampaign:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to create campaign',
+        error: error.message
+      });
     }
-  },
+  }
 
-  // Update campaign
-  updateCampaign: async (req, res) => {
+  // PUT /api/campaigns/:id - Update campaign
+  static async updateCampaign(req, res) {
     try {
-      const { id } = req.params
+      console.log('🚀 CampaignController.updateCampaign - User:', req.user?.id);
+      
+      const { id } = req.params;
       const {
         name,
         persona,
         gender,
-        age,
+        min_age,
+        max_age,
         location,
         creatives,
+        is_enabled,
+        status,
         campaign_type_id,
-        brand,
-        is_enabled
-      } = req.body
+        brand
+      } = req.body;
 
-      if (!id || isNaN(id)) {
-        return res.status(400).json(
-          createResponse(false, 'Invalid campaign ID')
-        )
+      if (!id || isNaN(parseInt(id))) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid campaign ID'
+        });
       }
 
       // Check if campaign exists
-      const [existingCampaign] = await pool.execute(
-        'SELECT id FROM campaigns WHERE id = ?',
-        [id]
-      )
-
-      if (existingCampaign.length === 0) {
-        return res.status(404).json(
-          createResponse(false, 'Campaign not found')
-        )
+      const existingCampaign = await Campaign.findById(parseInt(id));
+      if (!existingCampaign) {
+        return res.status(404).json({
+          success: false,
+          message: 'Campaign not found'
+        });
       }
 
-      // Build update query dynamically
-      const updateFields = []
-      const params = []
-
-      if (name !== undefined) {
-        if (!name.trim()) {
-          return res.status(400).json(
-            createResponse(false, 'Campaign name cannot be empty')
-          )
-        }
-        updateFields.push('name = ?')
-        params.push(name.trim())
+      // Basic validation
+      if (!name || !name.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Campaign name is required'
+        });
       }
 
-      if (persona !== undefined) {
-        updateFields.push('persona = ?')
-        params.push(persona?.trim() || null) // Store persona as plain text
+      // Prepare update data
+      const campaignData = {
+        name: name.trim(),
+        persona: persona !== undefined ? persona : existingCampaign.persona,
+        gender: gender !== undefined ? gender : existingCampaign.gender,
+        min_age: min_age !== undefined ? min_age : existingCampaign.min_age,
+        max_age: max_age !== undefined ? max_age : existingCampaign.max_age,
+        location: location !== undefined ? location : existingCampaign.location,
+        creatives: creatives || existingCampaign.creatives,
+        is_enabled: is_enabled !== undefined ? is_enabled : existingCampaign.is_enabled,
+        status: status || existingCampaign.status,
+        campaign_type_id: campaign_type_id !== undefined ? campaign_type_id : existingCampaign.campaign_type_id,
+        brand: brand !== undefined ? brand : existingCampaign.brand
+      };
+
+      // Server-side validation
+      const validationErrors = Campaign.validate(campaignData, true);
+      if (validationErrors.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: validationErrors
+        });
       }
 
-      if (gender !== undefined) {
-        updateFields.push('gender = ?')
-        params.push(gender ? JSON.stringify(gender) : null)
+      // Check if name already exists (excluding current campaign)
+      const nameValid = await Campaign.validateName(campaignData.name, parseInt(id));
+      if (!nameValid) {
+        return res.status(400).json({
+          success: false,
+          message: 'A campaign with this name already exists'
+        });
       }
 
-      if (age !== undefined) {
-        updateFields.push('age = ?')
-        params.push(age ? parseInt(age) : null)
-      }
+      console.log('🚀 Updating campaign with data:', campaignData);
 
-      if (location !== undefined) {
-        updateFields.push('location = ?')
-        params.push(location?.trim() || null)
-      }
+      const campaign = await Campaign.update(parseInt(id), campaignData);
 
-      if (creatives !== undefined) {
-        updateFields.push('creatives = ?')
-        params.push(creatives || 'image')
-      }
+      console.log(`✅ Updated campaign: ${campaign.name}`);
 
-      if (campaign_type_id !== undefined) {
-        // Check if campaign type exists
-        const [typeCheck] = await pool.execute(
-          'SELECT id FROM campaign_types WHERE id = ? AND is_active = 1',
-          [campaign_type_id]
-        )
-
-        if (typeCheck.length === 0) {
-          return res.status(400).json(
-            createResponse(false, 'Invalid campaign type')
-          )
-        }
-
-        updateFields.push('campaign_type_id = ?')
-        params.push(parseInt(campaign_type_id))
-      }
-
-      if (brand !== undefined) {
-        updateFields.push('brand = ?')
-        params.push(brand?.trim() || null)
-      }
-
-      if (is_enabled !== undefined) {
-        updateFields.push('is_enabled = ?')
-        params.push(Boolean(is_enabled))
-      }
-
-      if (updateFields.length === 0) {
-        return res.status(400).json(
-          createResponse(false, 'No fields to update')
-        )
-      }
-
-      updateFields.push('updated_at = NOW()')
-      params.push(id)
-
-      const query = `UPDATE campaigns SET ${updateFields.join(', ')} WHERE id = ?`
-      await pool.execute(query, params)
-
-      // Get the updated campaign
-      const [updatedCampaign] = await pool.execute(`
-        SELECT c.*, ct.type_name as campaign_type_name
-        FROM campaigns c
-        LEFT JOIN campaign_types ct ON c.campaign_type_id = ct.id
-        WHERE c.id = ?
-      `, [id])
-
-      const formattedCampaign = formatCampaignData(updatedCampaign[0])
-
-      res.status(200).json(
-        createResponse(true, 'Campaign updated successfully', formattedCampaign)
-      )
+      return res.status(200).json({
+        success: true,
+        data: campaign,
+        message: 'Campaign updated successfully'
+      });
     } catch (error) {
-      console.error('Update campaign error:', error)
-
-      if (error.code === 'ER_DUP_ENTRY') {
-        return res.status(400).json(
-          createResponse(false, 'Campaign name already exists')
-        )
-      }
-
-      res.status(500).json(
-        createResponse(false, 'Failed to update campaign', null, ['Internal server error'])
-      )
+      console.error('❌ Error in CampaignController.updateCampaign:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to update campaign',
+        error: error.message
+      });
     }
-  },
+  }
 
-  // Delete campaign
-  deleteCampaign: async (req, res) => {
+  // DELETE /api/campaigns/:id - Delete campaign
+  static async deleteCampaign(req, res) {
     try {
-      const { id } = req.params
+      console.log('🚀 CampaignController.deleteCampaign - User:', req.user?.id);
+      
+      const { id } = req.params;
 
-      if (!id || isNaN(id)) {
-        return res.status(400).json(
-          createResponse(false, 'Invalid campaign ID')
-        )
+      if (!id || isNaN(parseInt(id))) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid campaign ID'
+        });
       }
 
       // Check if campaign exists
-      const [existingCampaign] = await pool.execute(
-        'SELECT id, name FROM campaigns WHERE id = ?',
-        [id]
-      )
-
-      if (existingCampaign.length === 0) {
-        return res.status(404).json(
-          createResponse(false, 'Campaign not found')
-        )
+      const existingCampaign = await Campaign.findById(parseInt(id));
+      if (!existingCampaign) {
+        return res.status(404).json({
+          success: false,
+          message: 'Campaign not found'
+        });
       }
 
-      // Delete the campaign
-      await pool.execute('DELETE FROM campaigns WHERE id = ?', [id])
+      console.log(`🚀 Deleting campaign: ${existingCampaign.name}`);
 
-      res.status(200).json(
-        createResponse(true, 'Campaign deleted successfully')
-      )
+      await Campaign.delete(parseInt(id));
+
+      console.log(`✅ Deleted campaign: ${existingCampaign.name}`);
+
+      return res.status(200).json({
+        success: true,
+        message: 'Campaign deleted successfully'
+      });
     } catch (error) {
-      console.error('Delete campaign error:', error)
-
-      if (error.code === 'ER_ROW_IS_REFERENCED_2') {
-        return res.status(400).json(
-          createResponse(false, 'Cannot delete campaign. It is referenced by other records.')
-        )
-      }
-
-      res.status(500).json(
-        createResponse(false, 'Failed to delete campaign', null, ['Internal server error'])
-      )
+      console.error('❌ Error in CampaignController.deleteCampaign:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to delete campaign',
+        error: error.message
+      });
     }
-  },
+  }
 
-  // Toggle campaign status
-  toggleCampaignStatus: async (req, res) => {
+  // PUT /api/campaigns/:id/toggle-status - Toggle campaign active/inactive status
+  static async toggleCampaignStatus(req, res) {
     try {
-      const { id } = req.params
+      console.log('🚀 CampaignController.toggleCampaignStatus - User:', req.user?.id);
+      
+      const { id } = req.params;
 
-      if (!id || isNaN(id)) {
-        return res.status(400).json(
-          createResponse(false, 'Invalid campaign ID')
-        )
+      if (!id || isNaN(parseInt(id))) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid campaign ID'
+        });
       }
 
-      // Get current status
-      const [campaign] = await pool.execute(
-        'SELECT id, is_enabled FROM campaigns WHERE id = ?',
-        [id]
-      )
+      console.log(`🚀 Toggling status for campaign ID: ${id}`);
 
-      if (campaign.length === 0) {
-        return res.status(404).json(
-          createResponse(false, 'Campaign not found')
-        )
+      const campaign = await Campaign.toggleActive(parseInt(id));
+
+      if (!campaign) {
+        return res.status(404).json({
+          success: false,
+          message: 'Campaign not found'
+        });
       }
 
-      const newStatus = !Boolean(campaign[0].is_enabled)
+      console.log(`✅ Toggled campaign status: ${campaign.name} -> ${campaign.status}`);
 
-      // Update status
-      await pool.execute(
-        'UPDATE campaigns SET is_enabled = ?, updated_at = NOW() WHERE id = ?',
-        [newStatus, id]
-      )
-
-      res.status(200).json(
-        createResponse(true, `Campaign ${newStatus ? 'enabled' : 'disabled'} successfully`, {
-          id: parseInt(id),
-          is_enabled: newStatus
-        })
-      )
+      return res.status(200).json({
+        success: true,
+        data: campaign,
+        message: `Campaign ${campaign.status === 'active' ? 'activated' : 'deactivated'} successfully`
+      });
     } catch (error) {
-      console.error('Toggle campaign status error:', error)
-      res.status(500).json(
-        createResponse(false, 'Failed to toggle campaign status', null, ['Internal server error'])
-      )
+      console.error('❌ Error in CampaignController.toggleCampaignStatus:', error);
+
+      if (error.message === 'Campaign not found') {
+        return res.status(404).json({
+          success: false,
+          message: 'Campaign not found'
+        });
+      }
+
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to toggle campaign status',
+        error: error.message
+      });
+    }
+  }
+
+  // PUT /api/campaigns/:id/toggle-enabled - Toggle campaign enabled/disabled status
+  static async toggleCampaignEnabled(req, res) {
+    try {
+      console.log('🚀 CampaignController.toggleCampaignEnabled - User:', req.user?.id);
+      
+      const { id } = req.params;
+
+      if (!id || isNaN(parseInt(id))) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid campaign ID'
+        });
+      }
+
+      console.log(`🚀 Toggling enabled status for campaign ID: ${id}`);
+
+      const campaign = await Campaign.toggleEnabled(parseInt(id));
+
+      if (!campaign) {
+        return res.status(404).json({
+          success: false,
+          message: 'Campaign not found'
+        });
+      }
+
+      console.log(`✅ Toggled campaign enabled status: ${campaign.name} -> ${campaign.is_enabled ? 'Enabled' : 'Disabled'}`);
+
+      return res.status(200).json({
+        success: true,
+        data: campaign,
+        message: `Campaign ${campaign.is_enabled ? 'enabled' : 'disabled'} successfully`
+      });
+    } catch (error) {
+      console.error('❌ Error in CampaignController.toggleCampaignEnabled:', error);
+
+      if (error.message === 'Campaign not found') {
+        return res.status(404).json({
+          success: false,
+          message: 'Campaign not found'
+        });
+      }
+
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to toggle campaign enabled status',
+        error: error.message
+      });
+    }
+  }
+
+  // PUT /api/campaigns/:id/activate - Activate campaign
+  static async activateCampaign(req, res) {
+    try {
+      console.log('🚀 CampaignController.activateCampaign - User:', req.user?.id);
+      
+      const { id } = req.params;
+
+      if (!id || isNaN(parseInt(id))) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid campaign ID'
+        });
+      }
+
+      // Check if campaign exists
+      const existingCampaign = await Campaign.findById(parseInt(id));
+      if (!existingCampaign) {
+        return res.status(404).json({
+          success: false,
+          message: 'Campaign not found'
+        });
+      }
+
+      if (existingCampaign.status === 'active') {
+        return res.status(400).json({
+          success: false,
+          message: 'Campaign is already active'
+        });
+      }
+
+      const campaign = await Campaign.update(parseInt(id), { status: 'active' });
+
+      console.log(`✅ Activated campaign: ${campaign.name}`);
+
+      return res.status(200).json({
+        success: true,
+        data: campaign,
+        message: 'Campaign activated successfully'
+      });
+    } catch (error) {
+      console.error('❌ Error in CampaignController.activateCampaign:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to activate campaign',
+        error: error.message
+      });
+    }
+  }
+
+  // PUT /api/campaigns/:id/deactivate - Deactivate campaign
+  static async deactivateCampaign(req, res) {
+    try {
+      console.log('🚀 CampaignController.deactivateCampaign - User:', req.user?.id);
+      
+      const { id } = req.params;
+
+      if (!id || isNaN(parseInt(id))) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid campaign ID'
+        });
+      }
+
+      // Check if campaign exists
+      const existingCampaign = await Campaign.findById(parseInt(id));
+      if (!existingCampaign) {
+        return res.status(404).json({
+          success: false,
+          message: 'Campaign not found'
+        });
+      }
+
+      if (existingCampaign.status === 'inactive') {
+        return res.status(400).json({
+          success: false,
+          message: 'Campaign is already inactive'
+        });
+      }
+
+      const campaign = await Campaign.update(parseInt(id), { status: 'inactive' });
+
+      console.log(`✅ Deactivated campaign: ${campaign.name}`);
+
+      return res.status(200).json({
+        success: true,
+        data: campaign,
+        message: 'Campaign deactivated successfully'
+      });
+    } catch (error) {
+      console.error('❌ Error in CampaignController.deactivateCampaign:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to deactivate campaign',
+        error: error.message
+      });
+    }
+  }
+
+  // GET /api/campaigns/stats - Get campaign statistics
+  static async getCampaignStats(req, res) {
+    try {
+      console.log('🚀 CampaignController.getCampaignStats - User:', req.user?.id);
+
+      const stats = await Campaign.getStats();
+
+      console.log('🚀 Campaign stats:', stats);
+
+      return res.status(200).json({
+        success: true,
+        data: stats,
+        message: 'Campaign statistics retrieved successfully'
+      });
+    } catch (error) {
+      console.error('❌ Error in CampaignController.getCampaignStats:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to fetch campaign statistics',
+        error: error.message
+      });
+    }
+  }
+
+  // GET /api/campaigns/by-brand/:brandId - Get campaigns by brand
+  static async getCampaignsByBrand(req, res) {
+    try {
+      console.log('🚀 CampaignController.getCampaignsByBrand - User:', req.user?.id);
+      
+      const { brandId } = req.params;
+      const { search, status, enabled } = req.query;
+
+      if (!brandId || isNaN(parseInt(brandId))) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid brand ID'
+        });
+      }
+
+      const filters = {};
+      
+      // Apply additional filters
+      if (status && ['active', 'inactive'].includes(status)) {
+        filters.status = status;
+      }
+      
+      if (enabled === 'true') {
+        filters.isEnabled = 1;
+      } else if (enabled === 'false') {
+        filters.isEnabled = 0;
+      }
+      
+      if (search && search.trim()) {
+        filters.search = search.trim();
+      }
+
+      const campaigns = await Campaign.findByBrand(parseInt(brandId), filters);
+
+      console.log(`🚀 Found ${campaigns.length} campaigns for brand ${brandId}`);
+
+      return res.status(200).json({
+        success: true,
+        data: campaigns,
+        message: campaigns.length === 0 ? 'No campaigns found for this brand' : `Found ${campaigns.length} campaigns`
+      });
+    } catch (error) {
+      console.error('❌ Error in CampaignController.getCampaignsByBrand:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to fetch campaigns by brand',
+        error: error.message
+      });
     }
   }
 }
 
-module.exports = campaignController
+module.exports = CampaignController;

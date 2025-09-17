@@ -81,6 +81,22 @@ const campaignDataService = {
       console.error('API getCardsForDropdown error:', error.response?.data || error.message);
       throw error;
     }
+  },
+
+  // Get all campaign data for a specific campaign
+  getByCampaignId: async (campaignId, params = {}) => {
+    try {
+      const response = await api.get('/campaign-data', {
+        params: {
+          campaign_id: campaignId,
+          ...params
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('API getByCampaignId error:', error.response?.data || error.message);
+      throw error;
+    }
   }
 };
 

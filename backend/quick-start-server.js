@@ -1,6 +1,6 @@
 const app = require('./app');
 
-const port = process.env.PORT || 3001; // Use different port to avoid conflicts
+const port = process.env.PORT || 5000; // Use port 5000 to match main server
 
 app.listen(port, () => {
   console.log(`🚀 Server running on http://localhost:${port}`);

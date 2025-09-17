@@ -4,6 +4,9 @@ const router = express.Router();
 // Authentication middleware
 const { authenticateToken } = require('../middleware/authMiddleware');
 
+// RBAC middleware
+const { createPermissionMiddleware } = require('../config/rbacRouteMapping');
+
 // Data privacy middleware
 const { 
   dataPrivacyMiddleware, 
@@ -126,7 +129,12 @@ router.use(campaignDataPrivacy);
 // =============================================================================
 
 // Returns user's active cards for dropdowns (user-filtered)
-router.get('/cards', helperLimiter, getCardsForDropdown);
+// RBAC: Requires campaign_data_read permission
+router.get('/cards', 
+  helperLimiter,
+  createPermissionMiddleware.campaignData.read(), // 🔒 RBAC: campaign_data_read required
+  getCardsForDropdown
+);
 
 // =============================================================================
 // DATA PRIVACY ENABLED ROUTES
@@ -137,9 +145,11 @@ router.get('/cards', helperLimiter, getCardsForDropdown);
  * Lists campaign data with user-based filtering
  * - Admins see all data
  * - Regular users see only their own data
+ * - RBAC: Requires campaign_data_read permission
  */
 router.get('/', 
-  listLimiter, 
+  listLimiter,
+  createPermissionMiddleware.campaignData.read(), // 🔒 RBAC: campaign_data_read required
   validateQueryParams, 
   getAllCampaignData
 );
@@ -147,9 +157,11 @@ router.get('/',
 /**
  * GET /api/campaign-data/:id
  * Gets single campaign data with ownership validation
+ * - RBAC: Requires campaign_data_read permission
  */
 router.get('/:id', 
-  getOneLimiter, 
+  getOneLimiter,
+  createPermissionMiddleware.campaignData.read(), // 🔒 RBAC: campaign_data_read required
   validateIdParam, 
   getCampaignDataById
 );
@@ -158,9 +170,11 @@ router.get('/:id',
  * POST /api/campaign-data
  * Creates campaign data with automatic user ownership
  * - Automatically sets created_by to current user
+ * - RBAC: Requires campaign_data_create permission
  */
 router.post('/', 
-  createLimiter, 
+  createLimiter,
+  createPermissionMiddleware.campaignData.create(), // 🔒 RBAC: campaign_data_create required
   ensureOwnership, // Automatically adds created_by
   validateCreateCampaignData, 
   createCampaignData
@@ -171,9 +185,11 @@ router.post('/',
  * Updates campaign data with ownership validation
  * - Users can only update their own data
  * - Admins can update any data
+ * - RBAC: Requires campaign_data_update permission
  */
 router.put('/:id', 
-  updateLimiter, 
+  updateLimiter,
+  createPermissionMiddleware.campaignData.update(), // 🔒 RBAC: campaign_data_update required
   validateIdParam, 
   validateUpdateCampaignData, 
   validateOwnership('campaign_data', 'created_by', 'id'), // Validates ownership before update
@@ -185,9 +201,11 @@ router.put('/:id',
  * Deletes campaign data with ownership validation
  * - Users can only delete their own data
  * - Admins can delete any data
+ * - RBAC: Requires campaign_data_delete permission
  */
 router.delete('/:id', 
-  deleteLimiter, 
+  deleteLimiter,
+  createPermissionMiddleware.campaignData.delete(), // 🔒 RBAC: campaign_data_delete required
   validateIdParam, 
   validateOwnership('campaign_data', 'created_by', 'id'), // Validates ownership before delete
   deleteCampaignData

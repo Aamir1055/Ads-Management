@@ -1,7 +1,8 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Target, Shield, ShieldCheck } from 'lucide-react'
 import { twoFactorApi } from '../utils/api'
+import { clearAllTokens, handleAuthError } from '../utils/tokenCleanup'
 
 const Login = () => {
   const [formData, setFormData] = useState({
@@ -17,7 +18,19 @@ const Login = () => {
   const [qrCode, setQrCode] = useState('')
   const [currentStep, setCurrentStep] = useState('credentials') // 'credentials', '2fa', or '2fa_setup'
   const [userId, setUserId] = useState(null) // Store user_id for 2FA step
+  const [cleanupMessage, setCleanupMessage] = useState('')
   const navigate = useNavigate()
+
+  // Check for cleanup message on component mount
+  useEffect(() => {
+    const message = sessionStorage.getItem('loginMessage')
+    if (message) {
+      setCleanupMessage(message)
+      sessionStorage.removeItem('loginMessage')
+      // Clear the message after 5 seconds
+      setTimeout(() => setCleanupMessage(''), 5000)
+    }
+  }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -106,20 +119,30 @@ const Login = () => {
             setError(data.message || 'Invalid username or password')
           }
         } catch (apiError) {
-          console.warn('API not available, using demo mode')
-          // Fallback to demo authentication if API is not available
-          if (formData.username === 'admin' && formData.password === 'password') {
-            const token = 'demo-token-' + Date.now()
-            localStorage.setItem('access_token', token)
-            localStorage.setItem('authToken', token)
-            localStorage.setItem('user', JSON.stringify({ 
-              id: 1, 
-              username: formData.username, 
-              role_id: 1 
-            }))
-            navigate('/dashboard')
+          console.error('Login API Error:', apiError)
+          
+          // Handle specific error types
+          if (apiError.response?.status === 401) {
+            handleAuthError(apiError)
+            setError('Invalid username or password. Please check your credentials and try again.')
+          } else if (apiError.code === 'ECONNREFUSED' || !apiError.response) {
+            console.warn('API not available, using demo mode')
+            // Fallback to demo authentication if API is not available
+            if (formData.username === 'admin' && formData.password === 'password') {
+              const token = 'demo-token-' + Date.now()
+              localStorage.setItem('access_token', token)
+              localStorage.setItem('authToken', token)
+              localStorage.setItem('user', JSON.stringify({ 
+                id: 1, 
+                username: formData.username, 
+                role_id: 1 
+              }))
+              navigate('/dashboard')
+            } else {
+              setError('API unavailable. Use demo credentials: admin/password')
+            }
           } else {
-            setError('API unavailable. Use demo credentials: admin/password')
+            setError('Failed to connect to server. Please try again or use demo credentials: admin/password')
           }
         }
         
@@ -291,11 +314,29 @@ const Login = () => {
 
         {/* Login Form */}
         <div className="bg-white rounded-xl shadow-2xl p-8">
+          {cleanupMessage && (
+            <div className="mb-4 p-3 bg-blue-100 border border-blue-300 text-blue-700 rounded-lg text-sm">
+              {cleanupMessage}
+            </div>
+          )}
+          
           {error && (
             <div className="mb-4 p-3 bg-red-100 border border-red-300 text-red-700 rounded-lg text-sm">
               {error}
             </div>
           )}
+          
+          <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-lg text-sm">
+            <strong>Demo Credentials:</strong> username: <code>admin</code>, password: <code>password</code>
+            <br />
+            <button 
+              type="button" 
+              onClick={clearAllTokens}
+              className="mt-1 text-xs text-blue-600 hover:text-blue-800 underline"
+            >
+              Clear stored tokens if having login issues
+            </button>
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {currentStep === 'credentials' ? (

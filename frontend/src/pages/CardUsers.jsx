@@ -156,7 +156,10 @@ const CardUsers = () => {
       await fetchAssignments()
     } catch (err) {
       console.error('Delete error:', err)
-      alert(err.response?.data?.message || 'Failed to delete assignment')
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to delete assignment';
+      setError(errorMessage);
+      setShowDeleteConfirm(false);
+      setItemToDelete(null);
     } finally {
       setDeleteLoading(false)
     }

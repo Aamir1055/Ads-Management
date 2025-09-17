@@ -38,7 +38,7 @@ async function createSimpleTestUser() {
     
     console.log('🎉 Test User Ready!');
     console.log('📋 Login Credentials:');
-    console.log('   URL: http://localhost:3001/');
+    console.log('   URL: http://localhost:5000/');
     console.log(`   Username: ${username}`);
     console.log(`   Password: ${password}`);
     console.log(`   Current 2FA Token: ${currentToken}`);

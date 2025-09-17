@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
+import ErrorAlert from './common/ErrorAlert'
 
 const CampaignTypeForm = ({ isOpen, onClose, onSubmit, editData = null, isLoading = false }) => {
   const [formData, setFormData] = useState({
@@ -8,6 +9,7 @@ const CampaignTypeForm = ({ isOpen, onClose, onSubmit, editData = null, isLoadin
     is_active: true
   })
   const [errors, setErrors] = useState({})
+  const [submitError, setSubmitError] = useState('')
 
   // Update form when editData changes
   useEffect(() => {
@@ -25,6 +27,7 @@ const CampaignTypeForm = ({ isOpen, onClose, onSubmit, editData = null, isLoadin
       })
     }
     setErrors({})
+    setSubmitError('')
   }, [editData, isOpen])
 
   const validateForm = () => {
@@ -68,9 +71,11 @@ const CampaignTypeForm = ({ isOpen, onClose, onSubmit, editData = null, isLoadin
     }
 
     try {
+      setSubmitError('')
       await onSubmit(formData)
     } catch (error) {
       console.error('Form submission error:', error)
+      setSubmitError(error?.response?.data?.message || error.message || 'An error occurred while saving')
     }
   }
 
@@ -90,6 +95,14 @@ const CampaignTypeForm = ({ isOpen, onClose, onSubmit, editData = null, isLoadin
             <X className="h-6 w-6" />
           </button>
         </div>
+
+        {submitError && (
+          <ErrorAlert 
+            error={submitError} 
+            onDismiss={() => setSubmitError('')}
+            className="mb-4"
+          />
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Campaign Type Name */}

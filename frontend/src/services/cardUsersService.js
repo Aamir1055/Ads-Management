@@ -1,4 +1,4 @@
-import api from '../utils/api'
+import api from '../utils/api';
 
 const cardUsersService = {
   // Get all card user assignments with filters and pagination

@@ -1,16 +1,10 @@
-import api from './api'
+import api from '../utils/api';
 
 const campaignService = {
-  // Get all campaigns with pagination
+  // Get all campaigns with pagination and filters
   getCampaigns: async (params = {}) => {
     const response = await api.get('/campaigns', { params })
-    // Handle the nested data structure from backend
-    const apiResponse = response.data
-    return {
-      success: apiResponse.success,
-      message: apiResponse.message,
-      data: apiResponse.data?.campaigns || apiResponse.data || []
-    }
+    return response.data
   },
 
   // Get single campaign by ID
@@ -37,15 +31,51 @@ const campaignService = {
     return response.data
   },
 
+  // Toggle campaign active/inactive status
+  toggleCampaignStatus: async (id) => {
+    const response = await api.put(`/campaigns/${id}/toggle-status`)
+    return response.data
+  },
+
+  // Toggle campaign enabled/disabled status
+  toggleCampaignEnabled: async (id) => {
+    const response = await api.put(`/campaigns/${id}/toggle-enabled`)
+    return response.data
+  },
+
+  // Activate campaign
+  activateCampaign: async (id) => {
+    const response = await api.put(`/campaigns/${id}/activate`)
+    return response.data
+  },
+
+  // Deactivate campaign
+  deactivateCampaign: async (id) => {
+    const response = await api.put(`/campaigns/${id}/deactivate`)
+    return response.data
+  },
+
+  // Get campaign statistics
+  getCampaignStats: async () => {
+    const response = await api.get('/campaigns/stats')
+    return response.data
+  },
+
+  // Get campaigns by brand
+  getCampaignsByBrand: async (brandId, params = {}) => {
+    const response = await api.get(`/campaigns/by-brand/${brandId}`, { params })
+    return response.data
+  },
+
   // Get campaign types for dropdown
   getCampaignTypes: async () => {
     const response = await api.get('/campaign-types')
     return response.data
   },
 
-  // Toggle campaign status
-  toggleCampaignStatus: async (id) => {
-    const response = await api.patch(`/campaigns/${id}/toggle-status`)
+  // Get brands for dropdown
+  getBrands: async () => {
+    const response = await api.get('/brands/active')
     return response.data
   }
 }

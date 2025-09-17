@@ -16,7 +16,8 @@ const {
   getChartData          // GET /charts
 } = require('../controllers/reportController');
 
-// const { authenticate, authorize } = require('../middleware/auth');
+const { authenticateToken } = require('../middleware/authMiddleware');
+const { attachUserPermissions, modulePermissions } = require('../middleware/rbacMiddleware');
 
 // ----------------------------------------------------------------------------
 // Middleware
@@ -33,6 +34,10 @@ const requestLogger = (req, res, next) => {
 };
 
 router.use(requestLogger);
+
+// Apply authentication and permission middleware to all routes
+router.use(authenticateToken);
+router.use(attachUserPermissions);
 
 // Simple in-memory rate limiter with cleanup (single instances)
 const createRateLimit = (windowMs = 15 * 60 * 1000, max = 100) => {
@@ -86,48 +91,47 @@ const buildLimiter = createRateLimit(15 * 60 * 1000, 30);      // builds
 const campaignBuildLimiter = createRateLimit(15 * 60 * 1000, 30);
 
 // ----------------------------------------------------------------------------
-// Public routes (enable auth when ready)
+// Protected routes with RBAC permissions
 // ----------------------------------------------------------------------------
-// router.use(authenticate);
 
-// Build daily reports for a specific date
-router.post('/build', buildLimiter, buildDaily);
+// Build daily reports for a specific date (requires create permission)
+router.post('/build', buildLimiter, modulePermissions.reports.create, buildDaily);
 
-// Build reports for a range of dates (inclusive)
-router.post('/build-range', buildLimiter, buildRange);
+// Build reports for a range of dates (requires create permission)
+router.post('/build-range', buildLimiter, modulePermissions.reports.create, buildRange);
 
-// Rebuild reports for a specific campaign over a date range
-router.post('/rebuild-campaign', campaignBuildLimiter, rebuildCampaignRange);
+// Rebuild reports for a specific campaign over a date range (requires update permission)
+router.post('/rebuild-campaign', campaignBuildLimiter, modulePermissions.reports.update, rebuildCampaignRange);
 
 // IMPORTANT: Specific routes MUST come before parameterized routes
 // Otherwise /dashboard will be matched by /:id
 
-// Generate comprehensive report with filters
-router.get('/generate', readLimiter, generateReport);
+// Generate comprehensive report with filters (requires read permission)
+router.get('/generate', readLimiter, modulePermissions.reports.read, generateReport);
 
-// Get available filter options
-router.get('/filters', readLimiter, getFilterOptions);
+// Get available filter options (requires read permission)
+router.get('/filters', readLimiter, modulePermissions.reports.read, getFilterOptions);
 
-// Get dashboard statistics
-router.get('/dashboard', readLimiter, getDashboardStats);
+// Get dashboard statistics (requires read permission)
+router.get('/dashboard', readLimiter, modulePermissions.reports.read, getDashboardStats);
 
-// Get chart-ready datasets
-router.get('/charts', readLimiter, getChartData);
+// Get chart-ready datasets (requires read permission)
+router.get('/charts', readLimiter, modulePermissions.reports.read, getChartData);
 
-// List reports (filters + pagination)
-router.get('/', readLimiter, getAll);
+// List reports (requires read permission)
+router.get('/', readLimiter, modulePermissions.reports.read, getAll);
 
-// Create a new report (manual entry)
-router.post('/', buildLimiter, createReport);
+// Create a new report (requires create permission)
+router.post('/', buildLimiter, modulePermissions.reports.create, createReport);
 
-// Get a single report row by id (MUST be last among GET routes)
-router.get('/:id', readLimiter, getById);
+// Get a single report row by id (requires read permission)
+router.get('/:id', readLimiter, modulePermissions.reports.read, getById);
 
-// Update an existing report by id
-router.put('/:id', buildLimiter, updateReport);
+// Update an existing report by id (requires update permission)
+router.put('/:id', buildLimiter, modulePermissions.reports.update, updateReport);
 
-// Delete a report by id
-router.delete('/:id', buildLimiter, deleteReport);
+// Delete a report by id (requires delete permission)
+router.delete('/:id', buildLimiter, modulePermissions.reports.delete, deleteReport);
 
 // ----------------------------------------------------------------------------
 // 404 and error handling (keep at bottom)

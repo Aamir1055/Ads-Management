@@ -95,6 +95,10 @@ exports.login = async (req, res, next) => {
     // Generate token for non-2FA users
     const tokens = await generateAuthTokens(user.id);
     await User.updateLastLogin(user.id);
+    
+    // Get full user info with role details
+    const fullUser = await User.findById(user.id);
+    
     res.status(200).json(
       createResponse(true, 'Login successful', {
         requires_2fa: false,
@@ -104,6 +108,7 @@ exports.login = async (req, res, next) => {
           id: user.id,
           username: user.username,
           role_id: user.role_id,
+          role_name: fullUser?.role_name,
           is_2fa_enabled: user.is_2fa_enabled
         }
       })
@@ -195,6 +200,7 @@ exports.loginWith2FA = async (req, res, next) => {
           id: user.id,
           username: user.username,
           role_id: user.role_id,
+          role_name: user.role_name,
           is_2fa_enabled: user.is_2fa_enabled,
           two_factor_verified: true
         }

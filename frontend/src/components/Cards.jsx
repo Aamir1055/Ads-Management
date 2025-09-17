@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import cardsService from '../services/cardsService'
 import CardForm from './CardForm'
+import { formatDate } from '../utils/dateUtils'
 
 const Cards = () => {
   const [cards, setCards] = useState([])
@@ -343,7 +344,7 @@ const Cards = () => {
                   <div className="flex items-center justify-between pt-4 border-t border-gray-200">
                     <div className="flex items-center text-xs text-gray-500">
                       <Calendar className="h-3 w-3 mr-1" />
-                      {card.created_at ? new Date(card.created_at).toLocaleDateString() : 'N/A'}
+                      {formatDate(card.created_at)}
                     </div>
                     <div className="flex items-center gap-2">
                       <button

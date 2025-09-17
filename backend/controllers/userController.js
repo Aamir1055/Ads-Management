@@ -91,7 +91,7 @@ const userController = {
       const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
       const search = (req.query.search || '').trim();
       const role_id = req.query.role_id ? parseInt(req.query.role_id, 10) : null;
-      const is_active = req.query.is_active !== undefined ? req.query.is_active === 'true' : true;
+      const is_active = req.query.is_active !== undefined ? req.query.is_active === 'true' : null;
 
       const result = await User.findAll({ page, limit, search, role_id, is_active });
 

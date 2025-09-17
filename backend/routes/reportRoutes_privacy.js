@@ -4,6 +4,9 @@ const router = express.Router();
 // Authentication middleware
 const { authenticateToken } = require('../middleware/authMiddleware');
 
+// RBAC middleware
+const { createPermissionMiddleware } = require('../config/rbacRouteMapping');
+
 // Data privacy middleware
 const { 
   dataPrivacyMiddleware, 
@@ -120,36 +123,44 @@ router.use(dataPrivacyMiddleware);
 /**
  * GET /api/reports/filters
  * Gets filter options with privacy filtering
+ * - RBAC: Requires reports_read permission
  */
 router.get('/filters', 
-  listLimiter, 
+  listLimiter,
+  createPermissionMiddleware.reports.read(), // 🔒 RBAC: reports_read required
   getFilterOptions
 );
 
 /**
  * GET /api/reports/generate
  * Generates comprehensive reports with privacy filtering
+ * - RBAC: Requires reports_export permission
  */
 router.get('/generate', 
-  generateLimiter, 
+  generateLimiter,
+  createPermissionMiddleware.reports.export(), // 🔒 RBAC: reports_export required
   generateReport
 );
 
 /**
  * GET /api/reports/dashboard
  * Gets dashboard statistics with privacy filtering
+ * - RBAC: Requires reports_read permission
  */
 router.get('/dashboard', 
-  listLimiter, 
+  listLimiter,
+  createPermissionMiddleware.reports.read(), // 🔒 RBAC: reports_read required
   getDashboardStats
 );
 
 /**
  * GET /api/reports/charts
  * Gets chart data with privacy filtering
+ * - RBAC: Requires reports_read permission
  */
 router.get('/charts', 
-  generateLimiter, 
+  generateLimiter,
+  createPermissionMiddleware.reports.read(), // 🔒 RBAC: reports_read required
   getChartData
 );
 
@@ -157,27 +168,33 @@ router.get('/charts',
  * POST /api/reports/build
  * Builds daily reports with privacy filtering
  * Non-admins can only build reports from their campaign data
+ * - RBAC: Requires reports_create permission
  */
 router.post('/build', 
-  buildLimiter, 
+  buildLimiter,
+  createPermissionMiddleware.reports.create(), // 🔒 RBAC: reports_create required
   buildDaily
 );
 
 /**
  * POST /api/reports/build-range
  * Builds reports for date range with privacy filtering
+ * - RBAC: Requires reports_create permission
  */
 router.post('/build-range', 
-  buildLimiter, 
+  buildLimiter,
+  createPermissionMiddleware.reports.create(), // 🔒 RBAC: reports_create required
   buildRange
 );
 
 /**
  * POST /api/reports/rebuild-campaign
  * Rebuilds reports for specific campaign with ownership validation
+ * - RBAC: Requires reports_create permission
  */
 router.post('/rebuild-campaign', 
-  buildLimiter, 
+  buildLimiter,
+  createPermissionMiddleware.reports.create(), // 🔒 RBAC: reports_create required
   rebuildCampaignRange
 );
 
@@ -186,18 +203,22 @@ router.post('/rebuild-campaign',
  * Lists reports with user-based filtering
  * - Admins see all reports
  * - Regular users see only their own reports
+ * - RBAC: Requires reports_read permission
  */
 router.get('/', 
-  listLimiter, 
+  listLimiter,
+  createPermissionMiddleware.reports.read(), // 🔒 RBAC: reports_read required
   getAll
 );
 
 /**
  * POST /api/reports
  * Creates report with automatic user ownership
+ * - RBAC: Requires reports_create permission
  */
 router.post('/', 
-  createLimiter, 
+  createLimiter,
+  createPermissionMiddleware.reports.create(), // 🔒 RBAC: reports_create required
   ensureOwnership, // Will add created_by
   createReport
 );
@@ -206,18 +227,22 @@ router.post('/',
  * GET /api/reports/:id
  * Gets single report with ownership validation
  * NOTE: This MUST come after all specific paths like /filters, /generate, etc.
+ * - RBAC: Requires reports_read permission
  */
 router.get('/:id', 
-  listLimiter, 
+  listLimiter,
+  createPermissionMiddleware.reports.read(), // 🔒 RBAC: reports_read required
   getById
 );
 
 /**
  * PUT /api/reports/:id
  * Updates report with ownership validation
+ * - RBAC: Requires reports_update permission
  */
 router.put('/:id', 
-  updateLimiter, 
+  updateLimiter,
+  createPermissionMiddleware.reports.update(), // 🔒 RBAC: reports_update required
   validateOwnership('reports', 'created_by', 'id'), 
   updateReport
 );
@@ -225,9 +250,11 @@ router.put('/:id',
 /**
  * DELETE /api/reports/:id
  * Deletes report with ownership validation
+ * - RBAC: Requires reports_delete permission
  */
 router.delete('/:id', 
-  deleteLimiter, 
+  deleteLimiter,
+  createPermissionMiddleware.reports.delete(), // 🔒 RBAC: reports_delete required
   validateOwnership('reports', 'created_by', 'id'), 
   deleteReport
 );

@@ -207,7 +207,8 @@ const campaignController = {
         name,
         persona,
         gender,
-        age,
+        min_age,
+        max_age,
         location,
         creatives,
         campaign_type_id,
@@ -228,21 +229,15 @@ const campaignController = {
         );
       }
 
-      // Check if campaign type exists and user has access to it (for non-admins)
-      let typeCheckQuery = 'SELECT id FROM campaign_types WHERE id = ? AND is_active = 1';
-      let typeCheckParams = [campaign_type_id];
-      
-      const isAdminForType = req.user.role && (req.user.role.level >= 8 || req.user.role.name === 'super_admin' || req.user.role.name === 'admin');
-      if (!isAdminForType) {
-        typeCheckQuery += ' AND created_by = ?';
-        typeCheckParams.push(req.user.id);
-      }
-      
-      const [typeCheck] = await pool.execute(typeCheckQuery, typeCheckParams);
+      // Check if campaign type exists (campaign types are now master data accessible to all)
+      const [typeCheck] = await pool.execute(
+        'SELECT id FROM campaign_types WHERE id = ? AND is_active = 1',
+        [campaign_type_id]
+      );
 
       if (typeCheck.length === 0) {
         return res.status(400).json(
-          createResponse(false, 'Invalid campaign type or you do not have access to it')
+          createResponse(false, 'Invalid campaign type')
         );
       }
 
@@ -265,21 +260,22 @@ const campaignController = {
 
       const query = `
         INSERT INTO campaigns (
-          name, persona, gender, age, location, creatives,
+          name, persona, gender, min_age, max_age, location, creatives,
           campaign_type_id, brand, is_enabled, created_by,
           created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
       `;
       
       const params = [
         name.trim(),
-        persona?.trim() || null, // Store persona as plain text
-        gender ? JSON.stringify(gender) : null,
-        age ? parseInt(age) : null,
-        location?.trim() || null,
+        persona && persona.length > 0 ? JSON.stringify(persona) : null, // Store persona as JSON array
+        gender && gender.length > 0 ? JSON.stringify(gender) : null,
+        min_age ? parseInt(min_age) : null,
+        max_age ? parseInt(max_age) : null,
+        location && location.length > 0 ? JSON.stringify(location) : null, // Store location as JSON array
         creatives || 'image',
         parseInt(campaign_type_id),
-        brand?.trim() || null,
+        brand ? parseInt(brand) : null, // Store brand as integer ID
         Boolean(is_enabled),
         req.user.id // Assign to current user
       ];
@@ -322,7 +318,8 @@ const campaignController = {
         name,
         persona,
         gender,
-        age,
+        min_age,
+        max_age,
         location,
         creatives,
         campaign_type_id,
@@ -393,22 +390,27 @@ const campaignController = {
 
       if (persona !== undefined) {
         updateFields.push('persona = ?');
-        params.push(persona?.trim() || null); // Store persona as plain text
+        params.push(persona && persona.length > 0 ? JSON.stringify(persona) : null); // Store persona as JSON array
       }
 
       if (gender !== undefined) {
         updateFields.push('gender = ?');
-        params.push(gender ? JSON.stringify(gender) : null);
+        params.push(gender && gender.length > 0 ? JSON.stringify(gender) : null);
       }
 
-      if (age !== undefined) {
-        updateFields.push('age = ?');
-        params.push(age ? parseInt(age) : null);
+      if (min_age !== undefined) {
+        updateFields.push('min_age = ?');
+        params.push(min_age ? parseInt(min_age) : null);
+      }
+
+      if (max_age !== undefined) {
+        updateFields.push('max_age = ?');
+        params.push(max_age ? parseInt(max_age) : null);
       }
 
       if (location !== undefined) {
         updateFields.push('location = ?');
-        params.push(location?.trim() || null);
+        params.push(location && location.length > 0 ? JSON.stringify(location) : null); // Store location as JSON array
       }
 
       if (creatives !== undefined) {
@@ -417,21 +419,15 @@ const campaignController = {
       }
 
       if (campaign_type_id !== undefined) {
-        // Check if campaign type exists and user has access
-        let typeCheckQuery = 'SELECT id FROM campaign_types WHERE id = ? AND is_active = 1';
-        let typeCheckParams = [campaign_type_id];
-        
-        const isAdminForTypeUpdate = req.user.role && (req.user.role.level >= 8 || req.user.role.name === 'super_admin' || req.user.role.name === 'admin');
-        if (!isAdminForTypeUpdate) {
-          typeCheckQuery += ' AND created_by = ?';
-          typeCheckParams.push(req.user.id);
-        }
-        
-        const [typeCheck] = await pool.execute(typeCheckQuery, typeCheckParams);
+        // Check if campaign type exists (campaign types are now master data accessible to all)
+        const [typeCheck] = await pool.execute(
+          'SELECT id FROM campaign_types WHERE id = ? AND is_active = 1',
+          [campaign_type_id]
+        );
 
         if (typeCheck.length === 0) {
           return res.status(400).json(
-            createResponse(false, 'Invalid campaign type or you do not have access to it')
+            createResponse(false, 'Invalid campaign type')
           );
         }
 
@@ -441,7 +437,7 @@ const campaignController = {
 
       if (brand !== undefined) {
         updateFields.push('brand = ?');
-        params.push(brand?.trim() || null);
+        params.push(brand ? parseInt(brand) : null); // Store brand as integer ID
       }
 
       if (is_enabled !== undefined) {
@@ -592,6 +588,222 @@ const campaignController = {
       console.error('Toggle campaign status error:', error);
       res.status(500).json(
         createResponse(false, 'Failed to toggle campaign status', null, ['Internal server error'])
+      );
+    }
+  },
+
+  // Get campaign statistics - admins see all, users see their own
+  getCampaignStats: async (req, res) => {
+    try {
+      const isAdmin = req.user.role && (req.user.role.level >= 8 || req.user.role.name === 'super_admin' || req.user.role.name === 'admin');
+      
+      let whereClause = '';
+      const params = [];
+      
+      if (!isAdmin) {
+        whereClause = 'WHERE created_by = ?';
+        params.push(req.user.id);
+      }
+
+      const query = `
+        SELECT 
+          COUNT(*) as total_campaigns,
+          SUM(CASE WHEN is_enabled = 1 THEN 1 ELSE 0 END) as enabled_campaigns,
+          SUM(CASE WHEN is_enabled = 0 THEN 1 ELSE 0 END) as disabled_campaigns,
+          COUNT(DISTINCT campaign_type_id) as unique_campaign_types,
+          COUNT(DISTINCT brand) as unique_brands,
+          COUNT(DISTINCT CASE WHEN created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN id END) as recent_campaigns
+        FROM campaigns ${whereClause}
+      `;
+
+      const [stats] = await pool.execute(query, params);
+      
+      res.status(200).json(
+        createResponse(true, 'Campaign statistics retrieved successfully', stats[0])
+      );
+    } catch (error) {
+      console.error('Get campaign stats error:', error);
+      res.status(500).json(
+        createResponse(false, 'Failed to retrieve campaign statistics', null, ['Internal server error'])
+      );
+    }
+  },
+
+  // Get campaigns by brand with ownership filtering
+  getCampaignsByBrand: async (req, res) => {
+    try {
+      const { brandId } = req.params;
+      const { page = 1, limit = 50, search = '', is_enabled = null } = req.query;
+
+      if (!brandId || isNaN(brandId)) {
+        return res.status(400).json(
+          createResponse(false, 'Invalid brand ID')
+        );
+      }
+
+      let whereClause = 'WHERE c.brand = ?';
+      const params = [brandId];
+
+      // Add privacy filtering for non-admins
+      const isAdmin = req.user.role && (req.user.role.level >= 8 || req.user.role.name === 'super_admin' || req.user.role.name === 'admin');
+      if (!isAdmin) {
+        whereClause += ' AND c.created_by = ?';
+        params.push(req.user.id);
+      }
+
+      if (search) {
+        whereClause += ' AND c.name LIKE ?';
+        params.push(`%${search}%`);
+      }
+
+      if (is_enabled !== null) {
+        whereClause += ' AND c.is_enabled = ?';
+        params.push(is_enabled === 'true' ? 1 : 0);
+      }
+
+      const offset = (page - 1) * limit;
+
+      const query = `
+        SELECT c.*, ct.type_name as campaign_type_name
+        FROM campaigns c
+        LEFT JOIN campaign_types ct ON c.campaign_type_id = ct.id
+        ${whereClause}
+        ORDER BY c.created_at DESC
+        LIMIT ? OFFSET ?
+      `;
+
+      params.push(parseInt(limit), parseInt(offset));
+      const [campaigns] = await pool.execute(query, params);
+      const formattedCampaigns = campaigns.map(formatCampaignData);
+
+      res.status(200).json(
+        createResponse(true, 'Campaigns by brand retrieved successfully', formattedCampaigns)
+      );
+    } catch (error) {
+      console.error('Get campaigns by brand error:', error);
+      res.status(500).json(
+        createResponse(false, 'Failed to retrieve campaigns by brand', null, ['Internal server error'])
+      );
+    }
+  },
+
+  // Toggle campaign enabled status - alias for toggleCampaignStatus for compatibility
+  toggleCampaignEnabled: async (req, res) => {
+    return campaignController.toggleCampaignStatus(req, res);
+  },
+
+  // Activate campaign with ownership validation
+  activateCampaign: async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      if (!id || isNaN(id)) {
+        return res.status(400).json(
+          createResponse(false, 'Invalid campaign ID')
+        );
+      }
+
+      // Check if campaign exists and user has access
+      const [existingCampaign] = await pool.execute(
+        'SELECT id, is_enabled, created_by FROM campaigns WHERE id = ?',
+        [id]
+      );
+
+      if (existingCampaign.length === 0) {
+        return res.status(404).json(
+          createResponse(false, 'Campaign not found')
+        );
+      }
+
+      const campaign = existingCampaign[0];
+
+      // Privacy check - only owner or admin can activate
+      if (!isAdminOrOwner(req, campaign.created_by)) {
+        return res.status(403).json(
+          createResponse(false, 'Access denied. You can only modify campaigns you created.')
+        );
+      }
+
+      if (campaign.is_enabled) {
+        return res.status(400).json(
+          createResponse(false, 'Campaign is already enabled')
+        );
+      }
+
+      // Activate campaign
+      await pool.execute(
+        'UPDATE campaigns SET is_enabled = 1, updated_at = NOW() WHERE id = ?',
+        [id]
+      );
+
+      res.status(200).json(
+        createResponse(true, 'Campaign activated successfully', {
+          id: parseInt(id),
+          is_enabled: true
+        })
+      );
+    } catch (error) {
+      console.error('Activate campaign error:', error);
+      res.status(500).json(
+        createResponse(false, 'Failed to activate campaign', null, ['Internal server error'])
+      );
+    }
+  },
+
+  // Deactivate campaign with ownership validation
+  deactivateCampaign: async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      if (!id || isNaN(id)) {
+        return res.status(400).json(
+          createResponse(false, 'Invalid campaign ID')
+        );
+      }
+
+      // Check if campaign exists and user has access
+      const [existingCampaign] = await pool.execute(
+        'SELECT id, is_enabled, created_by FROM campaigns WHERE id = ?',
+        [id]
+      );
+
+      if (existingCampaign.length === 0) {
+        return res.status(404).json(
+          createResponse(false, 'Campaign not found')
+        );
+      }
+
+      const campaign = existingCampaign[0];
+
+      // Privacy check - only owner or admin can deactivate
+      if (!isAdminOrOwner(req, campaign.created_by)) {
+        return res.status(403).json(
+          createResponse(false, 'Access denied. You can only modify campaigns you created.')
+        );
+      }
+
+      if (!campaign.is_enabled) {
+        return res.status(400).json(
+          createResponse(false, 'Campaign is already disabled')
+        );
+      }
+
+      // Deactivate campaign
+      await pool.execute(
+        'UPDATE campaigns SET is_enabled = 0, updated_at = NOW() WHERE id = ?',
+        [id]
+      );
+
+      res.status(200).json(
+        createResponse(true, 'Campaign deactivated successfully', {
+          id: parseInt(id),
+          is_enabled: false
+        })
+      );
+    } catch (error) {
+      console.error('Deactivate campaign error:', error);
+      res.status(500).json(
+        createResponse(false, 'Failed to deactivate campaign', null, ['Internal server error'])
       );
     }
   }

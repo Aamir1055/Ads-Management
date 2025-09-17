@@ -209,16 +209,37 @@ export const twoFactorApi = {
 // Role API functions
 export const roleApi = {
   // Get all roles
-  getRoles: () => api.get('/users/roles'),
+  getRoles: () => api.get('/permissions/roles'),
   
   // Create new role
-  createRole: (roleData) => api.post('/roles', roleData),
+  createRole: (roleData) => api.post('/permissions/roles', roleData),
   
   // Update role
-  updateRole: (roleId, roleData) => api.put(`/roles/${roleId}`, roleData),
+  updateRole: (roleId, roleData) => api.put(`/permissions/roles/${roleId}`, roleData),
   
   // Delete role
-  deleteRole: (roleId) => api.delete(`/roles/${roleId}`),
+  deleteRole: (roleId) => api.delete(`/permissions/role/${roleId}`),
+}
+
+// Brand API functions
+export const brandApi = {
+  // Get all brands
+  getBrands: () => api.get('/brands'),
+  
+  // Get brand by ID
+  getBrand: (brandId) => api.get(`/brands/${brandId}`),
+  
+  // Create new brand
+  createBrand: (brandData) => api.post('/brands', brandData),
+  
+  // Update brand
+  updateBrand: (brandId, brandData) => api.put(`/brands/${brandId}`, brandData),
+  
+  // Delete brand
+  deleteBrand: (brandId) => api.delete(`/brands/${brandId}`),
+  
+  // Toggle brand status
+  toggleBrandStatus: (brandId) => api.patch(`/brands/${brandId}/status`),
 }
 
 // Export both named and default exports

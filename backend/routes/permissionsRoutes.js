@@ -4,6 +4,7 @@ const router = express.Router();
 const { permissionsController } = require('../controllers/permissionsController');
 const { protect } = require('../middleware/auth');
 const { attachUserPermissions } = require('../middleware/frontendPermissionCheck');
+const { checkModulePermission } = require('../middleware/rbacMiddleware');
 
 // Request logger (sanitized)
 const requestLogger = (req, res, next) => {
@@ -43,14 +44,17 @@ const createRateLimit = (windowMs = 15 * 60 * 1000, max = 200) => {
 const rlRead = createRateLimit(5 * 60 * 1000, 300);
 const rlWrite = createRateLimit(15 * 60 * 1000, 100);
 
+// Middleware for role management operations
+const requireRoleManagementAccess = checkModulePermission('role_management', 'update');
+
 // router.use(protect); // enable auth globally for this module if needed
 
 // -------------------------------
 // Roles
 // -------------------------------
-router.post('/roles', rlWrite, permissionsController.createRole);
+router.post('/roles', rlWrite, protect, requireRoleManagementAccess, permissionsController.createRole);
 router.get('/roles', rlRead, permissionsController.listRoles);
-router.put('/roles/:id', rlWrite, permissionsController.updateRole);
+router.put('/roles/:id', rlWrite, protect, requireRoleManagementAccess, permissionsController.updateRole);
 
 // -------------------------------
 // Modules
@@ -148,21 +152,21 @@ router.get('/my-roles', protect, attachUserPermissions, (req, res) => {
 });
 
 // Role Assignment
-router.post('/assign-role', rlWrite, permissionsController.assignRoleToUser);
-router.delete('/revoke-role', rlWrite, permissionsController.revokeRoleFromUser);
+router.post('/assign-role', rlWrite, protect, requireRoleManagementAccess, permissionsController.assignRoleToUser);
+router.delete('/revoke-role', rlWrite, protect, requireRoleManagementAccess, permissionsController.revokeRoleFromUser);
 
 // Role Management
-router.post('/role', rlWrite, permissionsController.createRole); // Frontend-compatible endpoint
-router.delete('/role/:id', rlWrite, permissionsController.deleteRole); // Add delete endpoint
+router.post('/role', rlWrite, protect, requireRoleManagementAccess, permissionsController.createRole); // Frontend-compatible endpoint
+router.delete('/role/:id', rlWrite, protect, requireRoleManagementAccess, permissionsController.deleteRole); // Add delete endpoint
 router.get('/roles-list', rlRead, permissionsController.getAllRoles);
 router.get('/permissions-list', rlRead, permissionsController.getAllPermissions);
 router.get('/modules-with-permissions', rlRead, permissionsController.getModulesWithPermissions);
 router.get('/role/:roleId/permissions', rlRead, permissionsController.getRolePermissions);
 
 // Role-Permission Assignment
-router.post('/grant-role-permission', rlWrite, permissionsController.grantRolePermission);
-router.delete('/revoke-role-permission', rlWrite, permissionsController.revokeRolePermission);
-router.post('/role/assign', rlWrite, permissionsController.assignPermissionsToRole); // Frontend-compatible endpoint
+router.post('/grant-role-permission', rlWrite, protect, requireRoleManagementAccess, permissionsController.grantRolePermission);
+router.delete('/revoke-role-permission', rlWrite, protect, requireRoleManagementAccess, permissionsController.revokeRolePermission);
+router.post('/role/assign', rlWrite, protect, requireRoleManagementAccess, permissionsController.assignPermissionsToRole); // Frontend-compatible endpoint
 
 // Audit Log
 router.get('/audit', rlRead, permissionsController.getAuditLog);

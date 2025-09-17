@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
+import ErrorAlert from './common/ErrorAlert'
 
 const CardForm = ({ isOpen, onClose, onSubmit, editData = null, isLoading = false }) => {
   const [submitError, setSubmitError] = useState('')
@@ -141,9 +142,11 @@ const CardForm = ({ isOpen, onClose, onSubmit, editData = null, isLoading = fals
         </div>
 
         {submitError && (
-          <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-            {submitError}
-          </div>
+          <ErrorAlert 
+            error={submitError} 
+            onDismiss={() => setSubmitError('')}
+            className="mb-4"
+          />
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
