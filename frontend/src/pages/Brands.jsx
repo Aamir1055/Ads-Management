@@ -1,526 +1,439 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import {
-  Box,
-  Typography,
-  Button,
-  Paper,
-  Alert,
-  Snackbar,
-  CircularProgress,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  DialogContentText,
-  Breadcrumbs,
-  Link
-} from '@mui/material';
-import {
-  Add as AddIcon,
-  Refresh as RefreshIcon,
-  Delete as DeleteIcon,
-  Home as HomeIcon,
-  Storefront as StorefrontIcon
-} from '@mui/icons-material';
-
-// Import components
-import BrandTable from '../components/brands/BrandTable';
-import BrandForm from '../components/brands/BrandForm';
-import BrandFilters from '../components/brands/BrandFilters';
-
-// Import services and hooks
-import brandService from '../services/brandService';
-import { useAuth } from '../contexts/AuthContext';
-import { usePermissions } from '../hooks/usePermissions';
+import React, { useState, useEffect } from 'react'
+import { 
+  Plus, 
+  Search, 
+  Edit, 
+  Trash2, 
+  Eye, 
+  AlertCircle,
+  CheckCircle,
+  XCircle,
+  RefreshCw
+} from 'lucide-react'
+import { brandAPI } from '../services/brandService'
+import BrandForm from '../components/BrandForm'
+import { formatDate } from '../utils/dateUtils'
 
 const Brands = () => {
-  // Auth and permissions
-  const { user, isAuthenticated } = useAuth();
-  const { permissions, loading: permissionsLoading } = usePermissions();
+  const [brands, setBrands] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [filterStatus, setFilterStatus] = useState('all') // 'all', 'active', 'inactive'
+  const [sortBy, setSortBy] = useState('created_at')
+  const [sortOrder, setSortOrder] = useState('desc')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage] = useState(10)
 
-  // Data state
-  const [brands, setBrands] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  // Form states
+  const [showForm, setShowForm] = useState(false)
+  const [editingItem, setEditingItem] = useState(null)
+  const [formLoading, setFormLoading] = useState(false)
 
-  // UI state
-  const [formOpen, setFormOpen] = useState(false);
-  const [selectedBrand, setSelectedBrand] = useState(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [brandToDelete, setBrandToDelete] = useState(null);
-  const [formLoading, setFormLoading] = useState(false);
+  // Delete confirmation state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [itemToDelete, setItemToDelete] = useState(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
 
-  // Filter state
-  const [filters, setFilters] = useState({
-    search: '',
-    status: 'all'
-  });
-
-  // Success/Error notifications
-  const [notification, setNotification] = useState({
-    open: false,
-    message: '',
-    severity: 'info'
-  });
-
-  // Check permissions with multiple fallbacks - FIXED LOGIC
-  const getPermissions = useCallback(() => {
-    // Wait for authentication and permissions to load
-    if (!user || permissionsLoading) {
-      return {
-        canCreate: false,
-        canView: false,
-        canEdit: false,
-        canDelete: false
-      };
-    }
-
-    // Check if user is authenticated first
-    const isAuth = typeof isAuthenticated === 'function' ? isAuthenticated() : !!user;
-    
-    if (!isAuth) {
-      return {
-        canCreate: false,
-        canView: false,
-        canEdit: false,
-        canDelete: false
-      };
-    }
-
-    // Check if user is super admin
-    const isSuperAdmin = user?.role_name === 'super_admin' || 
-                        user?.role?.name === 'super_admin' ||
-                        user?.role === 'super_admin';
-
-    // If super admin, grant all permissions
-    if (isSuperAdmin) {
-      return {
-        canCreate: true,
-        canView: true,
-        canEdit: true,
-        canDelete: true
-      };
-    }
-
-    // Check permissions through multiple methods
-    const hasPermissionInArray = (permission) => {
-      return Array.isArray(user?.permissions) && user.permissions.includes(permission);
-    };
-
-    const hasPermissionInObject = (permission) => {
-      return permissions && permissions[permission] === true;
-    };
-
-    // Check each permission
-    const canCreate = hasPermissionInObject('brands_create') || 
-                     hasPermissionInArray('brands_create');
-    
-    const canView = hasPermissionInObject('brands_read') || 
-                   hasPermissionInObject('brands_create') || 
-                   hasPermissionInObject('brands_update') ||
-                   hasPermissionInArray('brands_read') || 
-                   hasPermissionInArray('brands_create') || 
-                   hasPermissionInArray('brands_update');
-    
-    const canEdit = hasPermissionInObject('brands_update') || 
-                   hasPermissionInObject('brands_create') ||
-                   hasPermissionInArray('brands_update') || 
-                   hasPermissionInArray('brands_create');
-    
-    const canDelete = hasPermissionInObject('brands_delete') || 
-                     hasPermissionInArray('brands_delete');
-
-    return { canCreate, canView, canEdit, canDelete };
-  }, [user, permissions, permissionsLoading, isAuthenticated]);
-
-  // Get current permissions
-  const { canCreate, canView, canEdit, canDelete } = getPermissions();
-
-  // Load brands data
-  const loadBrands = useCallback(async (currentFilters = filters) => {
+  // Fetch brands
+  const fetchBrands = async () => {
     try {
-      setLoading(true);
-      setError(null);
+      setLoading(true)
+      setError(null)
       
-      console.log('🏷️ Loading brands with filters:', currentFilters);
-      
-      // Prepare API filters
-      const apiFilters = {};
-      
-      if (currentFilters.search?.trim()) {
-        apiFilters.search = currentFilters.search.trim();
+      const params = {
+        search: searchTerm,
+        status: filterStatus === 'all' ? undefined : filterStatus,
+        sort: sortBy,
+        order: sortOrder,
+        page: currentPage,
+        limit: itemsPerPage
       }
       
-      if (currentFilters.status && currentFilters.status !== 'all') {
-        apiFilters.is_active = currentFilters.status === 'active';
-      }
-
-      const response = await brandService.getAllBrands(apiFilters);
+      const response = await brandAPI.getAll(params)
       
       if (response.success) {
-        setBrands(response.data || []);
-        console.log('✅ Brands loaded successfully:', response.data?.length, 'brands');
+        setBrands(response.data || [])
       } else {
-        throw new Error(response.message || 'Failed to load brands');
+        setError(response.message || 'Failed to fetch brands')
       }
     } catch (err) {
-      console.error('❌ Error loading brands:', err);
-      setError(err.message || 'Failed to load brands');
-      setBrands([]);
+      setError(err.response?.data?.message || 'Failed to fetch brands')
+      console.error('Error fetching brands:', err)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  }, [filters]);
-
-  // Initial load - FIXED: Don't load until permissions are ready
-  useEffect(() => {
-    console.log('🏷️ Brand Management - Component mounted');
-    console.log('👤 Current user:', user);
-    console.log('🔑 User permissions object:', permissions);
-    console.log('🔑 Permissions loading:', permissionsLoading);
-    console.log('🔑 Is authenticated:', typeof isAuthenticated === 'function' ? isAuthenticated() : !!user);
-    console.log('🔑 Permission check results:', { canCreate, canView, canEdit, canDelete });
-    
-    // Debug: Check if user is super admin
-    const isSuperAdmin = user?.role_name === 'super_admin' || 
-                        user?.role?.name === 'super_admin' ||
-                        user?.role === 'super_admin';
-    console.log('🔑 Is Super Admin:', isSuperAdmin);
-    
-    // Only load brands if user is authenticated and permissions are loaded
-    if (user && !permissionsLoading) {
-      loadBrands();
-    }
-  }, [user, permissionsLoading, loadBrands, canCreate, canView, canEdit, canDelete]);
-
-  // Handle filter changes
-  const handleFiltersChange = useCallback((newFilters) => {
-    console.log('🔍 Filters changed:', newFilters);
-    setFilters(newFilters);
-    loadBrands(newFilters);
-  }, [loadBrands]);
-
-  // Handle filter reset
-  const handleFiltersReset = useCallback((resetFilters) => {
-    console.log('🔄 Filters reset:', resetFilters);
-    setFilters(resetFilters);
-    loadBrands(resetFilters);
-  }, [loadBrands]);
-
-  // Handle refresh
-  const handleRefresh = useCallback(() => {
-    console.log('🔄 Refreshing brands...');
-    loadBrands();
-  }, [loadBrands]);
-
-  // Handle create new brand
-  const handleCreateNew = () => {
-    console.log('➕ Creating new brand');
-    setSelectedBrand(null);
-    setFormOpen(true);
-  };
-
-  // Handle edit brand
-  const handleEdit = (brand) => {
-    console.log('✏️ Editing brand:', brand);
-    setSelectedBrand(brand);
-    setFormOpen(true);
-  };
-
-  // Handle view brand (same as edit for now)
-  const handleView = (brand) => {
-    console.log('👁️ Viewing brand:', brand);
-    // For now, viewing is the same as editing
-    // In the future, this could open a read-only dialog
-    handleEdit(brand);
-  };
-
-  // Handle form save
-  const handleFormSave = async (brandData) => {
-    try {
-      setFormLoading(true);
-      
-      let response;
-      if (selectedBrand?.id) {
-        // Update existing brand
-        console.log('📝 Updating brand:', selectedBrand.id, brandData);
-        response = await brandService.updateBrand(selectedBrand.id, brandData);
-      } else {
-        // Create new brand
-        console.log('➕ Creating new brand:', brandData);
-        response = await brandService.createBrand(brandData);
-      }
-
-      if (response.success) {
-        setFormOpen(false);
-        setSelectedBrand(null);
-        
-        // Show success message
-        setNotification({
-          open: true,
-          message: response.message || `Brand ${selectedBrand ? 'updated' : 'created'} successfully`,
-          severity: 'success'
-        });
-        
-        // Reload brands
-        loadBrands();
-      } else {
-        // Error is already shown via toast in service
-        console.error('❌ Form save failed:', response.message);
-      }
-    } catch (error) {
-      console.error('❌ Form save error:', error);
-    } finally {
-      setFormLoading(false);
-    }
-  };
-
-  // Handle delete confirmation
-  const handleDeleteClick = (brand) => {
-    console.log('🗑️ Delete clicked for brand:', brand);
-    setBrandToDelete(brand);
-    setDeleteDialogOpen(true);
-  };
-
-  // Handle delete confirmation
-  const handleDeleteConfirm = async () => {
-    if (!brandToDelete) return;
-
-    try {
-      console.log('🗑️ Deleting brand:', brandToDelete.id);
-      const response = await brandService.deleteBrand(brandToDelete.id);
-      
-      if (response.success) {
-        setNotification({
-          open: true,
-          message: response.message || 'Brand deleted successfully',
-          severity: 'success'
-        });
-        
-        // Reload brands
-        loadBrands();
-      }
-    } catch (error) {
-      console.error('❌ Delete error:', error);
-    } finally {
-      setDeleteDialogOpen(false);
-      setBrandToDelete(null);
-    }
-  };
-
-  // Handle toggle status
-  const handleToggleStatus = async (brandId, newStatus) => {
-    try {
-      console.log('🔄 Toggling brand status:', brandId, 'to', newStatus);
-      const response = await brandService.toggleBrandStatus(brandId, newStatus);
-      
-      if (response.success) {
-        setNotification({
-          open: true,
-          message: response.message || 'Brand status updated successfully',
-          severity: 'success'
-        });
-        
-        // Reload brands
-        loadBrands();
-      }
-    } catch (error) {
-      console.error('❌ Toggle status error:', error);
-    }
-  };
-
-  // Close notification
-  const handleNotificationClose = () => {
-    setNotification(prev => ({ ...prev, open: false }));
-  };
-
-  // Show loading state while permissions are loading
-  if (permissionsLoading || !user) {
-    return (
-      <Box sx={{ p: 3 }}>
-        <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
-          <CircularProgress />
-          <Typography sx={{ ml: 2 }}>Loading permissions...</Typography>
-        </Box>
-      </Box>
-    );
   }
 
-  console.log('🔑 Final Brand permissions:', { canCreate, canView, canEdit, canDelete });
+  // Initial load and refresh when filters change
+  useEffect(() => {
+    fetchBrands()
+  }, [searchTerm, filterStatus, sortBy, sortOrder, currentPage])
+
+  // Handle create/update
+  const handleFormSubmit = async (formData) => {
+    try {
+      setFormLoading(true)
+      setError(null) // Clear any previous errors
+      
+      console.log('Submitting form data:', formData)
+      console.log('Editing item:', editingItem)
+      
+      let response
+      if (editingItem) {
+        console.log('Updating brand with ID:', editingItem.id)
+        response = await brandAPI.update(editingItem.id, formData)
+      } else {
+        console.log('Creating new brand')
+        response = await brandAPI.create(formData)
+      }
+
+      console.log('API Response:', response)
+      
+      // Handle both success response patterns
+      if (response.success || response.data) {
+        setShowForm(false)
+        setEditingItem(null)
+        fetchBrands() // Refresh the list
+        
+        // Show success message (you can implement a toast notification here)
+        console.log(editingItem ? 'Brand updated successfully' : 'Brand created successfully')
+      } else {
+        throw new Error(response.message || 'Operation failed')
+      }
+    } catch (error) {
+      console.error('Form submission error:', error)
+      console.error('Error response data:', error.response?.data)
+      console.error('Error status:', error.response?.status)
+      
+      // Set error message from API response or fallback
+      const errorMessage = error.response?.data?.message || 
+                          error.response?.data?.error || 
+                          error.message || 
+                          'Operation failed'
+      setError(errorMessage)
+    } finally {
+      setFormLoading(false)
+    }
+  }
+
+  // Handle delete
+  const handleDelete = async (id) => {
+    try {
+      setDeleteLoading(true)
+      const response = await brandAPI.delete(id)
+      
+      if (response.success) {
+        setShowDeleteConfirm(false)
+        setItemToDelete(null)
+        fetchBrands() // Refresh the list
+        console.log('Brand deleted successfully')
+      } else {
+        throw new Error(response.message || 'Delete failed')
+      }
+    } catch (error) {
+      console.error('Delete error:', error)
+      setError(error.response?.data?.message || 'Delete failed')
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
+
+  // Handle search
+  const handleSearch = (e) => {
+    setSearchTerm(e.target.value)
+    setCurrentPage(1) // Reset to first page when searching
+  }
+
+  // Handle filter change
+  const handleFilterChange = (filter) => {
+    setFilterStatus(filter)
+    setCurrentPage(1) // Reset to first page when filtering
+  }
+
+  // Handle sort
+  const handleSort = (column) => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortBy(column)
+      setSortOrder('asc')
+    }
+    setCurrentPage(1)
+  }
+
+  // Open edit form
+  const handleEdit = (item) => {
+    setEditingItem(item)
+    setShowForm(true)
+  }
+
+  // Open create form
+  const handleCreate = () => {
+    setEditingItem(null)
+    setShowForm(true)
+  }
+
+  // Open delete confirmation
+  const handleDeleteClick = (item) => {
+    setItemToDelete(item)
+    setShowDeleteConfirm(true)
+  }
+
+  // Format date for display
+  const formatDateForDisplay = (dateString) => {
+    if (!dateString) return '-'
+    return formatDate(dateString)
+  }
 
   return (
-    <Box sx={{ p: 3 }}>
+    <div className="p-6">
       {/* Header */}
-      <Box sx={{ mb: 3 }}>
-        {/* Breadcrumbs */}
-        <Breadcrumbs aria-label="breadcrumb" sx={{ mb: 2 }}>
-          <Link color="inherit" href="/dashboard" sx={{ display: 'flex', alignItems: 'center' }}>
-            <HomeIcon sx={{ mr: 0.5 }} fontSize="inherit" />
-            Dashboard
-          </Link>
-          <Typography color="text.primary" sx={{ display: 'flex', alignItems: 'center' }}>
-            <StorefrontIcon sx={{ mr: 0.5 }} fontSize="inherit" />
-            Brand Management
-          </Typography>
-        </Breadcrumbs>
+      <div className="mb-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Brand Management</h1>
+            <p className="text-gray-600 mt-1">Manage your brand portfolio</p>
+          </div>
+          <button
+            onClick={handleCreate}
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Brand
+          </button>
+        </div>
+      </div>
 
-        {/* Page Title and Actions */}
-        <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2}>
-          <Box>
-            <Typography variant="h4" component="h1" gutterBottom>
-              Brand Management
-            </Typography>
-            <Typography variant="body1" color="text.secondary">
-              Manage your brand portfolio and brand information
-            </Typography>
-          </Box>
-          
-          <Box display="flex" gap={1}>
-            <Button
-              variant="outlined"
-              startIcon={<RefreshIcon />}
-              onClick={handleRefresh}
-              disabled={loading}
-            >
-              Refresh
-            </Button>
-            
-            {canCreate && (
-              <Button
-                variant="contained"
-                startIcon={<AddIcon />}
-                onClick={handleCreateNew}
-                disabled={loading}
-              >
-                Add Brand
-              </Button>
-            )}
-          </Box>
-        </Box>
-      </Box>
-
-      {/* Permission Check */}
-      {!canView && (
-        <Alert severity="warning" sx={{ mb: 3 }}>
-          You don't have permission to view brands. Contact your administrator for access.
-        </Alert>
-      )}
-
-      {canView && (
-        <>
-          {/* Filters */}
-          <BrandFilters
-            filters={filters}
-            onFiltersChange={handleFiltersChange}
-            onReset={handleFiltersReset}
-            loading={loading}
-          />
-
-          {/* Error Alert */}
-          {error && (
-            <Alert severity="error" sx={{ mb: 3 }}>
-              {error}
-            </Alert>
-          )}
-
-          {/* Main Content */}
-          <Paper elevation={1}>
-            {loading ? (
-              <Box display="flex" justifyContent="center" alignItems="center" p={4}>
-                <CircularProgress />
-                <Typography sx={{ ml: 2 }}>Loading brands...</Typography>
-              </Box>
-            ) : (
-              <BrandTable
-                brands={brands}
-                loading={loading}
-                onEdit={canEdit ? handleEdit : undefined}
-                onDelete={canDelete ? handleDeleteClick : undefined}
-                onToggleStatus={canEdit ? handleToggleStatus : undefined}
-                onView={handleView}
-                permissions={permissions}
+      {/* Filters and Search */}
+      <div className="bg-white rounded-lg shadow mb-6">
+        <div className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <input
+                type="text"
+                placeholder="Search brands..."
+                value={searchTerm}
+                onChange={handleSearch}
+                className="pl-10 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm py-2"
               />
-            )}
-          </Paper>
+            </div>
 
-          {/* Brands Count */}
-          {!loading && brands.length > 0 && (
-            <Box mt={2}>
-              <Typography variant="body2" color="text.secondary">
-                Showing {brands.length} brand{brands.length !== 1 ? 's' : ''}
-              </Typography>
-            </Box>
-          )}
-        </>
+            {/* Status Filter */}
+            <div>
+              <select
+                value={filterStatus}
+                onChange={(e) => handleFilterChange(e.target.value)}
+                className="block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm py-2"
+              >
+                <option value="all">All Status</option>
+                <option value="active">Active Only</option>
+                <option value="inactive">Inactive Only</option>
+              </select>
+            </div>
+
+            {/* Refresh Button */}
+            <div className="flex justify-end">
+              <button
+                onClick={fetchBrands}
+                disabled={loading}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                Refresh
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-6">
+          <div className="flex">
+            <AlertCircle className="h-5 w-5 text-red-400" />
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-red-800">Error</h3>
+              <p className="text-sm text-red-700 mt-1">{error}</p>
+            </div>
+          </div>
+        </div>
       )}
 
-      {/* Brand Form Dialog */}
+      {/* Table */}
+      <div className="bg-white shadow overflow-hidden sm:rounded-md">
+        {loading ? (
+          <div className="text-center py-12">
+            <RefreshCw className="h-8 w-8 animate-spin mx-auto text-gray-400" />
+            <p className="text-gray-500 mt-2">Loading brands...</p>
+          </div>
+        ) : brands.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="text-gray-400 mb-4">
+              <Plus className="h-12 w-12 mx-auto" />
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No brands found</h3>
+            <p className="text-gray-500 mb-4">Get started by creating your first brand.</p>
+            <button
+              onClick={handleCreate}
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Brand
+            </button>
+          </div>
+        ) : (
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th 
+                  scope="col" 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleSort('name')}
+                >
+                  Name
+                  {sortBy === 'name' && (
+                    <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                  )}
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Description
+                </th>
+                <th 
+                  scope="col" 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleSort('is_active')}
+                >
+                  Status
+                  {sortBy === 'is_active' && (
+                    <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                  )}
+                </th>
+                <th 
+                  scope="col" 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleSort('created_at')}
+                >
+                  Created
+                  {sortBy === 'created_at' && (
+                    <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                  )}
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {brands.map((item) => (
+                <tr key={item.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm font-medium text-gray-900">{item.name}</div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="text-sm text-gray-700 max-w-xs truncate">
+                      {item.description || '-'}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      item.is_active
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-red-100 text-red-800'
+                    }`}>
+                      {item.is_active ? (
+                        <>
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          Active
+                        </>
+                      ) : (
+                        <>
+                          <XCircle className="h-3 w-3 mr-1" />
+                          Inactive
+                        </>
+                      )}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                    {formatDateForDisplay(item.created_at)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <div className="flex items-center space-x-3">
+                      <button
+                        onClick={() => handleEdit(item)}
+                        className="text-blue-600 hover:text-blue-900 transition-colors"
+                        title="Edit"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteClick(item)}
+                        className="text-red-600 hover:text-red-900 transition-colors"
+                        title="Delete"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Brand Form Modal */}
       <BrandForm
-        open={formOpen}
+        isOpen={showForm}
         onClose={() => {
-          setFormOpen(false);
-          setSelectedBrand(null);
+          setShowForm(false)
+          setEditingItem(null)
+          setError(null)
         }}
-        onSave={handleFormSave}
-        brand={selectedBrand}
-        loading={formLoading}
-        permissions={permissions}
+        onSubmit={handleFormSubmit}
+        editData={editingItem}
+        isLoading={formLoading}
       />
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog
-        open={deleteDialogOpen}
-        onClose={() => setDeleteDialogOpen(false)}
-        aria-labelledby="delete-dialog-title"
-      >
-        <DialogTitle id="delete-dialog-title">
-          <Box display="flex" alignItems="center" gap={1}>
-            <DeleteIcon color="error" />
-            Confirm Delete
-          </Box>
-        </DialogTitle>
-        
-        <DialogContent>
-          <DialogContentText>
-            Are you sure you want to delete the brand "{brandToDelete?.name}"?
-          </DialogContentText>
-          <DialogContentText color="error" sx={{ mt: 2 }}>
-            This action cannot be undone.
-          </DialogContentText>
-        </DialogContent>
-        
-        <DialogActions>
-          <Button onClick={() => setDeleteDialogOpen(false)} color="inherit">
-            Cancel
-          </Button>
-          <Button 
-            onClick={handleDeleteConfirm} 
-            color="error" 
-            variant="contained"
-            startIcon={<DeleteIcon />}
-          >
-            Delete Brand
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && itemToDelete && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div className="mt-3 text-center">
+              <AlertCircle className="mx-auto h-12 w-12 text-red-600" />
+              <h3 className="text-lg font-medium text-gray-900 mt-4">Delete Brand</h3>
+              <div className="mt-2 px-7 py-3">
+                <p className="text-sm text-gray-500">
+                  Are you sure you want to delete "{itemToDelete.name}"? This action cannot be undone.
+                </p>
+              </div>
+              <div className="flex justify-center space-x-3 mt-4">
+                <button
+                  onClick={() => {
+                    setShowDeleteConfirm(false)
+                    setItemToDelete(null)
+                  }}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  disabled={deleteLoading}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleDelete(itemToDelete.id)}
+                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
+                  disabled={deleteLoading}
+                >
+                  {deleteLoading ? 'Deleting...' : 'Delete'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
-      {/* Success/Error Notification */}
-      <Snackbar
-        open={notification.open}
-        autoHideDuration={6000}
-        onClose={handleNotificationClose}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-      >
-        <Alert
-          onClose={handleNotificationClose}
-          severity={notification.severity}
-          sx={{ width: '100%' }}
-        >
-          {notification.message}
-        </Alert>
-      </Snackbar>
-    </Box>
-  );
-};
-
-export default Brands;
+export default Brands
