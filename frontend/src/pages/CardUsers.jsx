@@ -35,6 +35,7 @@ const CardUsers = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [itemToDelete, setItemToDelete] = useState(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
+  const [deleteError, setDeleteError] = useState(null)
 
   // Fetch assignments
   const fetchAssignments = async () => {
@@ -145,6 +146,7 @@ const CardUsers = () => {
     
     try {
       setDeleteLoading(true)
+      setDeleteError(null) // Clear any previous delete errors
       const response = await cardUsersService.delete(itemToDelete.id || itemToDelete._id)
       
       if (!response.success) {
@@ -153,13 +155,13 @@ const CardUsers = () => {
       
       setShowDeleteConfirm(false)
       setItemToDelete(null)
+      setDeleteError(null) // Clear delete errors on success
       await fetchAssignments()
     } catch (err) {
       console.error('Delete error:', err)
+      // Show error in delete modal, not on main page
       const errorMessage = err.response?.data?.message || err.message || 'Failed to delete assignment';
-      setError(errorMessage);
-      setShowDeleteConfirm(false);
-      setItemToDelete(null);
+      setDeleteError(errorMessage);
     } finally {
       setDeleteLoading(false)
     }
@@ -168,6 +170,7 @@ const CardUsers = () => {
   const handleDeleteCancel = () => {
     setShowDeleteConfirm(false)
     setItemToDelete(null)
+    setDeleteError(null) // Clear delete errors when canceling
   }
 
   // Filter assignments based on search term
@@ -428,6 +431,11 @@ const CardUsers = () => {
                     <p className="text-sm text-gray-500">
                       Are you sure you want to delete the assignment of "{itemToDelete.card_name}" to "{itemToDelete.username}"? This action cannot be undone.
                     </p>
+                    {deleteError && (
+                      <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
+                        <p className="text-sm text-red-600">{deleteError}</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

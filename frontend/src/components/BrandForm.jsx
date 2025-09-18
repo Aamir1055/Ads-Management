@@ -72,7 +72,9 @@ const BrandForm = ({ isOpen, onClose, onSubmit, editData = null, isLoading = fal
 
     try {
       setSubmitError('')
-      await onSubmit(formData)
+      const result = await onSubmit(formData)
+      // If onSubmit returns successfully without throwing an error, the parent will handle closing
+      // The form will be closed by the parent component on success
     } catch (error) {
       console.error('Form submission error:', error)
       setSubmitError(error?.response?.data?.message || error.message || 'An error occurred while saving')

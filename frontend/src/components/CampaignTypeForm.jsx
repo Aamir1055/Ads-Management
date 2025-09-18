@@ -17,7 +17,8 @@ const CampaignTypeForm = ({ isOpen, onClose, onSubmit, editData = null, isLoadin
       setFormData({
         type_name: editData.type_name || '',
         description: editData.description || '',
-        is_active: editData.is_active !== undefined ? editData.is_active : true
+        // Convert database value (1/0) to boolean
+        is_active: editData.is_active !== undefined ? Boolean(editData.is_active) : true
       })
     } else {
       setFormData({
@@ -72,7 +73,9 @@ const CampaignTypeForm = ({ isOpen, onClose, onSubmit, editData = null, isLoadin
 
     try {
       setSubmitError('')
-      await onSubmit(formData)
+      const result = await onSubmit(formData)
+      // If onSubmit returns successfully without throwing an error, the parent will handle closing
+      // The form will be closed by the parent component on success
     } catch (error) {
       console.error('Form submission error:', error)
       setSubmitError(error?.response?.data?.message || error.message || 'An error occurred while saving')

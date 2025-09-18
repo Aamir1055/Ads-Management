@@ -32,6 +32,19 @@ const {
 const requestLogger = (req, res, next) => {
   const ts = new Date().toISOString();
   console.log(`[${ts}] ${req.method} ${req.originalUrl} - Campaign Types API`);
+  
+  // Debug user authentication for POST requests
+  if (req.method === 'POST') {
+    console.log('📝 [Campaign Types POST] User auth debug:', {
+      hasUser: !!req.user,
+      userId: req.user?.id,
+      username: req.user?.username,
+      roleId: req.user?.role_id,
+      roleName: req.user?.role?.name,
+      authHeader: req.headers.authorization ? `${req.headers.authorization.substring(0, 20)}...` : 'No auth header'
+    });
+  }
+  
   next();
 };
 

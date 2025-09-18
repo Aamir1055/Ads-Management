@@ -345,7 +345,12 @@ const cardsController = {
         cardsQuery += wc;
       }
 
-      cardsQuery += ' ORDER BY c.created_at DESC LIMIT ? OFFSET ?';
+      // Add ORDER BY with correct table alias based on query type
+      if (isSuperAdmin) {
+        cardsQuery += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+      } else {
+        cardsQuery += ' ORDER BY c.created_at DESC LIMIT ? OFFSET ?';
+      }
 
       // totals
       const [countRows] = await pool.query(countQuery, queryParams);

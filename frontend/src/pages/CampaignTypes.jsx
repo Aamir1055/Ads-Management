@@ -8,7 +8,8 @@ import {
   AlertCircle,
   CheckCircle,
   XCircle,
-  RefreshCw
+  RefreshCw,
+  X
 } from 'lucide-react'
 import { campaignTypesAPI } from '../services/campaignTypesService'
 import CampaignTypeForm from '../components/CampaignTypeForm'
@@ -34,6 +35,7 @@ const CampaignTypes = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [itemToDelete, setItemToDelete] = useState(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
+  const [deleteError, setDeleteError] = useState(null)
 
   // Fetch campaign types
   const fetchCampaignTypes = async () => {
@@ -70,6 +72,16 @@ const CampaignTypes = () => {
     fetchCampaignTypes()
   }, [searchTerm, filterStatus, sortBy, sortOrder, currentPage])
 
+  // Auto-dismiss error messages after 5 seconds
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => {
+        setError(null)
+      }, 5000)
+      return () => clearTimeout(timer)
+    }
+  }, [error])
+
   // Handle create/update
   const handleFormSubmit = async (formData) => {
     try {
@@ -98,6 +110,7 @@ const CampaignTypes = () => {
         
         // Show success message (you can implement a toast notification here)
         console.log(editingItem ? 'Campaign type updated successfully' : 'Campaign type created successfully')
+        return { success: true } // Return success indicator for the form
       } else {
         throw new Error(response.message || 'Operation failed')
       }
@@ -106,12 +119,9 @@ const CampaignTypes = () => {
       console.error('Error response data:', error.response?.data)
       console.error('Error status:', error.response?.status)
       
-      // Set error message from API response or fallback
-      const errorMessage = error.response?.data?.message || 
-                          error.response?.data?.error || 
-                          error.message || 
-                          'Operation failed'
-      setError(errorMessage)
+      // Don't set main page error when form is handling it
+      // The form will display the error message, no need for duplicate display
+      throw error // Re-throw the error so the form knows it failed
     } finally {
       setFormLoading(false)
     }
@@ -121,11 +131,13 @@ const CampaignTypes = () => {
   const handleDelete = async (id) => {
     try {
       setDeleteLoading(true)
+      setDeleteError(null) // Clear any previous delete errors
       const response = await campaignTypesAPI.delete(id)
       
       if (response.success) {
         setShowDeleteConfirm(false)
         setItemToDelete(null)
+        setDeleteError(null) // Clear delete errors on success
         fetchCampaignTypes() // Refresh the list
         console.log('Campaign type deleted successfully')
       } else {
@@ -133,7 +145,8 @@ const CampaignTypes = () => {
       }
     } catch (error) {
       console.error('Delete error:', error)
-      setError(error.response?.data?.message || 'Delete failed')
+      // Show error in delete modal, not on main page
+      setDeleteError(error.response?.data?.message || error.message || 'Delete failed')
     } finally {
       setDeleteLoading(false)
     }
@@ -252,12 +265,19 @@ const CampaignTypes = () => {
       {/* Error Message */}
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-6">
-          <div className="flex">
-            <AlertCircle className="h-5 w-5 text-red-400" />
-            <div className="ml-3">
+          <div className="flex items-center">
+            <AlertCircle className="h-5 w-5 text-red-400 mr-2" />
+            <div className="flex-1">
               <h3 className="text-sm font-medium text-red-800">Error</h3>
               <p className="text-sm text-red-700 mt-1">{error}</p>
             </div>
+            <button
+              onClick={() => setError(null)}
+              className="text-red-400 hover:text-red-600 transition-colors ml-3"
+              aria-label="Dismiss error"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
         </div>
       )}
@@ -408,12 +428,18 @@ const CampaignTypes = () => {
                 <p className="text-sm text-gray-500">
                   Are you sure you want to delete "{itemToDelete.type_name}"? This action cannot be undone.
                 </p>
+                {deleteError && (
+                  <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
+                    <p className="text-sm text-red-600">{deleteError}</p>
+                  </div>
+                )}
               </div>
               <div className="flex justify-center space-x-3 mt-4">
                 <button
                   onClick={() => {
                     setShowDeleteConfirm(false)
                     setItemToDelete(null)
+                    setDeleteError(null) // Clear delete errors when canceling
                   }}
                   className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                   disabled={deleteLoading}

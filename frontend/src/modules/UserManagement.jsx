@@ -12,9 +12,12 @@ import {
   AlertCircle,
   CheckCircle,
   Clock,
-  Search
+  Search,
+  ExternalLink,
+  RefreshCw
 } from 'lucide-react';
 import { formatDate } from '../utils/dateUtils';
+import { handleAccessDenied, isAccessDeniedError, getAccessDeniedMessageProps } from '../utils/accessDeniedHandler';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
@@ -51,7 +54,7 @@ const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
 
 
 // Create/Edit User Modal
-const UserFormModal = ({ isOpen, onClose, user, roles, onSubmit, isLoading }) => {
+const UserFormModal = ({ isOpen, onClose, user, roles, onSubmit, isLoading, accessDeniedMessage, modalError }) => {
   const [formData, setFormData] = useState({
     username: '',
     password: '',
@@ -115,6 +118,64 @@ const UserFormModal = ({ isOpen, onClose, user, roles, onSubmit, isLoading }) =>
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={user ? 'Edit User' : 'Create New User'} size="lg">
+      {/* Access Denied Message at Top of Modal */}
+      {accessDeniedMessage && (
+        <div className="mb-4 p-4 bg-red-100 border-2 border-red-300 rounded-lg shadow-lg animate-pulse">
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              <AlertCircle className="h-5 w-5 mr-3 mt-0.5 text-red-600" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-bold text-red-800 mb-2">Access Denied</h3>
+              <div className="text-red-700 font-medium mb-4">
+                {accessDeniedMessage}
+              </div>
+              <div className="flex space-x-3">
+                <button
+                  type="button"
+                  onClick={() => window.location.href = '/login'}
+                  className="inline-flex items-center px-3 py-2 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition-colors"
+                >
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  Go to Login
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.location.reload()}
+                  className="inline-flex items-center px-3 py-2 bg-gray-600 text-white text-sm rounded hover:bg-gray-700 transition-colors"
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Refresh Page
+                </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="inline-flex items-center px-3 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
+                >
+                  <X className="w-4 h-4 mr-2" />
+                  Close Form
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* General Modal Error */}
+      {modalError && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              <AlertCircle className="h-5 w-5 mr-3 mt-0.5 text-red-600" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-sm font-medium text-red-800 mb-1">Error</h3>
+              <p className="text-sm text-red-700">{modalError}</p>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Username */}
@@ -268,7 +329,9 @@ const UserManagement = () => {
   const [showUserModal, setShowUserModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [message, setMessage] = useState({ type: '', content: '' });
+  const [message, setMessage] = useState({ type: '', content: '', isAccessDenied: false });
+  const [modalAccessDeniedMessage, setModalAccessDeniedMessage] = useState('');
+  const [modalError, setModalError] = useState('');
 
   // API functions
   const getAuthHeader = () => {
@@ -296,13 +359,17 @@ const UserManagement = () => {
       console.log('📊 Response status:', response.status);
       
       if (!response.ok) {
-        if (response.status === 403) {
-          setMessage({ 
-            type: 'error', 
-            content: 'Authentication required. Please login first.' 
+        // Handle access denied errors with improved UX
+        if (response.status === 403 || response.status === 401) {
+          handleAccessDenied({
+            closeForm: () => {
+              setShowUserModal(false);
+              setSelectedUser(null);
+            },
+            setMessage,
+            error: { response },
+            context: 'loading users'
           });
-          // Optionally redirect to login
-          // window.location.href = '/login';
         }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -344,7 +411,25 @@ const UserManagement = () => {
       }
     } catch (error) {
       console.error('Error creating user:', error);
-      setMessage({ type: 'error', content: 'Failed to create user' });
+      
+      // Handle access denied errors - show in modal instead of closing
+      if (isAccessDeniedError(error)) {
+        const errorResponse = error?.response;
+        const errorData = errorResponse?.data;
+        let accessDeniedMessage = '';
+        
+        if (errorResponse?.status === 403) {
+          accessDeniedMessage = errorData?.message || 'Access denied. You do not have permission to create users.';
+        } else if (errorResponse?.status === 401) {
+          accessDeniedMessage = 'Authentication required. Please log in first.';
+        } else {
+          accessDeniedMessage = errorData?.message || error?.message || 'Access denied while creating user';
+        }
+        
+        setModalAccessDeniedMessage(accessDeniedMessage);
+      } else {
+        setMessage({ type: 'error', content: 'Failed to create user' });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -353,6 +438,7 @@ const UserManagement = () => {
   const handleUpdateUser = async (userData) => {
     try {
       setIsSubmitting(true);
+      setModalError(''); // Clear any previous modal errors
       const response = await fetch(`${API_BASE_URL}/user-management/${selectedUser.id}`, {
         method: 'PUT',
         headers: {
@@ -368,13 +454,34 @@ const UserManagement = () => {
         setMessage({ type: 'success', content: 'User updated successfully!' });
         setShowUserModal(false);
         setSelectedUser(null);
+        setModalError(''); // Clear modal errors on success
         await fetchUsers();
       } else {
-        setMessage({ type: 'error', content: data.message || 'Failed to update user' });
+        // Show error in modal, not on main page
+        setModalError(data.message || 'Failed to update user');
       }
     } catch (error) {
       console.error('Error updating user:', error);
-      setMessage({ type: 'error', content: 'Failed to update user' });
+      
+      // Handle access denied errors - show in modal instead of closing
+      if (isAccessDeniedError(error)) {
+        const errorResponse = error?.response;
+        const errorData = errorResponse?.data;
+        let accessDeniedMessage = '';
+        
+        if (errorResponse?.status === 403) {
+          accessDeniedMessage = errorData?.message || 'Access denied. You do not have permission to update users.';
+        } else if (errorResponse?.status === 401) {
+          accessDeniedMessage = 'Authentication required. Please log in first.';
+        } else {
+          accessDeniedMessage = errorData?.message || error?.message || 'Access denied while updating user';
+        }
+        
+        setModalAccessDeniedMessage(accessDeniedMessage);
+      } else {
+        // Show error in modal, not on main page
+        setModalError(error?.response?.data?.message || error?.message || 'Failed to update user');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -401,7 +508,21 @@ const UserManagement = () => {
       }
     } catch (error) {
       console.error('Error deleting user:', error);
-      setMessage({ type: 'error', content: 'Failed to delete user' });
+      
+      // Handle access denied errors with improved UX
+      if (isAccessDeniedError(error)) {
+        handleAccessDenied({
+          closeForm: () => {
+            // No form to close for delete, but clear any selections
+            setSelectedUser(null);
+          },
+          setMessage,
+          error,
+          context: 'deleting user'
+        });
+      } else {
+        setMessage({ type: 'error', content: 'Failed to delete user' });
+      }
     }
   };
 
@@ -438,9 +559,9 @@ const UserManagement = () => {
   }, []);
 
   useEffect(() => {
-    if (message.content) {
+    if (message.content && !message.isAccessDenied) { // Don't auto-close access denied messages
       const timer = setTimeout(() => {
-        setMessage({ type: '', content: '' });
+        setMessage({ type: '', content: '', isAccessDenied: false });
       }, 5000);
       return () => clearTimeout(timer);
     }
@@ -484,19 +605,63 @@ const UserManagement = () => {
         </div>
       </div>
 
-      {/* Message Display */}
+      {/* Message Display - Enhanced for Access Denied */}
       {message.content && (
-        <div className={`mb-4 p-4 rounded-lg flex items-center ${
-          message.type === 'success' 
+        <div className={`mb-4 p-4 rounded-lg ${
+          message.isAccessDenied 
+            ? 'bg-red-100 border-2 border-red-300 shadow-2xl animate-pulse' // More prominent for access denied
+            : message.type === 'success' 
             ? 'bg-green-50 text-green-700 border border-green-200' 
             : 'bg-red-50 text-red-700 border border-red-200'
         }`}>
-          {message.type === 'success' ? (
-            <CheckCircle className="h-5 w-5 mr-2" />
-          ) : (
-            <AlertCircle className="h-5 w-5 mr-2" />
-          )}
-          {message.content}
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              {message.type === 'success' ? (
+                <CheckCircle className="h-5 w-5 mr-3 mt-0.5 text-green-500" />
+              ) : (
+                <AlertCircle className={`h-5 w-5 mr-3 mt-0.5 ${
+                  message.isAccessDenied ? 'text-red-600' : 'text-red-500'
+                }`} />
+              )}
+            </div>
+            <div className="flex-1">
+              {message.isAccessDenied && (
+                <h3 className="text-lg font-bold text-red-800 mb-2">Access Denied</h3>
+              )}
+              <div className={`${
+                message.isAccessDenied ? 'text-red-700 font-medium' : ''
+              }`}>
+                {message.content}
+              </div>
+              {message.isAccessDenied && (
+                <div className="mt-4 flex space-x-3">
+                  <button
+                    onClick={() => window.location.href = '/login'}
+                    className="inline-flex items-center px-3 py-2 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition-colors"
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    Go to Login
+                  </button>
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="inline-flex items-center px-3 py-2 bg-gray-600 text-white text-sm rounded hover:bg-gray-700 transition-colors"
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Refresh Page
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="flex-shrink-0">
+              <button
+                onClick={() => setMessage({ type: '', content: '', isAccessDenied: false })}
+                className="text-gray-400 hover:text-gray-600 transition-colors p-1"
+                aria-label="Dismiss message"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -658,11 +823,15 @@ const UserManagement = () => {
         onClose={() => {
           setShowUserModal(false);
           setSelectedUser(null);
+          setModalAccessDeniedMessage(''); // Clear modal message when closing
+          setModalError(''); // Clear modal errors when closing
         }}
         user={selectedUser}
         roles={roles}
         onSubmit={selectedUser ? handleUpdateUser : handleCreateUser}
         isLoading={isSubmitting}
+        accessDeniedMessage={modalAccessDeniedMessage}
+        modalError={modalError}
       />
     </div>
   );

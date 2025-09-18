@@ -250,7 +250,7 @@ const requireAdmin = async (req, res, next) => {
       });
     }
 
-    const roleId = req.user.role_id;
+    const roleId = req.user.role ? req.user.role.id : req.user.role_id; // Support both structures
 
     // Check if user has admin role OR SuperAdmin (SuperAdmin can do everything)
     const [roleInfo] = await pool.query(`
@@ -294,7 +294,7 @@ const requireManagerOrAdmin = async (req, res, next) => {
       });
     }
 
-    const roleId = req.user.role_id;
+    const roleId = req.user.role ? req.user.role.id : req.user.role_id; // Support both structures
 
     // Check if user has manager or admin role
     const [roleInfo] = await pool.query(`
@@ -326,19 +326,49 @@ const requireManagerOrAdmin = async (req, res, next) => {
  */
 const requireSuperAdmin = async (req, res, next) => {
   try {
+    const ts = new Date().toISOString();
+    console.log('\n🟡 ================================================');
+    console.log('🔍 [SuperAdmin Check] Starting check at:', ts);
+    console.log('🔍 [SuperAdmin Check] Request details:', {
+      method: req.method,
+      originalUrl: req.originalUrl,
+      headers: {
+        authorization: req.headers.authorization ? `${req.headers.authorization.substring(0, 20)}...` : 'NONE',
+        'content-type': req.headers['content-type'],
+        'user-agent': req.headers['user-agent']?.substring(0, 50)
+      },
+      body: req.body ? JSON.stringify(req.body).substring(0, 100) : 'No body'
+    });
+    console.log('🔍 [SuperAdmin Check] Request user:', {
+      exists: !!req.user,
+      id: req.user?.id,
+      username: req.user?.username,
+      role_id: req.user?.role_id,
+      role: req.user?.role
+    });
+    
     if (!req.user || !req.user.id) {
+      console.log('❌ [SuperAdmin Check] No user found in request');
       return res.status(401).json({
         success: false,
         message: 'Authentication required'
       });
     }
 
-    const roleId = req.user.role_id;
+    // Get role ID from the correct location
+    const roleId = req.user.role ? req.user.role.id : req.user.role_id; // Support both structures
+    console.log('🔍 [SuperAdmin Check] Using role ID:', roleId);
+    console.log('🔍 [SuperAdmin Check] Role structure:', {
+      hasRoleObject: !!req.user.role,
+      roleName: req.user.role?.name,
+      roleLevel: req.user.role?.level,
+      fallbackRoleId: req.user.role_id
+    });
 
-    // Check if user has SuperAdmin role
+    // Check if user has SuperAdmin role (support multiple naming conventions OR high privilege level)
     const [roleInfo] = await pool.query(`
       SELECT name, level FROM roles 
-      WHERE id = ? AND (name = 'SuperAdmin' OR name = 'Super Admin')
+      WHERE id = ?
       LIMIT 1
     `, [roleId]);
 
@@ -353,6 +383,33 @@ const requireSuperAdmin = async (req, res, next) => {
         }
       });
     }
+
+    const roleName = roleInfo[0].name || '';
+    const roleLevel = Number(roleInfo[0].level) || 0;
+
+    const isSuperAdmin = (
+      roleLevel >= 10 ||
+      roleName === 'SuperAdmin' ||
+      roleName === 'Super Admin' ||
+      roleName === 'super_admin' ||
+      roleName === 'superadmin' ||
+      roleName === 'SUPERADMIN'
+    );
+
+    if (!isSuperAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'SuperAdmin access required. This master data module can only be modified by SuperAdmin users.',
+        details: {
+          reason: 'Master data access restriction',
+          requiredRole: 'SuperAdmin',
+          currentAction: 'Master data modification'
+        }
+      });
+    }
+
+    // If SuperAdmin, log the bypass
+    console.log(`🔥 SuperAdmin bypassing admin check: ${roleName} (level ${roleLevel})`);
 
     next();
   } catch (error) {
@@ -430,7 +487,7 @@ const requireAllPermissions = (permissionList) => {
         });
       }
 
-      const roleId = req.user.role_id;
+      const roleId = req.user.role ? req.user.role.id : req.user.role_id; // Support both structures
       
       // 🔥 SUPERADMIN BYPASS: SuperAdmin has access to EVERYTHING
       const [roleInfo] = await pool.query('SELECT name, level FROM roles WHERE id = ? LIMIT 1', [roleId]);
@@ -523,7 +580,7 @@ const requireAnyPermissions = (permissionList) => {
         });
       }
 
-      const roleId = req.user.role_id;
+      const roleId = req.user.role ? req.user.role.id : req.user.role_id; // Support both structures
       
       // 🔥 SUPERADMIN BYPASS: SuperAdmin has access to EVERYTHING
       const [roleInfo] = await pool.query('SELECT name, level FROM roles WHERE id = ? LIMIT 1', [roleId]);
