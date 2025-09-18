@@ -611,6 +611,16 @@ const reportsController = {
             THEN cd.spent / (cd.facebook_result + cd.xoho_result)
             ELSE NULL 
           END as cost_per_lead,
+          CASE 
+            WHEN cd.facebook_result > 0 
+            THEN cd.spent / cd.facebook_result
+            ELSE NULL 
+          END as facebook_cost_per_lead,
+          CASE 
+            WHEN cd.xoho_result > 0 
+            THEN cd.spent / cd.xoho_result
+            ELSE NULL 
+          END as zoho_cost_per_lead,
           cd.created_at,
           cd.updated_at
         FROM campaign_data cd
@@ -622,6 +632,21 @@ const reportsController = {
       `;
 
       const [reportData] = await pool.query(reportSql, params);
+      
+      // DEBUG: Log the actual data being returned
+      console.log('🔍 [DEBUG] generateReport - Privacy Controller:');
+      console.log('Results count:', reportData?.length || 0);
+      if (reportData && reportData.length > 0) {
+        console.log('First record:', {
+          id: reportData[0].id,
+          campaign_name: reportData[0].campaign_name,
+          facebook_result: reportData[0].facebook_result,
+          zoho_result: reportData[0].zoho_result,
+          spent: reportData[0].spent,
+          facebook_cost_per_lead: reportData[0].facebook_cost_per_lead,
+          zoho_cost_per_lead: reportData[0].zoho_cost_per_lead
+        });
+      }
 
       if (!reportData || reportData.length === 0) {
         return res.status(200).json(createResponse(true, 'No data found for the selected date range', {

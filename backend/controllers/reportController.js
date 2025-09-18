@@ -94,6 +94,16 @@ const reportsController = {
             THEN cd.spent / (cd.facebook_result + cd.xoho_result)
             ELSE NULL 
           END as cost_per_lead,
+          CASE 
+            WHEN cd.facebook_result > 0 
+            THEN cd.spent / cd.facebook_result
+            ELSE NULL 
+          END as facebook_cost_per_lead,
+          CASE 
+            WHEN cd.xoho_result > 0 
+            THEN cd.spent / cd.xoho_result
+            ELSE NULL 
+          END as zoho_cost_per_lead,
           cd.created_at,
           cd.updated_at
         FROM campaign_data cd
@@ -144,7 +154,12 @@ const reportsController = {
           leads: reportData[0].leads,
           leads_type: typeof reportData[0].leads,
           cost_per_lead: reportData[0].cost_per_lead,
-          cost_per_lead_type: typeof reportData[0].cost_per_lead
+          cost_per_lead_type: typeof reportData[0].cost_per_lead,
+          facebook_result: reportData[0].facebook_result,
+          zoho_result: reportData[0].zoho_result,
+          spent: reportData[0].spent,
+          facebook_cost_per_lead: reportData[0].facebook_cost_per_lead,
+          zoho_cost_per_lead: reportData[0].zoho_cost_per_lead
         });
       }
 

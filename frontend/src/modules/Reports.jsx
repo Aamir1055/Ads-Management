@@ -145,17 +145,24 @@ const Reports = () => {
                   Zoho
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Total Results
+                  Facebook Cost/Lead
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Cost/Result
+                  Zoho Cost/Lead
                 </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {reports.map((report, index) => {
-                const costPerResult = report.cost_per_result || 
-                  reportsService.calculateCostPerResult(report.spent, report.total_results);
+                const facebookCostPerLead = report.facebook_cost_per_lead ? parseFloat(report.facebook_cost_per_lead) : 0;
+                const zohoCostPerLead = report.zoho_cost_per_lead ? parseFloat(report.zoho_cost_per_lead) : 0;
+                
+                const getCostPerLeadStyle = (cost) => {
+                  if (!cost || cost === 0) return 'bg-gray-100 text-gray-800';
+                  if (cost < 5) return 'bg-green-100 text-green-800';
+                  if (cost < 10) return 'bg-yellow-100 text-yellow-800';
+                  return 'bg-red-100 text-red-800';
+                };
                 
                 return (
                   <tr key={index} className="hover:bg-gray-50">
@@ -174,17 +181,14 @@ const Reports = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {reportsService.formatNumber(report.zoho_result || 0)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {reportsService.formatNumber(report.total_results || 0)}
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <span className={`px-2 py-1 rounded-full text-xs ${getCostPerLeadStyle(facebookCostPerLead)}`}>
+                        {facebookCostPerLead > 0 ? reportsService.formatCurrency(facebookCostPerLead) : 'N/A'}
+                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <span className={`px-2 py-1 rounded-full text-xs ${
-                        costPerResult === 0 ? 'bg-gray-100 text-gray-800' :
-                        costPerResult < 5 ? 'bg-green-100 text-green-800' :
-                        costPerResult < 10 ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-red-100 text-red-800'
-                      }`}>
-                        {costPerResult === 0 ? 'N/A' : reportsService.formatCurrency(costPerResult)}
+                      <span className={`px-2 py-1 rounded-full text-xs ${getCostPerLeadStyle(zohoCostPerLead)}`}>
+                        {zohoCostPerLead > 0 ? reportsService.formatCurrency(zohoCostPerLead) : 'N/A'}
                       </span>
                     </td>
                   </tr>
