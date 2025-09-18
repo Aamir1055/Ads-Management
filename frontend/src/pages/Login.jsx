@@ -326,17 +326,6 @@ const Login = () => {
             </div>
           )}
           
-          <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-lg text-sm">
-            <strong>Demo Credentials:</strong> username: <code>admin</code>, password: <code>password</code>
-            <br />
-            <button 
-              type="button" 
-              onClick={clearAllTokens}
-              className="mt-1 text-xs text-blue-600 hover:text-blue-800 underline"
-            >
-              Clear stored tokens if having login issues
-            </button>
-          </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {currentStep === 'credentials' ? (

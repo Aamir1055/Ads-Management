@@ -572,16 +572,24 @@ const permissionsController = {
         {
           name: 'User Management',
           categories: ['users'],
-          description: 'User management related permissions'
+          description: 'User management related permissions',
+          filterPermissions: [
+            'users_create',
+            'users_read',
+            'users_update',
+            'users_delete'
+          ]
         },
         {
           name: 'Role Management', 
-          categories: ['permissions', 'system'],
+          categories: ['permissions', 'system', 'roles'],
           description: 'Role and permission management',
-          filterPermissions: ['role_management', 'permissions_create', 'permissions_read', 'permissions_update', 'permissions_delete', 'role_assign', 'role_revoke'],
-          permissionNameOverrides: {
-            'role_management': 'Manage Roles & Permissions'
-          }
+          filterPermissions: [
+            'roles_create',
+            'roles_read', 
+            'roles_update',
+            'roles_delete'
+          ]
         },
         {
           name: 'Brand',
