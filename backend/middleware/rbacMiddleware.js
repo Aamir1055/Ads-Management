@@ -61,6 +61,17 @@ const checkModulePermission = (module, action, options = {}) => {
       const permissionName = options.useNewFormat ? `${module}.${action}` : `${module}_${action}`;
       const fallbackPermissionName = options.useNewFormat ? `${module}_${action}` : `${module}.${action}`;
 
+    // 🐛 DEBUG: Add detailed logging for cards permission issue
+    if (module === 'cards' && action === 'read') {
+      console.log('🔍 RBAC DEBUG - Cards Read Permission Check:');
+      console.log('   User ID:', userId);
+      console.log('   Role ID:', roleId);
+      console.log('   Module:', module);
+      console.log('   Action:', action);
+      console.log('   Permission Name:', permissionName);
+      console.log('   Fallback Permission Name:', fallbackPermissionName);
+    }
+
     // Check if user has the required permission through their role
           const [permissions] = await pool.query(`
       SELECT p.name, r.name as role_name, r.level as role_level, p.category as module_name
@@ -71,6 +82,22 @@ const checkModulePermission = (module, action, options = {}) => {
       AND p.is_active = 1
       LIMIT 1
     `, [roleId, permissionName]);
+    
+    // 🐛 DEBUG: Log the query result for cards
+    if (module === 'cards' && action === 'read') {
+      console.log('   Query Result:', permissions.length > 0 ? permissions[0] : 'NO PERMISSIONS FOUND');
+      
+      if (permissions.length === 0) {
+        // Try to see what permissions this role actually has
+        const [allRolePermissions] = await pool.query(`
+          SELECT p.name, p.display_name
+          FROM permissions p
+          JOIN role_permissions rp ON p.id = rp.permission_id
+          WHERE rp.role_id = ? AND p.is_active = 1
+        `, [roleId]);
+        console.log('   All Role Permissions:', allRolePermissions.map(p => p.name));
+      }
+    }
 
             if (permissions.length === 0) {
         // Get user's role name and available permissions for better error message

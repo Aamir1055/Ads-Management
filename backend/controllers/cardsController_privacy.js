@@ -261,7 +261,9 @@ const cardsController = {
     }
   },
 
-  // Get active cards for assignment dropdowns - with ownership validation
+  // Get active cards for assignment dropdowns - with proper user permission filtering
+  // Shows only cards that the user can actually assign (owned by them or available for assignment)
+  // Includes zero balance cards but filters by user permissions for better UX
   getActiveCards: async (req, res) => {
     try {
       const page = Math.max(1, parseInt(req.query.page, 10) || 1);
@@ -271,34 +273,70 @@ const cardsController = {
       const searchTerm = (req.query.search || '').trim();
       const search = searchTerm ? `%${searchTerm}%` : null;
 
-      let countQuery = 'SELECT COUNT(*) AS total FROM cards WHERE is_active = 1';
-      let cardsQuery = `
-        SELECT 
-          id,
-          card_name,
-          card_number_last4,
-          card_type,
-          current_balance,
-          credit_limit,
-          is_active,
-          created_by,
-          created_at,
-          updated_at
-        FROM cards WHERE is_active = 1`;
+      // Check if user is super admin (can see all cards)
+      const isSuperAdmin = req.user.role && (
+        req.user.role.level >= 8 || 
+        req.user.role.name === 'super_admin' ||
+        req.user.role.name === 'admin' ||
+        req.user.role.name === 'Admin'
+      );
 
+      // Build query based on user permissions
+      // Super Admins can see all active cards
+      // Advertisers and regular users see only cards they own or are assigned to them
+      let countQuery, cardsQuery;
       const queryParams = [];
       const where = [];
 
-      // Add privacy filtering for non-admins
-      const isAdmin = req.user.role && (req.user.role.level >= 8 || req.user.role.name === 'super_admin' || req.user.role.name === 'admin');
-      if (!isAdmin) {
-        where.push('created_by = ?');
-        queryParams.push(req.user.id);
+      if (isSuperAdmin) {
+        // Super Admins can assign any active card
+        countQuery = 'SELECT COUNT(*) AS total FROM cards WHERE is_active = 1';
+        cardsQuery = `
+          SELECT 
+            id,
+            card_name,
+            card_number_last4,
+            card_type,
+            current_balance,
+            credit_limit,
+            is_active,
+            created_by,
+            created_at,
+            updated_at
+          FROM cards WHERE is_active = 1`;
+      } else {
+        // Advertisers and regular users can only assign cards they own or are assigned to them
+        countQuery = `SELECT COUNT(DISTINCT c.id) AS total FROM cards c 
+                     LEFT JOIN card_users cu ON c.id = cu.card_id 
+                     WHERE c.is_active = 1 AND (c.created_by = ? OR cu.user_id = ?)`;
+        cardsQuery = `
+          SELECT DISTINCT
+            c.id,
+            c.card_name,
+            c.card_number_last4,
+            c.card_type,
+            c.current_balance,
+            c.credit_limit,
+            c.is_active,
+            c.created_by,
+            c.created_at,
+            c.updated_at
+          FROM cards c
+          LEFT JOIN card_users cu ON c.id = cu.card_id 
+          WHERE c.is_active = 1 AND (c.created_by = ? OR cu.user_id = ?)`;
+        // Push parameters for countQuery first (2 params)
+        queryParams.push(req.user.id, req.user.id);
       }
 
       if (search) {
-        where.push('(card_name LIKE ? OR card_type LIKE ?)');
-        queryParams.push(search, search);
+        if (isSuperAdmin) {
+          where.push('(card_name LIKE ? OR card_type LIKE ?)');
+          queryParams.push(search, search);
+        } else {
+          // For non-admins with JOIN queries, need to prefix columns with table alias
+          where.push('(c.card_name LIKE ? OR c.card_type LIKE ?)');
+          queryParams.push(search, search);
+        }
       }
 
       if (where.length) {
@@ -307,7 +345,7 @@ const cardsController = {
         cardsQuery += wc;
       }
 
-      cardsQuery += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+      cardsQuery += ' ORDER BY c.created_at DESC LIMIT ? OFFSET ?';
 
       // totals
       const [countRows] = await pool.query(countQuery, queryParams);
@@ -319,6 +357,7 @@ const cardsController = {
       const totalPages = Math.max(1, Math.ceil(totalCards / limit));
       const hasNextPage = page < totalPages;
       const hasPrevPage = page > 1;
+
 
       return res.status(200).json(
         createResponse(true, 'Active cards fetched successfully', {

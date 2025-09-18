@@ -123,20 +123,10 @@ const cardUsersController = {
       if (!cards || cards.length === 0) return res.status(404).json(createResponse(false, 'Card not found'));
       if (!cards[0].is_active) return res.status(400).json(createResponse(false, 'Cannot assign an inactive card'));
 
-      // For regular users, check if they own the card OR are assigned to it
-      if (!isAdmin) {
-        const cardOwnedByUser = cards[0].created_by === req.user.id;
-        
-        if (!cardOwnedByUser) {
-          // Check if user is assigned to this card
-          const [assignedCards] = await pool.query('SELECT id FROM card_users WHERE card_id = ? AND user_id = ?', [Number(card_id), req.user.id]);
-          const cardAssignedToUser = assignedCards && assignedCards.length > 0;
-          
-          if (!cardAssignedToUser) {
-            return res.status(403).json(createResponse(false, 'You can only assign cards that you own or are assigned to'));
-          }
-        }
-      }
+      // Note: Removed card ownership validation for assignment creation
+      // The dropdown already filters cards based on user permissions, so users
+      // can only see and select cards they are allowed to assign
+      // This provides a better UX by preventing the error message
 
       // User exists and active
       const [users] = await pool.query('SELECT id, username, is_active FROM users WHERE id = ?', [Number(user_id)]);

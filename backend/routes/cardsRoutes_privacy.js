@@ -135,6 +135,7 @@ router.get('/',
  * Lists only active cards for assignment dropdowns
  * - Admins see all active cards
  * - Regular users see only their own active cards
+ * - Cards with zero balance are now included (no balance restrictions)
  * - RBAC: Requires cards_read permission
  */
 router.get('/active', 

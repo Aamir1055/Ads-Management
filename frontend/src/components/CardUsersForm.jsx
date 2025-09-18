@@ -112,17 +112,33 @@ const CardUsersForm = ({ isOpen, onClose, onSubmit, editData, isLoading }) => {
   const loadOptions = async () => {
     setLoadingOptions(true)
     try {
+      console.log('🔄 CardUsersForm: Loading options...');
+      
       // Load only active cards for assignment dropdown
+      console.log('📡 CardUsersForm: Calling cardsService.getActive...');
       const cardsResponse = await cardsService.getActive({ limit: 100 })
+      console.log('📨 CardUsersForm: Cards response:', cardsResponse);
+      
       const cardsList = cardsResponse?.data?.cards || cardsResponse?.data || []
+      console.log('📋 CardUsersForm: Extracted cards list:', cardsList);
+      console.log('📊 CardUsersForm: Cards list length:', cardsList.length);
+      
+      if (Array.isArray(cardsList) && cardsList.length > 0) {
+        cardsList.forEach((card, index) => {
+          console.log(`   Card ${index + 1}: ID=${card.id}, Name="${card.card_name}", Balance=${card.current_balance}`);
+        });
+      }
+      
       setCards(Array.isArray(cardsList) ? cardsList : [])
 
       // Load users from API
+      console.log('👥 CardUsersForm: Loading users...');
       const usersResponse = await usersService.getForDropdown()
       const usersList = usersResponse?.data || []
+      console.log('👥 CardUsersForm: Users loaded:', usersList.length);
       setUsers(Array.isArray(usersList) ? usersList : [])
     } catch (error) {
-      console.error('Error loading options:', error)
+      console.error('❌ CardUsersForm: Error loading options:', error)
       setCards([])
       setUsers([])
     } finally {
