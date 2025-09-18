@@ -25,6 +25,7 @@ const RoleManagementInterface = () => {
   // Error and success states for better UX
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [rbacError, setRbacError] = useState(null); // Special state for RBAC/permission errors
 
   // Sort modules in the same order as the sidebar (only manageable modules)
   const sortModulesBySidebarOrder = useCallback((modules) => {
@@ -37,14 +38,15 @@ const RoleManagementInterface = () => {
       'Campaign Data',
       'Cards',
       'Cards Users',
-      'Report',
-      'Report Analytics'
+      'Report Analytics',
+      'Report'
     ];
     
     // Map different possible module names to standard names
     const getStandardName = (name) => {
       const nameMap = {
         'users': 'User Management',
+        'user management': 'User Management',
         'campaigns': 'Campaign',
         'campaign_data': 'Campaign Data',
         'campaign-data': 'Campaign Data',
@@ -54,7 +56,9 @@ const RoleManagementInterface = () => {
         'card_users': 'Cards Users',
         'card-users': 'Cards Users',
         'reports': 'Report',
+        'report': 'Report',
         'permissions': 'Role Management',
+        'role management': 'Role Management',
         'system': 'Role Management'
       };
       
@@ -192,6 +196,46 @@ const RoleManagementInterface = () => {
     return errors;
   }, []);
 
+  // Handle RBAC/Permission errors - close modals and show prominent error
+  const handleRbacError = useCallback((error) => {
+    console.error('RBAC Error:', error);
+    
+    // Close any open modals immediately
+    setShowCreateModal(false);
+    setShowEditModal(false);
+    setEditingRole(null);
+    
+    // Clear form states
+    setNewRoleName('');
+    setNewRoleDescription('');
+    setSelectedPermissions({});
+    setEditRoleName('');
+    setEditRoleDescription('');
+    setEditSelectedPermissions({});
+    
+    // Set the RBAC error for prominent display
+    const errorData = error.response?.data;
+    setRbacError({
+      message: errorData?.message || error.message,
+      details: errorData?.details,
+      userRole: errorData?.details?.userRole,
+      requiredPermission: errorData?.details?.requiredPermission,
+      availableActions: errorData?.details?.availableActions,
+      suggestion: errorData?.details?.suggestion
+    });
+    
+    // Also set regular error message as fallback
+    setErrorMessage(errorData?.message || error.message);
+  }, []);
+
+  // Clear RBAC error after timeout
+  useEffect(() => {
+    if (rbacError) {
+      const timer = setTimeout(() => setRbacError(null), 12000); // Longer timeout for RBAC errors
+      return () => clearTimeout(timer);
+    }
+  }, [rbacError]);
+
   // Clear messages after timeout
   useEffect(() => {
     if (successMessage) {
@@ -249,7 +293,10 @@ const RoleManagementInterface = () => {
       console.error('Error creating role:', err);
       
       // Handle specific error cases
-      if (err.response?.status === 409) {
+      if (err.response?.status === 403) {
+        // RBAC/Permission error - close modal and show prominent error
+        handleRbacError(err);
+      } else if (err.response?.status === 409) {
         setErrorMessage('A role with this name already exists. Please choose a different name.');
       } else if (err.response?.status === 400) {
         setErrorMessage('Invalid role data. Please check your inputs.');
@@ -257,7 +304,7 @@ const RoleManagementInterface = () => {
         setErrorMessage(`Error creating role: ${err.response?.data?.message || err.message}`);
       }
     }
-  }, [newRoleName, newRoleDescription, selectedPermissions, validateRoleName, loadData]);
+  }, [newRoleName, newRoleDescription, selectedPermissions, validateRoleName, loadData, handleRbacError]);
 
   // Handle role update
   const handleUpdateRole = useCallback(async () => {
@@ -303,17 +350,25 @@ const RoleManagementInterface = () => {
       console.error('Error updating role:', err);
       
       // Handle specific error cases
-      if (err.response?.status === 409) {
+      if (err.response?.status === 403) {
+        // Check if this is an RBAC permission error or a system role error
+        const errorData = err.response?.data;
+        if (errorData?.details?.requiredPermission || errorData?.message?.includes('permission')) {
+          // RBAC/Permission error - close modal and show prominent error
+          handleRbacError(err);
+        } else {
+          // System role error - keep in modal
+          setErrorMessage('Cannot update this role: It is a system role.');
+        }
+      } else if (err.response?.status === 409) {
         setErrorMessage('A role with this name already exists. Please choose a different name.');
       } else if (err.response?.status === 400) {
         setErrorMessage('Invalid role data. Please check your inputs.');
-      } else if (err.response?.status === 403) {
-        setErrorMessage('Cannot update this role: It is a system role.');
       } else {
         setErrorMessage(`Error updating role: ${err.response?.data?.message || err.message}`);
       }
     }
-  }, [editRoleName, editRoleDescription, editSelectedPermissions, editingRole, validateRoleName, loadData]);
+  }, [editRoleName, editRoleDescription, editSelectedPermissions, editingRole, validateRoleName, loadData, handleRbacError]);
 
   // Handle role deletion
   const handleDeleteRole = useCallback(async (roleId, roleName, isSystemRole) => {
@@ -334,7 +389,15 @@ const RoleManagementInterface = () => {
         
         // Handle specific error cases
         if (err.response?.status === 403) {
-          setErrorMessage('Cannot delete this role: It is a system role or has restrictions.');
+          // Check if this is an RBAC permission error or a system role/restriction error
+          const errorData = err.response?.data;
+          if (errorData?.details?.requiredPermission || errorData?.message?.includes('permission')) {
+            // RBAC/Permission error - show prominent error
+            handleRbacError(err);
+          } else {
+            // System role or other restriction error
+            setErrorMessage('Cannot delete this role: It is a system role or has restrictions.');
+          }
         } else if (err.response?.status === 400) {
           setErrorMessage('Cannot delete this role: It may be assigned to active users.');
         } else {
@@ -342,7 +405,7 @@ const RoleManagementInterface = () => {
         }
       }
     }
-  }, [loadData]);
+  }, [loadData, handleRbacError]);
 
   // Handle permission selection for role creation
   const handlePermissionToggle = useCallback((moduleId, permissionKey, isChecked) => {
@@ -500,6 +563,66 @@ const RoleManagementInterface = () => {
 
   return (
     <div className="p-6">
+      {/* RBAC/Permission Error Message - Most Prominent */}
+      {rbacError && (
+        <div className="mb-6 bg-red-100 border-2 border-red-300 rounded-lg p-6 shadow-lg">
+          <div className="flex items-start space-x-3">
+            <div className="flex-shrink-0">
+              <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.94-.833-2.31 0L4.504 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-bold text-red-800 mb-2">Access Denied</h3>
+              <p className="text-red-700 font-medium text-base mb-3">{rbacError.message}</p>
+              
+              {rbacError.details && (
+                <div className="bg-red-50 rounded-md p-4 border border-red-200 space-y-2">
+                  {rbacError.userRole && (
+                    <div className="text-sm">
+                      <span className="font-medium text-red-800">Current Role:</span>
+                      <span className="text-red-700 ml-2">{rbacError.userRole}</span>
+                    </div>
+                  )}
+                  
+                  {rbacError.requiredPermission && (
+                    <div className="text-sm">
+                      <span className="font-medium text-red-800">Required Permission:</span>
+                      <span className="text-red-700 ml-2">{rbacError.requiredPermission}</span>
+                    </div>
+                  )}
+                  
+                  {rbacError.suggestion && (
+                    <div className="text-sm">
+                      <span className="font-medium text-red-800">Suggestion:</span>
+                      <span className="text-red-700 ml-2">{rbacError.suggestion}</span>
+                    </div>
+                  )}
+                  
+                  {rbacError.availableActions && rbacError.availableActions.length > 0 && (
+                    <div className="text-sm">
+                      <span className="font-medium text-red-800">Available Actions:</span>
+                      <span className="text-red-700 ml-2">{rbacError.availableActions.join(', ')}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="flex-shrink-0">
+              <button
+                className="text-red-400 hover:text-red-600 transition-colors"
+                onClick={() => setRbacError(null)}
+                aria-label="Dismiss error message"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* Success/Error Messages */}
       {successMessage && (
         <div className="mb-4 bg-green-50 border border-green-200 rounded-md p-4">

@@ -44,36 +44,39 @@ const createRateLimit = (windowMs = 15 * 60 * 1000, max = 200) => {
 const rlRead = createRateLimit(5 * 60 * 1000, 300);
 const rlWrite = createRateLimit(15 * 60 * 1000, 100);
 
-// Middleware for role management operations
-const requireRoleManagementAccess = checkModulePermission('role_management', 'update');
+// Middleware for role management operations - using proper RBAC
+const requireRoleRead = checkModulePermission('roles', 'read');
+const requireRoleCreate = checkModulePermission('roles', 'create');
+const requireRoleUpdate = checkModulePermission('roles', 'update');
+const requireRoleDelete = checkModulePermission('roles', 'delete');
 
 // router.use(protect); // enable auth globally for this module if needed
 
 // -------------------------------
-// Roles
+// Roles - RBAC Protected
 // -------------------------------
-router.post('/roles', rlWrite, protect, requireRoleManagementAccess, permissionsController.createRole);
-router.get('/roles', rlRead, permissionsController.listRoles);
-router.put('/roles/:id', rlWrite, protect, requireRoleManagementAccess, permissionsController.updateRole);
+router.post('/roles', rlWrite, protect, requireRoleCreate, permissionsController.createRole);
+router.get('/roles', rlRead, protect, requireRoleRead, permissionsController.listRoles);
+router.put('/roles/:id', rlWrite, protect, requireRoleUpdate, permissionsController.updateRole);
 
 // -------------------------------
-// Modules
+// Modules - RBAC Protected
 // -------------------------------
-router.post('/modules', rlWrite, permissionsController.createModule);
-router.get('/modules', rlRead, permissionsController.listModules);
-router.put('/modules/:id', rlWrite, permissionsController.updateModule);
+router.post('/modules', rlWrite, protect, requireRoleCreate, permissionsController.createModule);
+router.get('/modules', rlRead, protect, requireRoleRead, permissionsController.listModules);
+router.put('/modules/:id', rlWrite, protect, requireRoleUpdate, permissionsController.updateModule);
 
 // -------------------------------
-// Permissions
+// Permissions - RBAC Protected
 // -------------------------------
 // body: { role_id/role_name, module_id/module_name, can_get, can_post, can_put, can_delete }
-router.post('/grant', rlWrite, permissionsController.grantPermission);
+router.post('/grant', rlWrite, protect, requireRoleUpdate, permissionsController.grantPermission);
 
 // query filters: role_id/role_name, module_id/module_name
-router.get('/', rlRead, permissionsController.listPermissions);
+router.get('/', rlRead, protect, requireRoleRead, permissionsController.listPermissions);
 
 // revoke by role and module (query params)
-router.delete('/', rlWrite, permissionsController.revokePermission);
+router.delete('/', rlWrite, protect, requireRoleDelete, permissionsController.revokePermission);
 
 // -------------------------------
 // NEW ENHANCED PERMISSIONS ROUTES
@@ -151,22 +154,22 @@ router.get('/my-roles', protect, attachUserPermissions, (req, res) => {
   }
 });
 
-// Role Assignment
-router.post('/assign-role', rlWrite, protect, requireRoleManagementAccess, permissionsController.assignRoleToUser);
-router.delete('/revoke-role', rlWrite, protect, requireRoleManagementAccess, permissionsController.revokeRoleFromUser);
+// Role Assignment - RBAC Protected
+router.post('/assign-role', rlWrite, protect, requireRoleUpdate, permissionsController.assignRoleToUser);
+router.delete('/revoke-role', rlWrite, protect, requireRoleUpdate, permissionsController.revokeRoleFromUser);
 
-// Role Management
-router.post('/role', rlWrite, protect, requireRoleManagementAccess, permissionsController.createRole); // Frontend-compatible endpoint
-router.delete('/role/:id', rlWrite, protect, requireRoleManagementAccess, permissionsController.deleteRole); // Add delete endpoint
-router.get('/roles-list', rlRead, permissionsController.getAllRoles);
-router.get('/permissions-list', rlRead, permissionsController.getAllPermissions);
-router.get('/modules-with-permissions', rlRead, permissionsController.getModulesWithPermissions);
-router.get('/role/:roleId/permissions', rlRead, permissionsController.getRolePermissions);
+// Role Management - RBAC Protected
+router.post('/role', rlWrite, protect, requireRoleCreate, permissionsController.createRole); // Frontend-compatible endpoint
+router.delete('/role/:id', rlWrite, protect, requireRoleDelete, permissionsController.deleteRole); // Add delete endpoint
+router.get('/roles-list', rlRead, protect, requireRoleRead, permissionsController.getAllRoles);
+router.get('/permissions-list', rlRead, protect, requireRoleRead, permissionsController.getAllPermissions);
+router.get('/modules-with-permissions', rlRead, protect, requireRoleRead, permissionsController.getModulesWithPermissions);
+router.get('/role/:roleId/permissions', rlRead, protect, requireRoleRead, permissionsController.getRolePermissions);
 
-// Role-Permission Assignment
-router.post('/grant-role-permission', rlWrite, protect, requireRoleManagementAccess, permissionsController.grantRolePermission);
-router.delete('/revoke-role-permission', rlWrite, protect, requireRoleManagementAccess, permissionsController.revokeRolePermission);
-router.post('/role/assign', rlWrite, protect, requireRoleManagementAccess, permissionsController.assignPermissionsToRole); // Frontend-compatible endpoint
+// Role-Permission Assignment - RBAC Protected
+router.post('/grant-role-permission', rlWrite, protect, requireRoleUpdate, permissionsController.grantRolePermission);
+router.delete('/revoke-role-permission', rlWrite, protect, requireRoleUpdate, permissionsController.revokeRolePermission);
+router.post('/role/assign', rlWrite, protect, requireRoleUpdate, permissionsController.assignPermissionsToRole); // Frontend-compatible endpoint
 
 // Audit Log
 router.get('/audit', rlRead, permissionsController.getAuditLog);

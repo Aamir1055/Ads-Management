@@ -607,6 +607,11 @@ const permissionsController = {
           description: 'Campaign management permissions'
         },
         {
+          name: 'Campaign Data',
+          categories: ['campaign_data'],
+          description: 'Campaign data management permissions'
+        },
+        {
           name: 'Cards',
           categories: ['cards'],
           description: 'Card management permissions'

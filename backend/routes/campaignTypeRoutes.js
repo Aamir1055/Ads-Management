@@ -3,7 +3,7 @@ const router = express.Router();
 
 // Authentication and RBAC middleware
 const { authenticateToken } = require('../middleware/authMiddleware');
-const { requireSuperAdmin, attachUserPermissions } = require('../middleware/rbacMiddleware');
+const { requireSuperAdmin, attachUserPermissions, checkModulePermission } = require('../middleware/rbacMiddleware');
 
 // Controller
 const {
@@ -93,19 +93,29 @@ const updateLimiter = createRateLimit(15 * 60 * 1000, 20);
 const deleteLimiter = createRateLimit(60 * 60 * 1000, 5);
 
 // =============================================================================
-// PUBLIC ROUTES (Available to all authenticated users for master data usage)
+// MASTER DATA ROUTES (Campaign Types are master data - no data privacy filtering)
 // =============================================================================
 
 // Apply authentication to all routes
 router.use(authenticateToken);
 router.use(attachUserPermissions);
 
-// List campaign types (Available to all authenticated users)
-// This allows all roles to use campaign types in the Campaign module
-router.get('/', listLimiter, validateQueryParams, getAllCampaignTypes);
+// List campaign types (Requires campaign_types view permission, but shows ALL campaign types)
+// Campaign types are master data - users with view permission can see all of them
+router.get('/', 
+  listLimiter, 
+  checkModulePermission('campaign_types', 'read'), 
+  validateQueryParams, 
+  getAllCampaignTypes
+);
 
-// Get one campaign type (Available to all authenticated users)
-router.get('/:id', getOneLimiter, validateIdParam, getCampaignTypeById);
+// Get one campaign type (Requires campaign_types view permission, but shows ALL campaign types)
+router.get('/:id', 
+  getOneLimiter, 
+  checkModulePermission('campaign_types', 'read'), 
+  validateIdParam, 
+  getCampaignTypeById
+);
 
 
 // =============================================================================
@@ -131,8 +141,8 @@ router.use((req, res) => {
     success: false,
     message: `Route ${req.method} ${req.originalUrl} not found`,
     availableRoutes: {
-      'GET /api/campaign-types': 'Get all campaign types (available to all authenticated users)',
-      'GET /api/campaign-types/:id': 'Get campaign type by ID (available to all authenticated users)',
+      'GET /api/campaign-types': 'Get all campaign types (requires campaign_types read permission)',
+      'GET /api/campaign-types/:id': 'Get campaign type by ID (requires campaign_types read permission)',
       'POST /api/campaign-types': 'Create new campaign type (SuperAdmin only)',
       'PUT /api/campaign-types/:id': 'Update campaign type (SuperAdmin only)',
       'DELETE /api/campaign-types/:id': 'Delete campaign type (SuperAdmin only)'

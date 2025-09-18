@@ -201,6 +201,12 @@ const modulePermissions = {
     create: checkModulePermission('campaign_types', 'create'),
     update: checkModulePermission('campaign_types', 'update'),
     delete: checkModulePermission('campaign_types', 'delete')
+  },
+  roles: {
+    read: checkModulePermission('roles', 'read'),
+    create: checkModulePermission('roles', 'create'),
+    update: checkModulePermission('roles', 'update'),
+    delete: checkModulePermission('roles', 'delete')
   }
 };
 
