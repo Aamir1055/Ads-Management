@@ -481,48 +481,6 @@ const ReportAnalytics = () => {
 
       {analyticsData && (
         <>
-          {/* KPIs */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600 uppercase tracking-wide">Total Leads</p>
-                  <p className="text-3xl font-bold text-gray-900">{formatNumber(kpis.totalLeads)}</p>
-                </div>
-                <Target className="h-8 w-8 text-blue-500" />
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600 uppercase tracking-wide">Total Spent</p>
-                  <p className="text-3xl font-bold text-gray-900">{formatCurrency(kpis.totalSpent)}</p>
-                </div>
-                <IndianRupee className="h-8 w-8 text-green-500" />
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow p-6 border-l-4 border-purple-500">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600 uppercase tracking-wide">Avg Cost Per Lead</p>
-                  <p className="text-3xl font-bold text-gray-900">{formatCurrency(kpis.avgCPL)}</p>
-                </div>
-                <Activity className="h-8 w-8 text-purple-500" />
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow p-6 border-l-4 border-orange-500">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600 uppercase tracking-wide">Active Campaigns</p>
-                  <p className="text-3xl font-bold text-gray-900">{formatNumber(kpis.totalCampaigns)}</p>
-                </div>
-                <Users className="h-8 w-8 text-orange-500" />
-              </div>
-            </div>
-          </div>
 
           {/* Charts */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

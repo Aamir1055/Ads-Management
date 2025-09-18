@@ -222,56 +222,6 @@ const ReportsTable = () => {
           </div>
         </div>
 
-        {/* Summary Stats */}
-        {summary && (
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-blue-50 rounded-lg p-4">
-              <div className="flex items-center">
-                <TrendingUp className="h-5 w-5 text-blue-600 mr-2" />
-                <div>
-                  <p className="text-sm font-medium text-blue-600">Total Campaigns</p>
-                  <p className="text-2xl font-bold text-blue-900">{summary.totalCampaigns || 0}</p>
-                </div>
-              </div>
-            </div>
-            <div className="bg-green-50 rounded-lg p-4">
-              <div className="flex items-center">
-                <BarChart3 className="h-5 w-5 text-green-600 mr-2" />
-                <div>
-                  <p className="text-sm font-medium text-green-600">Total Leads</p>
-                  <p className="text-2xl font-bold text-green-900">
-                    {reportsService.formatNumber(summary.totalResults || 0)}
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="bg-purple-50 rounded-lg p-4">
-              <div className="flex items-center">
-                <div className="h-5 w-5 bg-purple-600 rounded mr-2"></div>
-                <div>
-                  <p className="text-sm font-medium text-purple-600">Total Spent</p>
-                  <p className="text-2xl font-bold text-purple-900">
-                    {reportsService.formatCurrency(summary.totalSpent || 0)}
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="bg-orange-50 rounded-lg p-4">
-              <div className="flex items-center">
-                <div className="h-5 w-5 bg-orange-600 rounded-full mr-2"></div>
-                <div>
-                  <p className="text-sm font-medium text-orange-600">Avg Cost/Lead</p>
-                  <p className="text-2xl font-bold text-orange-900">
-                    {summary.avgCostPerResult > 0 ? 
-                      reportsService.formatCurrency(summary.avgCostPerResult) : 
-                      'N/A'
-                    }
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Filters Section */}

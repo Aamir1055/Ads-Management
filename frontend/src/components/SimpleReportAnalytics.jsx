@@ -90,52 +90,6 @@ const SimpleReportAnalytics = () => {
       {/* Data Display */}
       {data && (
         <div className="space-y-6">
-          {/* Overview Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
-              <div>
-                <p className="text-sm font-medium text-gray-600 uppercase tracking-wide">
-                  Total Campaigns
-                </p>
-                <p className="text-3xl font-bold text-gray-900">
-                  {data.overview?.campaignsCount || 0}
-                </p>
-              </div>
-            </div>
-            
-            <div className="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
-              <div>
-                <p className="text-sm font-medium text-gray-600 uppercase tracking-wide">
-                  Total Leads
-                </p>
-                <p className="text-3xl font-bold text-gray-900">
-                  {data.overview?.totalLeads || 0}
-                </p>
-              </div>
-            </div>
-            
-            <div className="bg-white rounded-lg shadow p-6 border-l-4 border-purple-500">
-              <div>
-                <p className="text-sm font-medium text-gray-600 uppercase tracking-wide">
-                  Total Spent
-                </p>
-                <p className="text-3xl font-bold text-gray-900">
-                  ${(data.overview?.totalSpent || 0).toLocaleString()}
-                </p>
-              </div>
-            </div>
-            
-            <div className="bg-white rounded-lg shadow p-6 border-l-4 border-orange-500">
-              <div>
-                <p className="text-sm font-medium text-gray-600 uppercase tracking-wide">
-                  Avg Cost/Lead
-                </p>
-                <p className="text-3xl font-bold text-gray-900">
-                  ${(data.overview?.avgCostPerLead || 0).toFixed(2)}
-                </p>
-              </div>
-            </div>
-          </div>
 
           {/* Top Campaigns */}
           {data.topCampaigns && data.topCampaigns.length > 0 && (
