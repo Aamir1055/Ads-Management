@@ -296,6 +296,27 @@ const updateBrand = async (req, res) => {
 };
 
 /**
+ * GET /api/brands/active - Get only active brands (for dropdowns)
+ */
+const getActiveBrands = async (req, res) => {
+  try {
+    const [rows] = await pool.execute(
+      `SELECT id, name, description
+       FROM brands
+       WHERE is_active = 1
+       ORDER BY name ASC`
+    );
+
+    return res.status(200).json(
+      createResponse(true, `Retrieved ${rows.length} active brand(s)`, rows)
+    );
+  } catch (error) {
+    const { statusCode, response } = handleDatabaseError(error, 'active brands retrieval');
+    return res.status(statusCode).json(response);
+  }
+};
+
+/**
  * DELETE /api/brands/:id (soft delete)
  */
 const deleteBrand = async (req, res) => {
@@ -370,5 +391,6 @@ module.exports = {
   getAllBrands,
   getBrandById,
   updateBrand,
+  getActiveBrands,
   deleteBrand
 };

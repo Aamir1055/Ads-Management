@@ -5,6 +5,7 @@ const {
   getAllBrands,
   getBrandById,
   updateBrand,
+  getActiveBrands,
   deleteBrand
 } = require('../controllers/brandController');
 const { protect } = require('../middleware/auth');
@@ -16,6 +17,12 @@ router.use(protect);
 console.log('🏷️ Brand routes initialized with authentication middleware and RBAC');
 
 // Brand CRUD operations following Campaign Types pattern
+// GET /api/brands/active - Get only active brands (for dropdowns)
+router.get('/active', checkModulePermission('brands', 'read'), (req, res, next) => {
+  console.log('🏷️ Route: GET /api/brands/active - User:', req.user?.id, 'Permission:', req.currentPermission);
+  next();
+}, getActiveBrands);
+
 // GET /api/brands - Get all brands (requires read permission)
 router.get('/', checkModulePermission('brands', 'read'), (req, res, next) => {
   console.log('🏷️ Route: GET /api/brands - User:', req.user?.id, 'Permission:', req.currentPermission);

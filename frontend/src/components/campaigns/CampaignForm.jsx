@@ -307,7 +307,7 @@ const CampaignForm = ({ campaign = null, isOpen, onClose, onSave }) => {
                 }`}
               >
                 <option value="">Select Campaign Type</option>
-                {campaignTypes.map((type) => (
+                {campaignTypes.filter(type => type.is_active).map((type) => (
                   <option key={type.id} value={type.id}>
                     {type.type_name}
                   </option>

@@ -43,7 +43,7 @@ const CampaignTypes = () => {
       
       const params = {
         search: searchTerm,
-        active: filterStatus === 'all' ? undefined : filterStatus === 'active',
+        status: filterStatus,
         sort: sortBy,
         order: sortOrder,
         page: currentPage,

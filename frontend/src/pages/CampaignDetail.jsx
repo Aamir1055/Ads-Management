@@ -335,11 +335,33 @@ const CampaignDetail = () => {
     return card ? card.card_name : '-'
   }
 
-  // Convert yyyy-mm-dd to dd/mm/yyyy
+  // Convert various date formats to dd/mm/yyyy
   const formatToDisplayDate = (dateStr) => {
     if (!dateStr) return ''
-    const [year, month, day] = dateStr.split('-')
-    return `${day}/${month}/${year}`
+    
+    // Handle ISO date strings (2025-09-17T18:30:00.000Z or 2025-09-17)
+    if (dateStr.includes('T') || dateStr.includes('-')) {
+      try {
+        const date = new Date(dateStr)
+        if (!isNaN(date.getTime())) {
+          const day = String(date.getDate()).padStart(2, '0')
+          const month = String(date.getMonth() + 1).padStart(2, '0')
+          const year = date.getFullYear()
+          return `${day}/${month}/${year}`
+        }
+      } catch (e) {
+        console.error('Error parsing date:', dateStr, e)
+      }
+    }
+    
+    // Handle YYYY-MM-DD format
+    if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      const [year, month, day] = dateStr.split('-')
+      return `${day}/${month}/${year}`
+    }
+    
+    // If already in DD/MM/YYYY format or partial format, return as is
+    return dateStr
   }
 
   // Convert dd/mm/yyyy to yyyy-mm-dd for API
@@ -418,6 +440,52 @@ const CampaignDetail = () => {
     }
   }
 
+  // Handle form date input change with formatting (DD/MM/YYYY)
+  const handleFormDateChange = (value) => {
+    // Remove any non-numeric characters except /
+    let cleaned = value.replace(/[^0-9/]/g, '')
+    
+    // Auto-format as user types
+    if (cleaned.length >= 2 && cleaned.charAt(2) !== '/') {
+      if (cleaned.length === 2) {
+        cleaned = cleaned + '/'
+      } else if (cleaned.length > 2 && cleaned.length <= 4) {
+        cleaned = cleaned.substring(0, 2) + '/' + cleaned.substring(2)
+      }
+    }
+    
+    if (cleaned.length >= 5 && cleaned.charAt(5) !== '/') {
+      if (cleaned.length === 5) {
+        cleaned = cleaned + '/'
+      } else if (cleaned.length > 5) {
+        const parts = cleaned.split('/')
+        if (parts.length === 2) {
+          cleaned = parts[0] + '/' + parts[1].substring(0, 2) + '/' + parts[1].substring(2)
+        }
+      }
+    }
+    
+    // Limit to dd/mm/yyyy format (10 characters)
+    if (cleaned.length <= 10) {
+      // Convert DD/MM/YYYY back to YYYY-MM-DD for form data storage
+      if (isValidDate(cleaned)) {
+        const apiDate = formatToAPIDate(cleaned)
+        setFormData(prev => ({ ...prev, data_date: apiDate }))
+      } else {
+        // For partial input, just store the display format temporarily
+        // We'll validate on submit
+        setFormData(prev => ({ ...prev, data_date: cleaned }))
+      }
+    }
+  }
+
+  // Handle form date picker change (when user clicks calendar icon)
+  const handleFormDatePickerChange = (value) => {
+    if (value) {
+      setFormData(prev => ({ ...prev, data_date: value }))
+    }
+  }
+
   if (campaignLoading) {
     return (
       <div className="p-6">
@@ -467,146 +535,6 @@ const CampaignDetail = () => {
         </div>
       </div>
 
-      {/* Campaign Overview Cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* Basic Information Card */}
-        <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">Campaign Information</h2>
-          </div>
-          <div className="px-6 py-4">
-            <dl className="grid grid-cols-1 gap-4">
-              <div>
-                <dt className="text-sm font-medium text-gray-500">Campaign Name</dt>
-                <dd className="mt-1 text-sm text-gray-900">{campaign.name}</dd>
-              </div>
-              
-              <div>
-                <dt className="text-sm font-medium text-gray-500">Campaign Type</dt>
-                <dd className="mt-1 text-sm text-gray-900">{campaign.campaignType?.name || 'Not specified'}</dd>
-              </div>
-              
-              <div>
-                <dt className="text-sm font-medium text-gray-500">Brand</dt>
-                <dd className="mt-1 text-sm text-gray-900">{campaign.brand?.name || 'Not specified'}</dd>
-              </div>
-              
-              <div>
-                <dt className="text-sm font-medium text-gray-500">Status</dt>
-                <dd className="mt-1">
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    campaign.enabled 
-                      ? 'bg-green-100 text-green-800' 
-                      : 'bg-red-100 text-red-800'
-                  }`}>
-                    {campaign.enabled ? 'Active' : 'Inactive'}
-                  </span>
-                </dd>
-              </div>
-              
-              <div>
-                <dt className="text-sm font-medium text-gray-500">Creatives</dt>
-                <dd className="mt-1">
-                  {parseJsonArray(campaign.creatives).length > 0 ? (
-                    <div className="flex flex-wrap gap-1">
-                      {parseJsonArray(campaign.creatives).map((creative, index) => (
-                        <span
-                          key={index}
-                          className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800"
-                        >
-                          {creative}
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <span className="text-sm text-gray-500">None specified</span>
-                  )}
-                </dd>
-              </div>
-            </dl>
-          </div>
-        </div>
-
-        {/* Targeting Information Card */}
-        <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">Targeting Information</h2>
-          </div>
-          <div className="px-6 py-4">
-            <dl className="grid grid-cols-1 gap-4">
-              <div>
-                <dt className="text-sm font-medium text-gray-500">Personas</dt>
-                <dd className="mt-1">
-                  {parseJsonArray(campaign.persona).length > 0 ? (
-                    <div className="flex flex-wrap gap-1">
-                      {parseJsonArray(campaign.persona).map((person, index) => (
-                        <span
-                          key={index}
-                          className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-purple-100 text-purple-800"
-                        >
-                          {person}
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <span className="text-sm text-gray-500">None specified</span>
-                  )}
-                </dd>
-              </div>
-              
-              <div>
-                <dt className="text-sm font-medium text-gray-500">Gender</dt>
-                <dd className="mt-1">
-                  {parseJsonArray(campaign.gender).length > 0 ? (
-                    <div className="flex flex-wrap gap-1">
-                      {parseJsonArray(campaign.gender).map((genderItem, index) => (
-                        <span
-                          key={index}
-                          className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-pink-100 text-pink-800"
-                        >
-                          {genderItem}
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <span className="text-sm text-gray-500">All</span>
-                  )}
-                </dd>
-              </div>
-              
-              <div>
-                <dt className="text-sm font-medium text-gray-500">Age Range</dt>
-                <dd className="mt-1 text-sm text-gray-900">
-                  {campaign.min_age || campaign.max_age 
-                    ? `${campaign.min_age || 'Any'} - ${campaign.max_age || 'Any'} years`
-                    : 'Not specified'
-                  }
-                </dd>
-              </div>
-              
-              <div>
-                <dt className="text-sm font-medium text-gray-500">Locations</dt>
-                <dd className="mt-1">
-                  {parseJsonArray(campaign.location).length > 0 ? (
-                    <div className="flex flex-wrap gap-1">
-                      {parseJsonArray(campaign.location).map((loc, index) => (
-                        <span
-                          key={index}
-                          className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-green-100 text-green-800"
-                        >
-                          {loc}
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <span className="text-sm text-gray-500">None specified</span>
-                  )}
-                </dd>
-              </div>
-            </dl>
-          </div>
-        </div>
-      </div>
 
 
       {/* Performance Data Section */}
@@ -904,22 +832,31 @@ const CampaignDetail = () => {
                 {/* Data Date */}
                 <div>
                   <label htmlFor="data_date" className="block text-sm font-medium text-gray-700">
-                    Date *
+                    Date * (DD/MM/YYYY)
                   </label>
-                  <input
-                    type="date"
-                    id="data_date"
-                    name="data_date"
-                    value={formData.data_date}
-                    onChange={handleInputChange}
-                    required
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm py-2 px-3"
-                  />
-                  {formData.data_date && (
-                    <p className="mt-1 text-xs text-gray-600">
-                      Selected: {formatToDisplayDate(formData.data_date)}
-                    </p>
-                  )}
+                  <div className="relative">
+                    <Calendar 
+                      className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 cursor-pointer z-10" 
+                      onClick={() => document.getElementById('form_date_picker').showPicker && document.getElementById('form_date_picker').showPicker()}
+                    />
+                    <input
+                      type="text"
+                      id="data_date"
+                      name="data_date"
+                      value={formData.data_date ? formatToDisplayDate(formData.data_date) : ''}
+                      onChange={(e) => handleFormDateChange(e.target.value)}
+                      placeholder="DD/MM/YYYY"
+                      required
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm py-2 px-3 pl-10"
+                    />
+                    <input
+                      type="date"
+                      id="form_date_picker"
+                      className="absolute opacity-0 pointer-events-none"
+                      onChange={(e) => handleFormDatePickerChange(e.target.value)}
+                      tabIndex={-1}
+                    />
+                  </div>
                 </div>
 
                 {/* Card Dropdown */}

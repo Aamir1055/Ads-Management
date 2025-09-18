@@ -78,7 +78,6 @@ router.get('/modules', async (req, res) => {
           { name: 'Brand Management', href: '/brands', icon: 'Tags', allowed: allowedModules.includes('brands') },
           { name: 'Campaign Types', href: '/campaign-types', icon: 'Tags', allowed: allowedModules.includes('campaign_types') },
           { name: 'Campaigns', href: '/campaigns', icon: 'Target', allowed: allowedModules.includes('campaigns') },
-          { name: 'Campaign Data', href: '/campaign-data', icon: 'Database', allowed: allowedModules.includes('campaign_data') },
           { name: 'Cards', href: '/cards', icon: 'CreditCard', allowed: allowedModules.includes('cards') },
           { name: 'Card Users', href: '/card-users', icon: 'UserCheck', allowed: allowedModules.includes('card_users') },
           { name: 'Reports', href: '/reports-table', icon: 'FileText', allowed: allowedModules.includes('reports') },

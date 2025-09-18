@@ -32,40 +32,17 @@ const handleDbError = (error, operation, res) => {
   );
 };
 
-// Privacy helper - checks if user is admin or owns the data
-const isAdminOrOwner = (req, dataCreatedBy) => {
-  const user = req.user;
-  if (!user) return false;
-  
-  // Admins can access all data (check role level or name)
-  if (user.role && (user.role.level >= 8 || user.role.name === 'super_admin' || user.role.name === 'admin')) {
-    return true;
-  }
-  
-  // User can access their own data
-  return user.id === dataCreatedBy;
-};
-
-// Add privacy filters to queries - filter based on created_by for non-admins
-const addPrivacyFilter = (req, where, params) => {
-  const user = req.user;
-  const isAdmin = user.role && (user.role.level >= 8 || user.role.name === 'super_admin' || user.role.name === 'admin');
-  
-  if (!isAdmin) {
-    where.push('r.created_by = ?');
-    params.push(req.user.id);
-  }
-};
-
-// Core aggregation query with privacy filtering
-const buildAggregationForDate = (userFilter = '') => `
+// Core aggregation query
+// Aggregates campaign_data per campaign_id for a given date, joins campaign denorm fields.
+const buildAggregationForDate = `
   SELECT
     DATE(cd.data_date) AS report_date,
     CONCAT(YEAR(cd.data_date), '-', LPAD(MONTH(cd.data_date), 2, '0')) AS report_month,
     cd.campaign_id,
     c.name AS campaign_name,
     ct.type_name AS campaign_type,
-    c.brand AS brand,
+    b.id AS brand_id,
+    b.name AS brand_name,
     SUM(cd.facebook_result + cd.xoho_result) AS leads,
     SUM(cd.facebook_result) AS facebook_result,
     SUM(cd.xoho_result) AS zoho_result,
@@ -73,16 +50,17 @@ const buildAggregationForDate = (userFilter = '') => `
   FROM campaign_data cd
   LEFT JOIN campaigns c ON cd.campaign_id = c.id
   LEFT JOIN campaign_types ct ON c.campaign_type_id = ct.id
-  WHERE cd.data_date = ? ${userFilter}
-  GROUP BY report_date, report_month, cd.campaign_id, c.name, ct.type_name, c.brand
+  LEFT JOIN brands b ON c.brand = b.id
+  WHERE cd.data_date = ?
+  GROUP BY report_date, report_month, cd.campaign_id, c.name, ct.type_name, b.id, b.name
 `;
 
-// Upsert into reports with user assignment
+// Upsert into reports; relies on unique key (report_date,campaign_id)
 const upsertReportRowSql = `
   INSERT INTO reports
-    (report_date, report_month, campaign_id, campaign_name, campaign_type, brand, leads, facebook_result, zoho_result, spent, created_by, created_at, updated_at)
+    (report_date, report_month, campaign_id, campaign_name, campaign_type, brand, leads, facebook_result, zoho_result, spent, created_at, updated_at)
   VALUES
-    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
   ON DUPLICATE KEY UPDATE
     report_month = VALUES(report_month),
     campaign_name = VALUES(campaign_name),
@@ -93,9 +71,9 @@ const upsertReportRowSql = `
     zoho_result = VALUES(zoho_result),
     spent = VALUES(spent),
     updated_at = NOW()
-`;
+`; // cost_per_lead is GENERATED ALWAYS; MySQL computes it. [1][8]
 
-// Controller with privacy enforcement
+// Controller
 const reportsController = {
   // POST /api/reports/build?date=YYYY-MM-DD
   // Build or refresh reports for a specific date by aggregating campaign_data.
@@ -104,23 +82,12 @@ const reportsController = {
     if (!dateStr) {
       return res.status(400).json(createResponse(false, 'Valid date (YYYY-MM-DD) is required'));
     }
-    
     let connection;
     try {
       connection = await pool.getConnection();
       await connection.beginTransaction();
 
-      // Add privacy filter for non-admins - only aggregate from campaigns they own
-      let userFilter = '';
-      let queryParams = [dateStr];
-      
-      const isAdmin = req.user.role && (req.user.role.level >= 8 || req.user.role.name === 'super_admin' || req.user.role.name === 'admin');
-      if (!isAdmin) {
-        userFilter = 'AND cd.created_by = ?';
-        queryParams.push(req.user.id);
-      }
-
-      const [rows] = await connection.query(buildAggregationForDate(userFilter), queryParams);
+      const [rows] = await connection.query(buildAggregationForDate, [dateStr]);
 
       if (!rows || rows.length === 0) {
         await connection.commit();
@@ -136,14 +103,14 @@ const reportsController = {
           Number(r.campaign_id),
           r.campaign_name || null,
           r.campaign_type || null,
-          r.brand || null,
+          r.brand_name || null,
           Number(r.leads || 0),
           Number(r.facebook_result || 0),
           Number(r.zoho_result || 0),
-          Number(r.spent || 0),
-          req.user.id // Assign to current user
+          Number(r.spent || 0)
         ];
         const [resUp] = await connection.query(upsertReportRowSql, params);
+        // affectedRows: insert=1, update=2 (per row with ON DUPLICATE); count upserts for visibility [18]
         affected += resUp?.affectedRows ? 1 : 0;
       }
 
@@ -161,7 +128,7 @@ const reportsController = {
   },
 
   // POST /api/reports/build-range?from=YYYY-MM-DD&to=YYYY-MM-DD
-  // Sequentially rebuild a date range (inclusive) with privacy filtering
+  // Sequentially rebuild a date range (inclusive).
   buildRange: async (req, res) => {
     const fromStr = toMysqlDate(req.query.from || req.body?.from);
     const toStr = toMysqlDate(req.query.to || req.body?.to);
@@ -174,21 +141,10 @@ const reportsController = {
       const start = new Date(fromStr);
       const end = new Date(toStr);
 
-      // Add privacy filter for non-admins
-      let userFilter = '';
-      let baseParams = [];
-      
-      const isAdmin = req.user.role && (req.user.role.level >= 8 || req.user.role.name === 'super_admin' || req.user.role.name === 'admin');
-      if (!isAdmin) {
-        userFilter = 'AND cd.created_by = ?';
-        baseParams.push(req.user.id);
-      }
-
       for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
         const day = toMysqlDate(d);
-        const queryParams = [day, ...baseParams];
-        
-        const [rows] = await pool.query(buildAggregationForDate(userFilter), queryParams);
+        // reuse build logic but inline for performance
+        const [rows] = await pool.query(buildAggregationForDate, [day]);
         if (!rows || rows.length === 0) continue;
 
         let affected = 0;
@@ -199,12 +155,11 @@ const reportsController = {
             Number(r.campaign_id),
             r.campaign_name || null,
             r.campaign_type || null,
-            r.brand || null,
+            r.brand_name || null,
             Number(r.leads || 0),
             Number(r.facebook_result || 0),
             Number(r.zoho_result || 0),
-            Number(r.spent || 0),
-            req.user.id // Assign to current user
+            Number(r.spent || 0)
           ];
           const [resUp] = await pool.query(upsertReportRowSql, params);
           affected += resUp?.affectedRows ? 1 : 0;
@@ -218,7 +173,8 @@ const reportsController = {
     }
   },
 
-  // GET /api/reports - List with privacy filtering
+  // GET /api/reports
+  // List with filters: campaign_id, date_from, date_to, month, search (name/brand/type). Pagination.
   getAll: async (req, res) => {
     try {
       const page = Math.max(1, parseInt(req.query.page, 10) || 1);
@@ -232,7 +188,7 @@ const reportsController = {
       const searchTerm = (req.query.search || '').trim();
       const search = searchTerm ? `%${searchTerm}%` : null;
 
-      let countSql = `SELECT COUNT(*) AS total FROM reports r`;
+      let countSql = `SELECT COUNT(*) AS total FROM reports r LEFT JOIN campaigns c ON r.campaign_id = c.id LEFT JOIN brands b ON c.brand = b.id`;
       let dataSql = `
         SELECT
           r.id,
@@ -241,21 +197,19 @@ const reportsController = {
           r.campaign_id,
           r.campaign_name,
           r.campaign_type,
-          r.brand,
+          COALESCE(b.name, r.brand) as brand,
           r.leads,
           r.spent,
           r.cost_per_lead,
-          r.created_by,
           r.created_at,
           r.updated_at
         FROM reports r
+        LEFT JOIN campaigns c ON r.campaign_id = c.id
+        LEFT JOIN brands b ON c.brand = b.id
       `;
 
       const where = [];
       const params = [];
-
-      // Add privacy filtering
-      addPrivacyFilter(req, where, params);
 
       if (campaignId) { where.push('r.campaign_id = ?'); params.push(campaignId); }
       if (dateFrom) { where.push('r.report_date >= ?'); params.push(dateFrom); }
@@ -275,7 +229,7 @@ const reportsController = {
       dataSql += ' ORDER BY r.report_date DESC, r.campaign_id ASC LIMIT ? OFFSET ?';
 
       const [countRows] = await pool.query(countSql, params);
-      const totalCount = Number(countRows[0]?.total || 0);
+  const totalCount = Number(countRows?.total || 0);
 
       const [rows] = await pool.query(dataSql, [...params, Number(limit), Number(offset)]);
       const totalPages = Math.max(1, Math.ceil(totalCount / limit));
@@ -304,36 +258,27 @@ const reportsController = {
     }
   },
 
-  // GET /api/reports/:id - with ownership validation
+  // GET /api/reports/:id
   getById: async (req, res) => {
     try {
       const id = Number(req.params.id);
       if (!id || id <= 0) return res.status(400).json(createResponse(false, 'Invalid report id'));
 
       const [rows] = await pool.query(
-        `SELECT id, report_date, report_month, campaign_id, campaign_name, campaign_type, brand, leads, facebook_result, zoho_result, spent, cost_per_lead, created_by, created_at, updated_at
+        `SELECT id, report_date, report_month, campaign_id, campaign_name, campaign_type, brand, leads, facebook_result, zoho_result, spent, cost_per_lead, created_at, updated_at
          FROM reports WHERE id = ?`,
         [id]
       );
-      
-      if (!rows || rows.length === 0) {
-        return res.status(404).json(createResponse(false, 'Report not found'));
-      }
+      if (!rows || rows.length === 0) return res.status(404).json(createResponse(false, 'Report not found'));
 
-      const report = rows[0];
-
-      // Privacy check - only owner or admin can access
-      if (!isAdminOrOwner(req, report.created_by)) {
-        return res.status(403).json(createResponse(false, 'Access denied. You can only access reports you created.'));
-      }
-
-      return res.status(200).json(createResponse(true, 'Report retrieved successfully', report));
+      return res.status(200).json(createResponse(true, 'Report retrieved successfully', rows));
     } catch (error) {
       return handleDbError(error, 'retrieve report', res);
     }
   },
 
-  // POST /api/reports - Create with automatic user assignment
+  // POST /api/reports
+  // Create a report row manually (rare - mainly for corrections)
   createReport: async (req, res) => {
     try {
       const {
@@ -362,8 +307,8 @@ const reportsController = {
       const sql = `
         INSERT INTO reports
           (report_date, report_month, campaign_id, campaign_name, campaign_type, brand,
-           leads, facebook_result, zoho_result, spent, created_by, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+           leads, facebook_result, zoho_result, spent, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
       `;
       const params = [
         dateStr,
@@ -375,38 +320,24 @@ const reportsController = {
         Number(leads || 0),
         Number(facebook_result || 0),
         Number(zoho_result || 0),
-        Number(spent || 0),
-        req.user.id // Assign to current user
+        Number(spent || 0)
       ];
 
       const [result] = await pool.query(sql, params);
       const newId = result?.insertId;
 
       const [rows] = await pool.query('SELECT * FROM reports WHERE id = ?', [newId]);
-      return res.status(201).json(createResponse(true, 'Report created successfully', rows[0]));
+      return res.status(201).json(createResponse(true, 'Report created successfully', rows));
     } catch (error) {
       return handleDbError(error, 'create report', res);
     }
   },
 
-  // PUT /api/reports/:id - with ownership validation
+  // PUT /api/reports/:id
   updateReport: async (req, res) => {
     try {
       const id = Number(req.params.id);
       if (!id || id <= 0) return res.status(400).json(createResponse(false, 'Invalid report id'));
-
-      // Check if report exists and user has access
-      const [existingRows] = await pool.query('SELECT id, created_by FROM reports WHERE id = ?', [id]);
-      if (!existingRows || existingRows.length === 0) {
-        return res.status(404).json(createResponse(false, 'Report not found'));
-      }
-
-      const existingReport = existingRows[0];
-
-      // Privacy check - only owner or admin can update
-      if (!isAdminOrOwner(req, existingReport.created_by)) {
-        return res.status(403).json(createResponse(false, 'Access denied. You can only update reports you created.'));
-      }
 
       const allowed = ['report_date','campaign_id','campaign_name','campaign_type','brand','leads','facebook_result','zoho_result','spent'];
       const updates = {};
@@ -440,30 +371,17 @@ const reportsController = {
       }
 
       const [rows] = await pool.query('SELECT * FROM reports WHERE id = ?', [id]);
-      return res.status(200).json(createResponse(true, 'Report updated successfully', rows[0]));
+      return res.status(200).json(createResponse(true, 'Report updated successfully', rows));
     } catch (error) {
       return handleDbError(error, 'update report', res);
     }
   },
 
-  // DELETE /api/reports/:id - with ownership validation
+  // DELETE /api/reports/:id
   deleteReport: async (req, res) => {
     try {
       const id = Number(req.params.id);
       if (!id || id <= 0) return res.status(400).json(createResponse(false, 'Invalid report id'));
-
-      // Check if report exists and user has access
-      const [existingRows] = await pool.query('SELECT id, created_by FROM reports WHERE id = ?', [id]);
-      if (!existingRows || existingRows.length === 0) {
-        return res.status(404).json(createResponse(false, 'Report not found'));
-      }
-
-      const existingReport = existingRows[0];
-
-      // Privacy check - only owner or admin can delete
-      if (!isAdminOrOwner(req, existingReport.created_by)) {
-        return res.status(403).json(createResponse(false, 'Access denied. You can only delete reports you created.'));
-      }
 
       const [resDel] = await pool.query('DELETE FROM reports WHERE id = ?', [id]);
       if (!resDel || resDel.affectedRows === 0) {
@@ -475,7 +393,8 @@ const reportsController = {
     }
   },
 
-  // POST /api/reports/rebuild-campaign - with privacy filtering
+  // POST /api/reports/rebuild-campaign?campaign_id=123&from=YYYY-MM-DD&to=YYYY-MM-DD
+  // Rebuild only a single campaign’s rows across a date range.
   rebuildCampaignRange: async (req, res) => {
     const campaignId = Number(req.query.campaign_id || req.body?.campaign_id);
     const fromStr = toMysqlDate(req.query.from || req.body?.from);
@@ -488,34 +407,17 @@ const reportsController = {
       return res.status(400).json(createResponse(false, 'Valid from and to dates (YYYY-MM-DD) are required, and from <= to'));
     }
 
+    // Constrain aggregation to a campaign
+    const aggSql = buildAggregationForDate.replace('WHERE cd.data_date = ?', 'WHERE cd.data_date = ? AND cd.campaign_id = ?');
+
     try {
-      // Check if user owns this campaign (for non-admins)
-      const isAdmin = req.user.role && (req.user.role.level >= 8 || req.user.role.name === 'super_admin' || req.user.role.name === 'admin');
-      if (!isAdmin) {
-        const [campaignCheck] = await pool.query('SELECT created_by FROM campaigns WHERE id = ?', [campaignId]);
-        if (!campaignCheck.length || campaignCheck[0].created_by !== req.user.id) {
-          return res.status(403).json(createResponse(false, 'Access denied. You can only rebuild reports for campaigns you created.'));
-        }
-      }
-
-      // Constrain aggregation to a campaign and user (for non-admins)
-      let userFilter = 'AND cd.campaign_id = ?';
-      let baseParams = [campaignId];
-      
-      if (!isAdmin) {
-        userFilter += ' AND cd.created_by = ?';
-        baseParams.push(req.user.id);
-      }
-
       let totalUpserts = 0;
       const start = new Date(fromStr);
       const end = new Date(toStr);
 
       for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
         const day = toMysqlDate(d);
-        const queryParams = [day, ...baseParams];
-        
-        const [rows] = await pool.query(buildAggregationForDate(userFilter), queryParams);
+        const [rows] = await pool.query(aggSql, [day, campaignId]);
         if (!rows || rows.length === 0) continue;
 
         for (const r of rows) {
@@ -525,12 +427,11 @@ const reportsController = {
             Number(r.campaign_id),
             r.campaign_name || null,
             r.campaign_type || null,
-            r.brand || null,
+            r.brand_name || null,
             Number(r.leads || 0),
             Number(r.facebook_result || 0),
             Number(r.zoho_result || 0),
-            Number(r.spent || 0),
-            req.user.id // Assign to current user
+            Number(r.spent || 0)
           ];
           const [resUp] = await pool.query(upsertReportRowSql, params);
           totalUpserts += resUp?.affectedRows ? 1 : 0;
@@ -543,11 +444,8 @@ const reportsController = {
     }
   },
 
-  // Other methods follow similar pattern - adding privacy filters where data is queried
-  // For brevity, I'll note that generateReport, getFilterOptions, getDashboardStats, and getChartData
-  // all need similar privacy filtering applied to their queries
-  
-  // Simplified version of generateReport with privacy
+  // GET /api/reports/generate
+  // Generate comprehensive reports with filters (from campaign_data table)
   generateReport: async (req, res) => {
     try {
       const dateFrom = toMysqlDate(req.query.date_from);
@@ -566,16 +464,9 @@ const reportsController = {
       where.push('cd.data_date >= ?', 'cd.data_date <= ?');
       params.push(dateFrom, dateTo);
 
-      // Privacy filter for non-admins
-      const isAdmin = req.user.role && (req.user.role.level >= 8 || req.user.role.name === 'super_admin' || req.user.role.name === 'admin');
-      if (!isAdmin) {
-        where.push('cd.created_by = ?');
-        params.push(req.user.id);
-      }
-
-      // Brand filter
+      // Brand filter (by brand name)
       if (brand) {
-        where.push('c.brand = ?');
+        where.push('b.name = ?');
         params.push(brand);
       }
 
@@ -587,9 +478,7 @@ const reportsController = {
 
       const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
 
-      // Rest of the generateReport logic with whereClause applied...
-      // (Keeping it brief for space, but would include all the same queries with privacy filtering)
-
+      // Get detailed report data from campaign_data with campaign info
       const reportSql = `
         SELECT
           cd.id,
@@ -598,107 +487,202 @@ const reportsController = {
           cd.campaign_id,
           c.name as campaign_name,
           ct.type_name as campaign_type,
-          COALESCE(b.name, 'Unknown Brand') as brand,
-          c.brand as brand_id,
+          b.name as brand,
           cd.facebook_result,
           cd.xoho_result as zoho_result,
-          (cd.facebook_result + cd.xoho_result) as leads,
           cd.spent,
-          cd.card_id,
           cd.card_name,
+          (cd.facebook_result + cd.xoho_result) as leads,
           CASE 
             WHEN (cd.facebook_result + cd.xoho_result) > 0 
             THEN cd.spent / (cd.facebook_result + cd.xoho_result)
             ELSE NULL 
           END as cost_per_lead,
-          cd.created_at,
-          cd.updated_at
+          (
+            SELECT SUM(cd2.spent) 
+            FROM campaign_data cd2 
+            WHERE cd2.campaign_id = cd.campaign_id
+            AND cd2.data_date >= ?
+            AND cd2.data_date <= ?
+          ) as total_campaign_spent
         FROM campaign_data cd
         LEFT JOIN campaigns c ON cd.campaign_id = c.id
         LEFT JOIN campaign_types ct ON c.campaign_type_id = ct.id
         LEFT JOIN brands b ON c.brand = b.id
         ${whereClause}
-        ORDER BY cd.data_date DESC, cd.id DESC
+        ORDER BY cd.data_date DESC, c.name ASC
       `;
 
-      const [reportData] = await pool.query(reportSql, params);
+      // Get summary statistics
+      const summarySql = `
+        SELECT
+          COUNT(DISTINCT cd.campaign_id) as total_campaigns,
+          COUNT(*) as total_records,
+          SUM(cd.facebook_result) as total_facebook_results,
+          SUM(cd.xoho_result) as total_zoho_results,
+          SUM(cd.facebook_result + cd.xoho_result) as total_results,
+          SUM(cd.spent) as total_spent,
+          AVG(CASE 
+            WHEN (cd.facebook_result + cd.xoho_result) > 0 
+            THEN cd.spent / (cd.facebook_result + cd.xoho_result)
+            ELSE NULL 
+          END) as avg_cost_per_result,
+          MIN(cd.data_date) as date_from,
+          MAX(cd.data_date) as date_to
+        FROM campaign_data cd
+        LEFT JOIN campaigns c ON cd.campaign_id = c.id
+        LEFT JOIN brands b ON c.brand = b.id
+        ${whereClause}
+      `;
 
+      // Get brand breakdown
+      const brandBreakdownSql = `
+        SELECT
+          b.name as brand,
+          COUNT(DISTINCT cd.campaign_id) as campaigns_count,
+          COUNT(*) as total_records,
+          SUM(cd.facebook_result + cd.xoho_result) as total_results,
+          SUM(cd.spent) as total_spent,
+          AVG(CASE 
+            WHEN (cd.facebook_result + cd.xoho_result) > 0 
+            THEN cd.spent / (cd.facebook_result + cd.xoho_result)
+            ELSE NULL 
+          END) as avg_cost_per_result
+        FROM campaign_data cd
+        LEFT JOIN campaigns c ON cd.campaign_id = c.id
+        LEFT JOIN brands b ON c.brand = b.id
+        ${whereClause}
+        GROUP BY b.name
+        ORDER BY total_spent DESC
+      `;
+
+      // Get campaign breakdown
+      const campaignBreakdownSql = `
+        SELECT
+          cd.campaign_id,
+          c.name as campaign_name,
+          b.name as brand,
+          COUNT(*) as total_records,
+          SUM(cd.facebook_result) as total_facebook_results,
+          SUM(cd.xoho_result) as total_zoho_results,
+          SUM(cd.facebook_result + cd.xoho_result) as total_results,
+          SUM(cd.spent) as total_spent,
+          AVG(CASE 
+            WHEN (cd.facebook_result + cd.xoho_result) > 0 
+            THEN cd.spent / (cd.facebook_result + cd.xoho_result)
+            ELSE NULL 
+          END) as avg_cost_per_result
+        FROM campaign_data cd
+        LEFT JOIN campaigns c ON cd.campaign_id = c.id
+        LEFT JOIN brands b ON c.brand = b.id
+        ${whereClause}
+        GROUP BY cd.campaign_id, c.name, b.name
+        ORDER BY total_spent DESC
+      `;
+
+      // Add dateFrom and dateTo again for the subquery in total_campaign_spent
+      const reportParams = [...params, dateFrom, dateTo];
+      const [reportData] = await pool.query(reportSql, reportParams);
+      const [summaryData] = await pool.query(summarySql, params);
+      const [brandBreakdown] = await pool.query(brandBreakdownSql, params);
+      const [campaignBreakdown] = await pool.query(campaignBreakdownSql, params);
+
+      // Check if we have any data
       if (!reportData || reportData.length === 0) {
         return res.status(200).json(createResponse(true, 'No data found for the selected date range', {
-          summary: { totalRecords: 0 },
+          summary: {
+            totalCampaigns: 0,
+            totalRecords: 0,
+            totalFacebookResults: 0,
+            totalZohoResults: 0,
+            totalResults: 0,
+            totalSpent: 0,
+            avgCostPerResult: 0,
+            dateRange: {
+              from: dateFrom,
+              to: dateTo
+            }
+          },
+          brandBreakdown: [],
+          campaignBreakdown: [],
           reports: [],
-          filters: { dateFrom, dateTo }
+          filters: {
+            dateFrom,
+            dateTo,
+            ...(brand && { brand }),
+            ...(campaignId && { campaignId })
+          },
+          message: 'No data found for the selected date range'
         }));
       }
 
-      return res.status(200).json(createResponse(true, `Report generated successfully with ${reportData.length} records`, {
-        reports: reportData,
-        filters: { dateFrom, dateTo, ...(brand && { brand }), ...(campaignId && { campaignId }) }
-      }));
+      const summary = summaryData[0] || {};
+      
+      const responseData = {
+        summary: {
+          totalCampaigns: Number(summary.total_campaigns || 0),
+          totalRecords: Number(summary.total_records || 0),
+          totalFacebookResults: Number(summary.total_facebook_results || 0),
+          totalZohoResults: Number(summary.total_zoho_results || 0),
+          totalResults: Number(summary.total_results || 0),
+          totalSpent: Number(summary.total_spent || 0),
+          avgCostPerResult: Number(summary.avg_cost_per_result || 0),
+          dateRange: {
+            from: summary.date_from || dateFrom,
+            to: summary.date_to || dateTo
+          }
+        },
+        brandBreakdown: brandBreakdown || [],
+        campaignBreakdown: campaignBreakdown || [],
+        reports: reportData || [],
+        filters: {
+          dateFrom,
+          dateTo,
+          ...(brand && { brand }),
+          ...(campaignId && { campaignId })
+        }
+      };
+
+      return res.status(200).json(createResponse(true, `Report generated successfully with ${reportData.length} records`, responseData));
     } catch (error) {
       return handleDbError(error, 'generate report', res);
     }
   },
 
-  // GET /api/reports/filters - Get filter options with privacy
+  // GET /api/reports/filters
+  // Get available filter options for the Reports module (from campaigns table)
   getFilterOptions: async (req, res) => {
     try {
-      // Get all available brands from campaigns table (filtered by user)
-      let brandsQuery = `
-        SELECT DISTINCT c.brand
+      // Get all available brands from campaigns table
+      const [brandsData] = await pool.query(`
+        SELECT DISTINCT b.name as brand
         FROM campaigns c
-        WHERE c.brand IS NOT NULL AND c.brand != '' AND c.is_enabled = 1
-      `;
-      let brandsParams = [];
-      
-      // Add privacy filtering for non-admins
-      const isAdmin = req.user.role && (req.user.role.level >= 8 || req.user.role.name === 'super_admin' || req.user.role.name === 'admin');
-      if (!isAdmin) {
-        brandsQuery += ' AND c.created_by = ?';
-        brandsParams.push(req.user.id);
-      }
-      
-      brandsQuery += ' ORDER BY c.brand ASC';
-      
-      const [brandsData] = await pool.query(brandsQuery, brandsParams);
+        LEFT JOIN brands b ON c.brand = b.id
+        WHERE b.name IS NOT NULL AND b.name != '' AND c.is_enabled = 1 AND b.is_active = 1
+        ORDER BY b.name ASC
+      `);
 
-      // Get all available campaigns from campaigns table (filtered by user)
-      let campaignsQuery = `
+      // Get all available campaigns from campaigns table
+      const [campaignsData] = await pool.query(`
         SELECT 
           c.id,
           c.name,
-          c.brand,
+          b.name as brand,
           ct.type_name as campaign_type
         FROM campaigns c
+        LEFT JOIN brands b ON c.brand = b.id
         LEFT JOIN campaign_types ct ON c.campaign_type_id = ct.id
         WHERE c.is_enabled = 1
-      `;
-      let campaignsParams = [];
-      
-      if (!isAdmin) {
-        campaignsQuery += ' AND c.created_by = ?';
-        campaignsParams.push(req.user.id);
-      }
-      
-      campaignsQuery += ' ORDER BY c.name ASC';
-      
-      const [campaignsData] = await pool.query(campaignsQuery, campaignsParams);
+        ORDER BY c.name ASC
+      `);
 
-      // Get date ranges from campaign_data (filtered by user)
-      let dateRangeQuery = `
+      // Get date ranges from campaign_data (earliest and latest dates with actual data)
+      const [dateRangeData] = await pool.query(`
         SELECT
           MIN(cd.data_date) as earliest_date,
           MAX(cd.data_date) as latest_date
         FROM campaign_data cd
-      `;
-      let dateRangeParams = [];
-      
-      if (!isAdmin) {
-        dateRangeQuery += ' WHERE cd.created_by = ?';
-        dateRangeParams.push(req.user.id);
-      }
-      
-      const [dateRangeData] = await pool.query(dateRangeQuery, dateRangeParams);
+      `);
 
       const dateRange = dateRangeData[0] || {};
 
@@ -722,13 +706,14 @@ const reportsController = {
     }
   },
 
-  // GET /api/reports/dashboard - Get dashboard stats with privacy
+  // GET /api/reports/dashboard
+  // Get dashboard statistics for overview
   getDashboardStats: async (req, res) => {
     try {
       // Get current month stats
       const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format
       
-      let currentMonthQuery = `
+      const [currentMonthStats] = await pool.query(`
         SELECT
           COUNT(*) as campaigns_count,
           SUM(r.leads) as total_leads,
@@ -736,20 +721,10 @@ const reportsController = {
           AVG(r.cost_per_lead) as avg_cost_per_lead
         FROM reports r
         WHERE r.report_month = ?
-      `;
-      let currentMonthParams = [currentMonth];
-      
-      // Add privacy filtering for non-admins
-      const isAdmin = req.user.role && (req.user.role.level >= 8 || req.user.role.name === 'super_admin' || req.user.role.name === 'admin');
-      if (!isAdmin) {
-        currentMonthQuery += ' AND r.created_by = ?';
-        currentMonthParams.push(req.user.id);
-      }
-      
-      const [currentMonthStats] = await pool.query(currentMonthQuery, currentMonthParams);
+      `, [currentMonth]);
 
       // Get top performing brands (this month)
-      let topBrandsQuery = `
+      const [topBrands] = await pool.query(`
         SELECT
           r.brand,
           SUM(r.leads) as total_leads,
@@ -757,48 +732,26 @@ const reportsController = {
           AVG(r.cost_per_lead) as avg_cost_per_lead
         FROM reports r
         WHERE r.report_month = ? AND r.brand IS NOT NULL
-      `;
-      let topBrandsParams = [currentMonth];
-      
-      if (!isAdmin) {
-        topBrandsQuery += ' AND r.created_by = ?';
-        topBrandsParams.push(req.user.id);
-      }
-      
-      topBrandsQuery += `
         GROUP BY r.brand
         ORDER BY total_leads DESC
         LIMIT 5
-      `;
-      
-      const [topBrands] = await pool.query(topBrandsQuery, topBrandsParams);
+      `, [currentMonth]);
 
       // Get recent campaign performance (last 7 days)
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
       const sevenDaysAgoStr = toMysqlDate(sevenDaysAgo);
 
-      let recentPerformanceQuery = `
+      const [recentPerformance] = await pool.query(`
         SELECT
           DATE(r.report_date) as date,
           SUM(r.leads) as daily_leads,
           SUM(r.spent) as daily_spent
         FROM reports r
         WHERE r.report_date >= ?
-      `;
-      let recentPerformanceParams = [sevenDaysAgoStr];
-      
-      if (!isAdmin) {
-        recentPerformanceQuery += ' AND r.created_by = ?';
-        recentPerformanceParams.push(req.user.id);
-      }
-      
-      recentPerformanceQuery += `
         GROUP BY DATE(r.report_date)
         ORDER BY r.report_date DESC
-      `;
-      
-      const [recentPerformance] = await pool.query(recentPerformanceQuery, recentPerformanceParams);
+      `, [sevenDaysAgoStr]);
 
       const currentStats = currentMonthStats[0] || {};
       
@@ -820,7 +773,8 @@ const reportsController = {
     }
   },
 
-  // GET /api/reports/charts - Get chart data with privacy
+  // GET /api/reports/charts
+  // Returns normalized datasets for charts between date_from and date_to
   getChartData: async (req, res) => {
     try {
       const dateFrom = toMysqlDate(req.query.date_from);
@@ -834,20 +788,10 @@ const reportsController = {
 
       const where = [];
       const params = [];
-      
       where.push('r.report_date >= ?', 'r.report_date <= ?');
       params.push(dateFrom, dateTo);
-      
-      // Add privacy filtering for non-admins
-      const isAdmin = req.user.role && (req.user.role.level >= 8 || req.user.role.name === 'super_admin' || req.user.role.name === 'admin');
-      if (!isAdmin) {
-        where.push('r.created_by = ?');
-        params.push(req.user.id);
-      }
-      
       if (brand) { where.push('r.brand = ?'); params.push(brand); }
       if (campaignId) { where.push('r.campaign_id = ?'); params.push(campaignId); }
-      
       const whereClause = where.length ? 'WHERE ' + where.join(' AND ') : '';
 
       // Time series by day
