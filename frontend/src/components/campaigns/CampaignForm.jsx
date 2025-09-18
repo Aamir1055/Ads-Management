@@ -17,7 +17,6 @@ const CampaignForm = ({ campaign = null, isOpen, onClose, onSave }) => {
   })
 
   const [personaInput, setPersonaInput] = useState('')
-  const [genderInput, setGenderInput] = useState('')
   const [locationInput, setLocationInput] = useState('')
 
   const [campaignTypes, setCampaignTypes] = useState([])
@@ -31,6 +30,12 @@ const CampaignForm = ({ campaign = null, isOpen, onClose, onSave }) => {
     { value: 'image', label: 'Image' },
     { value: 'carousel', label: 'Carousel' },
     { value: 'collection', label: 'Collection' }
+  ]
+
+  const genderOptions = [
+    { value: 'Male', label: 'Male' },
+    { value: 'Female', label: 'Female' },
+    { value: 'Other', label: 'Other' }
   ]
 
   useEffect(() => {
@@ -100,7 +105,6 @@ const CampaignForm = ({ campaign = null, isOpen, onClose, onSave }) => {
 
   const resetInputs = () => {
     setPersonaInput('')
-    setGenderInput('')
     setLocationInput('')
   }
 
@@ -162,6 +166,15 @@ const CampaignForm = ({ campaign = null, isOpen, onClose, onSave }) => {
       e.preventDefault()
       addToArray(field, value, inputSetter)
     }
+  }
+
+  const handleGenderCheckboxChange = (genderValue, checked) => {
+    setFormData(prev => ({
+      ...prev,
+      gender: checked 
+        ? [...prev.gender, genderValue]
+        : prev.gender.filter(g => g !== genderValue)
+    }))
   }
 
   const validateForm = () => {
@@ -456,49 +469,49 @@ const CampaignForm = ({ campaign = null, isOpen, onClose, onSave }) => {
               </div>
             </div>
 
-            {/* Gender Multi-Value Input */}
+            {/* Gender Checkbox Selection */}
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Gender (Multiple Values)
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                Gender (Multiple Selection)
               </label>
               
               {/* Display selected genders */}
-              <div className="mb-2 flex flex-wrap gap-2">
-                {formData.gender.map((gender, index) => (
-                  <div
-                    key={index}
-                    className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800 border border-blue-200"
-                  >
-                    <span>{gender}</span>
-                    <button
-                      type="button"
-                      onClick={() => removeFromArray('gender', index)}
-                      className="ml-2 text-blue-600 hover:text-blue-800"
+              {formData.gender.length > 0 && (
+                <div className="mb-3 flex flex-wrap gap-2">
+                  {formData.gender.map((gender, index) => (
+                    <div
+                      key={index}
+                      className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800 border border-blue-200"
                     >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
+                      <span>{gender}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeFromArray('gender', index)}
+                        className="ml-2 text-blue-600 hover:text-blue-800"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
               
-              {/* Input for new gender */}
-              <div className="flex space-x-2">
-                <input
-                  type="text"
-                  value={genderInput}
-                  onChange={(e) => setGenderInput(e.target.value)}
-                  onKeyDown={(e) => handleKeyPress(e, 'gender', genderInput, setGenderInput)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                  placeholder="Type gender and press Enter"
-                />
-                <button
-                  type="button"
-                  onClick={() => addToArray('gender', genderInput, setGenderInput)}
-                  disabled={!genderInput.trim()}
-                  className="px-3 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Plus className="h-4 w-4" />
-                </button>
+              {/* Gender checkboxes */}
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {genderOptions.map((option) => (
+                  <label
+                    key={option.value}
+                    className="flex items-center space-x-3 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={formData.gender.includes(option.value)}
+                      onChange={(e) => handleGenderCheckboxChange(option.value, e.target.checked)}
+                      className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                    />
+                    <span className="text-sm text-gray-700">{option.label}</span>
+                  </label>
+                ))}
               </div>
             </div>
 
