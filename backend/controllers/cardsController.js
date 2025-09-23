@@ -107,6 +107,12 @@ const cardsController = {
       }
 
       const { card_name, card_number_last4 = null, card_type = null, current_balance = 0.0, credit_limit = null, is_active = true } = validation.data;
+      
+      // Get user ID from request (set by auth middleware)
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json(createResponse(false, 'User authentication required'));
+      }
 
       // Duplicate check
       const [existingCards] = await pool.query('SELECT id FROM cards WHERE card_name = ?', [card_name]);
@@ -118,10 +124,11 @@ const cardsController = {
       try {
         await connection.beginTransaction();
 
+        // Insert card with created_by field
         const [result] = await connection.query(
-          `INSERT INTO cards (card_name, card_number_last4, card_type, current_balance, credit_limit, is_active, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, NOW())`,
-          [card_name, card_number_last4, card_type, Number(current_balance), credit_limit !== null ? Number(credit_limit) : null, is_active ? 1 : 0]
+          `INSERT INTO cards (card_name, card_number_last4, card_type, current_balance, credit_limit, is_active, created_by, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+          [card_name, card_number_last4, card_type, Number(current_balance), credit_limit !== null ? Number(credit_limit) : null, is_active ? 1 : 0, userId]
         );
 
         if (!result || !result.insertId) {
@@ -130,13 +137,28 @@ const cardsController = {
           return res.status(500).json(createResponse(false, 'Failed to create card'));
         }
 
+        const cardId = result.insertId;
+
+        // Automatically assign the card to the creator as primary
+        const [assignResult] = await connection.query(
+          `INSERT INTO card_users (card_id, user_id, assigned_date, is_primary, created_at)
+           VALUES (?, ?, CURDATE(), 1, NOW())`,
+          [cardId, userId]
+        );
+
+        if (!assignResult) {
+          await connection.rollback();
+          connection.release();
+          return res.status(500).json(createResponse(false, 'Failed to assign card to user'));
+        }
+
         await connection.commit();
         connection.release();
 
-        const [newCards] = await pool.query('SELECT * FROM cards WHERE id = ?', [result.insertId]);
-  const cardData = newCards || null;
+        const [newCards] = await pool.query('SELECT * FROM cards WHERE id = ?', [cardId]);
+        const cardData = newCards || null;
 
-        return res.status(201).json(createResponse(true, 'Card created successfully', { card: cardData }));
+        return res.status(201).json(createResponse(true, 'Card created and assigned successfully', { card: cardData }));
       } catch (dbError) {
         try { await connection.rollback(); } catch {}
         connection.release();
@@ -449,6 +471,185 @@ const cardsController = {
       }
     } catch (error) {
       return handleDatabaseError(error, 'delete card', res);
+    }
+  },
+
+  // Toggle card active/inactive status (for card owners)
+  toggleCardStatus: async (req, res) => {
+    try {
+      const cardId = parseInt(req.params.id, 10);
+      const userId = req.user?.id;
+      
+      if (!cardId || isNaN(cardId)) {
+        return res.status(400).json(createResponse(false, 'Invalid card ID'));
+      }
+
+      if (!userId) {
+        return res.status(401).json(createResponse(false, 'User authentication required'));
+      }
+
+      // Get current card status
+      const [cards] = await pool.query('SELECT id, card_name, is_active FROM cards WHERE id = ?', [cardId]);
+      if (!cards || cards.length === 0) {
+        return res.status(404).json(createResponse(false, 'Card not found'));
+      }
+
+      const card = cards[0];
+      const newStatus = !card.is_active;
+
+      const connection = await pool.getConnection();
+      try {
+        await connection.beginTransaction();
+
+        const [result] = await connection.query(
+          'UPDATE cards SET is_active = ?, updated_at = NOW() WHERE id = ?',
+          [newStatus, cardId]
+        );
+
+        if (!result || result.affectedRows === 0) {
+          await connection.rollback();
+          connection.release();
+          return res.status(500).json(createResponse(false, 'Failed to update card status'));
+        }
+
+        await connection.commit();
+        connection.release();
+
+        const statusText = newStatus ? 'activated' : 'deactivated';
+        return res.status(200).json(createResponse(true, `Card "${card.card_name}" has been ${statusText} successfully`, {
+          cardId: cardId,
+          cardName: card.card_name,
+          isActive: newStatus
+        }));
+      } catch (dbError) {
+        try { await connection.rollback(); } catch {}
+        connection.release();
+        throw dbError;
+      }
+    } catch (error) {
+      return handleDatabaseError(error, 'toggle card status', res);
+    }
+  },
+
+  // Set card as primary/secondary (for card owners)
+  setCardPriority: async (req, res) => {
+    try {
+      const cardId = parseInt(req.params.id, 10);
+      const userId = req.user?.id;
+      const { is_primary } = req.body;
+      
+      if (!cardId || isNaN(cardId)) {
+        return res.status(400).json(createResponse(false, 'Invalid card ID'));
+      }
+
+      if (!userId) {
+        return res.status(401).json(createResponse(false, 'User authentication required'));
+      }
+
+      if (typeof is_primary !== 'boolean') {
+        return res.status(400).json(createResponse(false, 'is_primary must be a boolean value'));
+      }
+
+      // Check if user has this card assigned
+      const [cardUsers] = await pool.query(
+        'SELECT id, is_primary FROM card_users WHERE card_id = ? AND user_id = ?',
+        [cardId, userId]
+      );
+
+      if (!cardUsers || cardUsers.length === 0) {
+        return res.status(404).json(createResponse(false, 'Card assignment not found for this user'));
+      }
+
+      const cardUser = cardUsers[0];
+      
+      if (cardUser.is_primary === is_primary) {
+        const currentStatus = is_primary ? 'primary' : 'secondary';
+        return res.status(200).json(createResponse(true, `Card is already set as ${currentStatus}`));
+      }
+
+      const connection = await pool.getConnection();
+      try {
+        await connection.beginTransaction();
+
+        // If setting as primary, unset any other primary cards for this user
+        if (is_primary) {
+          await connection.query(
+            'UPDATE card_users SET is_primary = FALSE WHERE user_id = ? AND card_id != ?',
+            [userId, cardId]
+          );
+        }
+
+        // Update the current card assignment
+        const [result] = await connection.query(
+          'UPDATE card_users SET is_primary = ?, updated_at = NOW() WHERE card_id = ? AND user_id = ?',
+          [is_primary, cardId, userId]
+        );
+
+        if (!result || result.affectedRows === 0) {
+          await connection.rollback();
+          connection.release();
+          return res.status(500).json(createResponse(false, 'Failed to update card priority'));
+        }
+
+        await connection.commit();
+        connection.release();
+
+        const priorityText = is_primary ? 'primary' : 'secondary';
+        
+        // Get updated card info
+        const [updatedCard] = await pool.query(
+          'SELECT c.card_name FROM cards c WHERE c.id = ?',
+          [cardId]
+        );
+
+        return res.status(200).json(createResponse(true, `Card "${updatedCard[0].card_name}" has been set as ${priorityText}`, {
+          cardId: cardId,
+          cardName: updatedCard[0].card_name,
+          isPrimary: is_primary
+        }));
+      } catch (dbError) {
+        try { await connection.rollback(); } catch {}
+        connection.release();
+        throw dbError;
+      }
+    } catch (error) {
+      return handleDatabaseError(error, 'set card priority', res);
+    }
+  },
+
+  // Get user's own cards
+  getMyCards: async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      
+      if (!userId) {
+        return res.status(401).json(createResponse(false, 'User authentication required'));
+      }
+
+      const [userCards] = await pool.query(`
+        SELECT 
+          c.id,
+          c.card_name,
+          c.card_number_last4,
+          c.card_type,
+          c.current_balance,
+          c.credit_limit,
+          c.is_active,
+          c.created_at,
+          cu.is_primary,
+          cu.assigned_date
+        FROM cards c
+        INNER JOIN card_users cu ON c.id = cu.card_id
+        WHERE cu.user_id = ?
+        ORDER BY cu.is_primary DESC, c.created_at DESC
+      `, [userId]);
+
+      return res.status(200).json(createResponse(true, 'User cards retrieved successfully', {
+        cards: userCards || [],
+        totalCards: userCards ? userCards.length : 0
+      }));
+    } catch (error) {
+      return handleDatabaseError(error, 'fetch user cards', res);
     }
   },
 };

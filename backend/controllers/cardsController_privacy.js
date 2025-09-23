@@ -156,13 +156,43 @@ const cardsController = {
           return res.status(500).json(createResponse(false, 'Failed to create card'));
         }
 
+        const cardId = result.insertId;
+
+        // Check if user has any existing primary cards
+        const [existingPrimary] = await connection.query(
+          'SELECT id FROM card_users WHERE user_id = ? AND is_primary = 1',
+          [currentUserId]
+        );
+
+        // Set as primary if user has no primary cards, otherwise secondary
+        const isPrimary = existingPrimary.length === 0 ? 1 : 0;
+
+        // Automatically assign the card to the creator
+        const [assignResult] = await connection.query(
+          `INSERT INTO card_users (card_id, user_id, assigned_date, is_primary, created_at)
+           VALUES (?, ?, CURDATE(), ?, NOW())`,
+          [cardId, currentUserId, isPrimary]
+        );
+
+        if (!assignResult) {
+          await connection.rollback();
+          connection.release();
+          return res.status(500).json(createResponse(false, 'Failed to assign card to user'));
+        }
+
         await connection.commit();
         connection.release();
 
-        const [newCards] = await pool.query('SELECT * FROM cards WHERE id = ?', [result.insertId]);
+        const [newCards] = await pool.query('SELECT * FROM cards WHERE id = ?', [cardId]);
         const cardData = newCards[0] || null;
 
-        return res.status(201).json(createResponse(true, 'Card created successfully', { card: cardData }));
+        return res.status(201).json(createResponse(true, 'Card created and assigned successfully', { 
+          card: cardData,
+          assignment: {
+            isPrimary: Boolean(isPrimary),
+            assignedDate: new Date().toISOString().split('T')[0]
+          }
+        }));
       } catch (dbError) {
         try { await connection.rollback(); } catch {}
         connection.release();

@@ -11,7 +11,9 @@ const {
   getUsersByCard
 } = require('../controllers/cardUsersController');
 
-// const { authenticate, authorize } = require('../middleware/auth');
+const { authenticateToken } = require('../middleware/authMiddleware');
+const { attachUserPermissions, modulePermissions } = require('../middleware/rbacMiddleware');
+const { checkCardAssignmentOwnership } = require('../middleware/cardOwnership');
 
 // Request logging
 const requestLogger = (req, res, next) => {
@@ -25,7 +27,11 @@ const requestLogger = (req, res, next) => {
 
 router.use(requestLogger);
 
-// Basic in-memory rate limiter with cleanup (single instances)
+// Apply authentication and permission middleware to all routes
+router.use(authenticateToken);
+router.use(attachUserPermissions);
+
+// Basic in-memory rate limiter
 const createRateLimit = (windowMs = 15 * 60 * 1000, max = 100) => {
   const requests = new Map();
 
@@ -80,20 +86,16 @@ const deleteLimiter = createRateLimit(60 * 60 * 1000, 10);
 const helperLimiter = createRateLimit(5 * 60 * 1000, 200);
 
 // =============================================================================
-// PUBLIC ROUTES
+// PROTECTED ROUTES WITH RBAC AND OWNERSHIP CHECKS
 // =============================================================================
 
-router.post('/', createLimiter, createCardUser);
-
-// =============================================================================
-// PROTECTED ROUTES (enable auth when ready)
-// =============================================================================
-// router.use(authenticate);
-
-router.get('/', listLimiter, getAllCardUsers);
-router.get('/:id', getOneLimiter, getCardUserById);
-router.put('/:id', updateLimiter, /* authorize(['admin','manager']), */ updateCardUser);
-router.delete('/:id', deleteLimiter, /* authorize(['admin','manager']), */ deleteCardUser);
+// Only superadmin or card owner can create new card-user assignments
+router.post('/', createLimiter, modulePermissions.cards.update, checkCardAssignmentOwnership, createCardUser);
+router.get('/', listLimiter, modulePermissions.cards.read, getAllCardUsers);
+router.get('/:id', getOneLimiter, modulePermissions.cards.read, getCardUserById);
+// Only superadmin or card owner can modify card assignments
+router.put('/:id', updateLimiter, modulePermissions.cards.update, checkCardAssignmentOwnership, updateCardUser);
+router.delete('/:id', deleteLimiter, modulePermissions.cards.delete, checkCardAssignmentOwnership, deleteCardUser);
 
 // =============================================================================
 // HELPER ENDPOINTS

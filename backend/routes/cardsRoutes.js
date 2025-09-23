@@ -7,11 +7,15 @@ const {
   getCardById,
   updateCard,
   deleteCard,
-  addBalance
+  addBalance,
+  toggleCardStatus,
+  setCardPriority,
+  getMyCards
 } = require('../controllers/cardsController');
 
 const { authenticateToken } = require('../middleware/authMiddleware');
 const { attachUserPermissions, modulePermissions } = require('../middleware/rbacMiddleware');
+const { checkCardOwnership } = require('../middleware/cardOwnership');
 
 // Request logging (sanitized)
 const requestLogger = (req, res, next) => {
@@ -90,10 +94,13 @@ const addBalanceLimiter = createRateLimit(15 * 60 * 1000, 30);
 
 router.post('/', createLimiter, modulePermissions.cards.create, createCard);
 router.get('/', listLimiter, modulePermissions.cards.read, getAllCards);
+router.get('/my-cards', listLimiter, modulePermissions.cards.read, getMyCards);
 router.get('/:id', getOneLimiter, modulePermissions.cards.read, getCardById);
-router.put('/:id', updateLimiter, modulePermissions.cards.update, updateCard);
-router.post('/:id/add-balance', addBalanceLimiter, modulePermissions.cards.update, addBalance);
-router.delete('/:id', deleteLimiter, modulePermissions.cards.delete, deleteCard);
+router.put('/:id', updateLimiter, modulePermissions.cards.update, checkCardOwnership, updateCard);
+router.post('/:id/add-balance', addBalanceLimiter, modulePermissions.cards.update, checkCardOwnership, addBalance);
+router.patch('/:id/toggle-status', updateLimiter, modulePermissions.cards.update, checkCardOwnership, toggleCardStatus);
+router.patch('/:id/set-priority', updateLimiter, modulePermissions.cards.update, checkCardOwnership, setCardPriority);
+router.delete('/:id', deleteLimiter, modulePermissions.cards.delete, checkCardOwnership, deleteCard);
 
 // =============================================================================
 // ERROR HANDLING

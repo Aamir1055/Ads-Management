@@ -701,6 +701,12 @@ const CampaignDetail = () => {
                       Spent
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Facebook Cost/Lead
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Zoho Cost/Lead
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Card
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -726,6 +732,22 @@ const CampaignDetail = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-medium text-green-600">{formatCurrency(item.spent)}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-blue-600 font-medium">
+                            {facebookResult > 0 
+                              ? formatCurrency(parseFloat(item.spent) / facebookResult)
+                              : '-'
+                            }
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-purple-600 font-medium">
+                            {zohoResult > 0 
+                              ? formatCurrency(parseFloat(item.spent) / zohoResult)
+                              : '-'
+                            }
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-700">{item.card_display_name || item.card_name || getCardName(item.card_id)}</div>

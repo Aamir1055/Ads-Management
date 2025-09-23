@@ -96,9 +96,15 @@ const handleDatabaseError = (error, operation, res) => {
 };
 
 const cardUsersController = {
-  // Create with automatic ownership
+  // Create - Only superadmin can create card-user assignments
   createCardUser: async (req, res) => {
     try {
+      // Only superadmin can create new card-user assignments
+      const isSuperAdmin = req.user.role && req.user.role.name === 'super_admin';
+      if (!isSuperAdmin) {
+        return res.status(403).json(createResponse(false, 'Access denied. Only superadmin can assign cards to users.'));
+      }
+
       const validation = validateInput(cardUserValidation.createCardUser, req.body);
       if (!validation.isValid) {
         return res.status(400).json(createResponse(false, 'Validation failed', null, validation.errors));
@@ -106,14 +112,6 @@ const cardUsersController = {
 
       const { card_id, user_id, assigned_date, is_primary } = validation.data;
       const assignedDate = toMysqlDate(assigned_date) || toMysqlDate(new Date());
-
-      // For regular users, they can only assign cards to themselves
-      const isAdmin = req.user.role && (req.user.role.level >= 8 || req.user.role.name === 'super_admin' || req.user.role.name === 'admin');
-      if (!isAdmin) {
-        if (user_id !== req.user.id) {
-          return res.status(403).json(createResponse(false, 'You can only assign cards to yourself'));
-        }
-      }
 
       // Card exists and active, and user has access to it
       let cardQuery = 'SELECT id, card_name, is_active, created_by FROM cards WHERE id = ?';
@@ -373,9 +371,15 @@ const cardUsersController = {
     }
   },
 
-  // Update with ownership validation
+  // Update - Only superadmin can update card-user assignments
   updateCardUser: async (req, res) => {
     try {
+      // Only superadmin can update card-user assignments
+      const isSuperAdmin = req.user.role && req.user.role.name === 'super_admin';
+      if (!isSuperAdmin) {
+        return res.status(403).json(createResponse(false, 'Access denied. Only superadmin can update card assignments.'));
+      }
+
       const idValidation = validateInput(cardUserValidation.validateId, { id: parseInt(req.params.id, 10) });
       if (!idValidation.isValid) {
         return res.status(400).json(createResponse(false, 'Invalid card user assignment ID', null, idValidation.errors));
@@ -393,11 +397,6 @@ const cardUsersController = {
         return res.status(404).json(createResponse(false, 'Card user assignment not found'));
       }
       const existingRow = existing[0];
-
-      // Privacy check - only creator or admin can update
-      if (!isAdminOrOwner(req, existingRow.created_by)) {
-        return res.status(403).json(createResponse(false, 'Access denied. You can only update assignments you created.'));
-      }
 
       const fields = Object.keys(updateData);
       if (fields.length === 0) {
@@ -477,9 +476,15 @@ const cardUsersController = {
     }
   },
 
-  // Delete with ownership validation
+  // Delete - Only superadmin can delete card-user assignments
   deleteCardUser: async (req, res) => {
     try {
+      // Only superadmin can delete card-user assignments
+      const isSuperAdmin = req.user.role && req.user.role.name === 'super_admin';
+      if (!isSuperAdmin) {
+        return res.status(403).json(createResponse(false, 'Access denied. Only superadmin can delete card assignments.'));
+      }
+
       const idValidation = validateInput(cardUserValidation.validateId, { id: parseInt(req.params.id, 10) });
       if (!idValidation.isValid) {
         return res.status(400).json(createResponse(false, 'Invalid card user assignment ID', null, idValidation.errors));
@@ -504,11 +509,6 @@ const cardUsersController = {
         return res.status(404).json(createResponse(false, 'Card user assignment not found'));
       }
       const row = existing[0];
-
-      // Privacy check - only creator or admin can delete
-      if (!isAdminOrOwner(req, row.created_by)) {
-        return res.status(403).json(createResponse(false, 'Access denied. You can only delete assignments you created.'));
-      }
 
       const connection = await pool.getConnection();
       try {
