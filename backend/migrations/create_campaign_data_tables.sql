@@ -2,27 +2,35 @@
 -- Created: 2025-09-08
 -- Description: Create tables for campaign data management system
 
--- Create campaigns table (references campaign_types)
+-- Create campaigns table (unified schema matching controller expectations)
 CREATE TABLE IF NOT EXISTS campaigns (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    campaign_name VARCHAR(255) NOT NULL,
-    campaign_type_id INT NOT NULL,
-    description TEXT,
-    status ENUM('active', 'paused', 'completed') DEFAULT 'active',
-    start_date DATE,
-    end_date DATE,
-    budget DECIMAL(15,2) DEFAULT 0.00,
-    target_audience TEXT,
-    is_active BOOLEAN DEFAULT TRUE,
-    created_by INT,
+    name VARCHAR(255) NOT NULL UNIQUE,
+    persona JSON NULL,
+    gender JSON NULL,
+    min_age INT NULL,
+    max_age INT NULL,
+    location JSON NULL,
+    creatives ENUM('video', 'image', 'carousel', 'collection') NOT NULL DEFAULT 'image',
+    is_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    status ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
+    campaign_type_id INT NULL,
+    brand INT NULL,
+    created_by INT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (campaign_type_id) REFERENCES campaign_types(id) ON DELETE RESTRICT ON UPDATE CASCADE,
-    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL ON UPDATE CASCADE,
-    INDEX idx_campaign_name (campaign_name),
-    INDEX idx_campaign_type_id (campaign_type_id),
-    INDEX idx_status (status),
-    INDEX idx_is_active (is_active)
+    age_backup VARCHAR(255) NULL COMMENT 'Backup field for legacy age data',
+    
+    INDEX idx_campaigns_status (status),
+    INDEX idx_campaigns_enabled (is_enabled),
+    INDEX idx_campaigns_brand (brand),
+    INDEX idx_campaigns_type (campaign_type_id),
+    INDEX idx_campaigns_created_by (created_by),
+    INDEX idx_campaigns_created_at (created_at),
+    
+    FOREIGN KEY (campaign_type_id) REFERENCES campaign_types(id) ON DELETE SET NULL ON UPDATE CASCADE,
+    FOREIGN KEY (brand) REFERENCES brands(id) ON DELETE SET NULL ON UPDATE CASCADE,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Create cards table 
@@ -64,12 +72,12 @@ CREATE TABLE IF NOT EXISTS campaign_data (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Insert sample campaigns (referencing existing campaign types)
-INSERT IGNORE INTO campaigns (campaign_name, campaign_type_id, description, status, budget, created_by) VALUES 
-('Summer Sale Campaign', 1, 'Summer promotional campaign using search ads', 'active', 5000.00, 1),
-('Brand Awareness Drive', 2, 'Display advertising for brand awareness', 'active', 8000.00, 1),
-('Social Media Boost', 3, 'Social media engagement campaign', 'active', 3000.00, 1),
-('Product Launch Video', 4, 'Video campaign for new product launch', 'paused', 12000.00, 1),
-('Holiday Shopping', 5, 'Shopping campaign for holiday season', 'active', 15000.00, 1);
+INSERT IGNORE INTO campaigns (name, campaign_type_id, creatives, is_enabled, status, created_by) VALUES 
+('Summer Sale Campaign', 1, 'image', true, 'active', 1),
+('Brand Awareness Drive', 2, 'image', true, 'active', 1),
+('Social Media Boost', 3, 'image', true, 'active', 1),
+('Product Launch Video', 4, 'video', false, 'inactive', 1),
+('Holiday Shopping', 5, 'carousel', true, 'active', 1);
 
 -- Insert sample cards
 INSERT IGNORE INTO cards (card_name, card_code, description, created_by) VALUES 

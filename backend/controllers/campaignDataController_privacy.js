@@ -77,7 +77,8 @@ const mapDatabaseToFrontend = (data) => {
   // Map xoho_result to zoho_result for frontend compatibility
   if ('xoho_result' in mapped) {
     mapped.zoho_result = mapped.xoho_result;
-    // Keep xoho_result for backward compatibility but frontend should use zoho_result
+    // Remove the database field name from frontend response for cleaner API
+    delete mapped.xoho_result;
   }
   
   return mapped;
@@ -192,20 +193,56 @@ const createCampaignData = async (req, res) => {
       card_name = ''
     } = req.body || {};
     
+    // Validation for required fields
+    if (!campaign_id) {
+      await connection.rollback();
+      return res.status(400).json(createResponse(false, 'Campaign is required'));
+    }
+    
+    if (!card_id) {
+      await connection.rollback();
+      return res.status(400).json(createResponse(false, 'Card is required'));
+    }
+    
+    if (!data_date) {
+      await connection.rollback();
+      return res.status(400).json(createResponse(false, 'Date is required'));
+    }
+    
+    // Validate campaign exists and user has access
+    const [campaignCheck] = await connection.execute(
+      'SELECT id, created_by FROM campaigns WHERE id = ?',
+      [Number(campaign_id)]
+    );
+    
+    if (campaignCheck.length === 0) {
+      await connection.rollback();
+      return res.status(400).json(createResponse(false, 'Invalid campaign'));
+    }
+    
+    // Check if user can access this campaign (privacy check)
+    const campaign = campaignCheck[0];
+    if (!isAdmin(req.user) && campaign.created_by !== userId) {
+      await connection.rollback();
+      return res.status(403).json(createResponse(false, 'Access denied. You can only create data for campaigns you own.'));
+    }
+    
+    // Validate card exists
+    const [cardCheck] = await connection.execute(
+      'SELECT id, card_name FROM cards WHERE id = ? AND is_active = 1',
+      [Number(card_id)]
+    );
+    
+    if (cardCheck.length === 0) {
+      await connection.rollback();
+      return res.status(400).json(createResponse(false, 'Invalid card'));
+    }
+    
     // Map zoho_result to xoho_result for database compatibility
     const xoho_result = zoho_result;
 
-    // Resolve card_name when card_id present and card_name blank
-    let finalCardName = card_name;
-    if (card_id && !card_name) {
-      const [cardInfo] = await connection.execute(
-        'SELECT card_name FROM cards WHERE id = ?',
-        [Number(card_id)]
-      );
-      if (cardInfo && cardInfo.length > 0) {
-        finalCardName = cardInfo[0].card_name;
-      }
-    }
+    // Use card name from validation query or provided card_name
+    const finalCardName = card_name || cardCheck[0].card_name;
 
     const dateForInsert = data_date ? toMysqlDate(data_date) : null;
 

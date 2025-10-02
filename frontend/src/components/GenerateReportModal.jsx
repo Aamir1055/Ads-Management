@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Calendar, Download, Filter, BarChart3, AlertCircle } from 'lucide-react';
 import reportsService from '../services/reportsService';
-// import * as XLSX from 'xlsx';
+import { api } from '../utils/api';
 
 // Date formatting utilities
 const formatDateToDisplay = (dateStr) => {
@@ -104,8 +104,69 @@ const GenerateReportModal = ({ isOpen, onClose, onReportGenerated }) => {
     return true;
   };
 
-  const downloadExcelReport = (reportData, filters) => {
-    setError('Excel export is currently disabled due to missing dependency.');
+  const downloadExcelReport = async (filters) => {
+    try {
+      const queryParams = new URLSearchParams();
+      
+      // Map frontend filter names to backend expected names
+      const filterMap = {
+        dateFrom: 'date_from',
+        dateTo: 'date_to',
+        campaignId: 'campaign_id',
+        brand: 'brand'
+      };
+      
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== null && value !== undefined && value !== '') {
+          const backendKey = filterMap[key] || key;
+          queryParams.append(backendKey, value);
+        }
+      });
+
+      const response = await api.get(`/reports/export?${queryParams.toString()}`, {
+        responseType: 'blob'
+      });
+
+      // Create a blob URL and trigger download
+      const blob = new Blob([response.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      });
+      
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Get filename from response headers or generate one
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = `Campaign_Reports_${filters.dateFrom}_to_${filters.dateTo}.xlsx`;
+      
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+        if (filenameMatch) {
+          filename = filenameMatch[1];
+        }
+      }
+      
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      // Close modal on successful download
+      if (onReportGenerated) {
+        onReportGenerated('Excel report downloaded successfully');
+      }
+      onClose();
+      
+    } catch (error) {
+      console.error('Error downloading Excel report:', error);
+      if (error.response?.status === 404) {
+        setError('No data found for the selected criteria. Please try different filters.');
+      } else {
+        setError('Failed to download Excel report. Please try again.');
+      }
+    }
   };
 
   const handleGenerateReport = async () => {
@@ -115,22 +176,48 @@ const GenerateReportModal = ({ isOpen, onClose, onReportGenerated }) => {
     setError('');
 
     try {
+      // Generate report for display using the reports service
       const response = await reportsService.generateReport(filters);
       
-      if (response.success) {
-        // Check if we have data
-        if (response.data.message === 'No data found for the selected date range') {
-          setError('No data found for the selected date range. Please try different filters.');
-        } else {
-          // Download Excel file with the report data
-          downloadExcelReport(response.data, filters);
-        }
+      if (response.success && response.data) {
+        // Pass the generated report data back to the Reports page
+        onReportGenerated(response.data);
+        onClose();
       } else {
-        setError(response.message || 'Failed to generate report');
+        setError('No data found for the selected criteria. Please try different filters.');
       }
     } catch (error) {
       console.error('Error generating report:', error);
-      setError('Failed to generate report. Please try again.');
+      if (error.response?.status === 404) {
+        setError('No data found for the selected criteria. Please try different filters.');
+      } else if (error.response?.status === 401) {
+        setError('Authentication failed. Please log in again.');
+      } else {
+        setError('Failed to generate report. Please try again.');
+      }
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleDownloadExcel = async () => {
+    if (!validateFilters()) return;
+
+    setIsGenerating(true);
+    setError('');
+
+    try {
+      // Download Excel file using the export endpoint
+      await downloadExcelReport(filters);
+    } catch (error) {
+      console.error('Error downloading Excel report:', error);
+      if (error.response?.status === 404) {
+        setError('No data found for the selected criteria. Please try different filters.');
+      } else if (error.response?.status === 401) {
+        setError('Authentication failed. Please log in again.');
+      } else {
+        setError('Failed to download Excel report. Please try again.');
+      }
     } finally {
       setIsGenerating(false);
     }
@@ -185,7 +272,7 @@ const GenerateReportModal = ({ isOpen, onClose, onReportGenerated }) => {
               </button>
             </div>
             <p className="mt-1 text-sm text-gray-500">
-              Generate and download an Excel report based on your selected filters
+              View report data on screen or download an Excel file based on your selected filters
             </p>
           </div>
 
@@ -336,8 +423,26 @@ const GenerateReportModal = ({ isOpen, onClose, onReportGenerated }) => {
                 </>
               ) : (
                 <>
+                  <BarChart3 className="h-4 w-4 mr-2" />
+                  View Report
+                </>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={handleDownloadExcel}
+              disabled={isGenerating || !filters.dateFrom || !filters.dateTo}
+              className="w-full inline-flex justify-center items-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isGenerating ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2"></div>
+                  Downloading...
+                </>
+              ) : (
+                <>
                   <Download className="h-4 w-4 mr-2" />
-                  Generate Report
+                  Download Excel
                 </>
               )}
             </button>

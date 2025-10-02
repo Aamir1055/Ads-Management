@@ -45,6 +45,14 @@ const handleDatabaseError = (error, operation = 'database operation') => {
 
 const normalizeBooleanToBit = (val, defaultVal = null) => {
   if (val === undefined || val === null) return defaultVal;
+  // Handle string representations
+  if (typeof val === 'string') {
+    const lowerVal = val.toLowerCase();
+    if (lowerVal === 'true' || lowerVal === '1') return 1;
+    if (lowerVal === 'false' || lowerVal === '0') return 0;
+    return defaultVal;
+  }
+  // Handle boolean and numeric values
   return val ? 1 : 0;
 };
 
@@ -70,6 +78,44 @@ const buildSearchConditions = (search, status) => {
 // Strict whitelist for updatable columns
 const UPDATABLE_FIELDS = new Set(['name', 'description', 'is_active']);
 
+// Enhanced ID validation
+const validateId = (id, paramName = 'ID') => {
+  const numId = parseInt(id, 10);
+  if (!id || isNaN(numId) || numId <= 0 || numId > Number.MAX_SAFE_INTEGER) {
+    return { valid: false, error: `Invalid ${paramName}` };
+  }
+  return { valid: true, value: numId };
+};
+
+// Input sanitization with malicious content detection
+const sanitizeText = (text, maxLength = 255) => {
+  if (typeof text !== 'string') return '';
+  
+  // Remove control characters
+  let sanitized = text.trim().substring(0, maxLength).replace(/[\x00-\x1f\x7f]/g, '');
+  
+  // Check for potentially malicious patterns
+  const maliciousPatterns = [
+    /drop\s+table/i,
+    /delete\s+from/i,
+    /insert\s+into/i,
+    /update\s+set/i,
+    /'\s*(or|and)\s+'\d+'\s*=\s*'\d+/i,
+    /<script/i,
+    /javascript:/i,
+    /on\w+\s*=/i
+  ];
+  
+  // If malicious patterns detected, return empty string to trigger validation error
+  for (const pattern of maliciousPatterns) {
+    if (pattern.test(sanitized)) {
+      return '';
+    }
+  }
+  
+  return sanitized;
+};
+
 // =============================================================================
 // CRUD
 // =============================================================================
@@ -81,8 +127,8 @@ const createBrand = async (req, res) => {
   let connection;
   try {
     const body = req.validatedData || req.body || {};
-    const name = (body.name || '').trim();
-    const description = (body.description || '').trim();
+    const name = sanitizeText(body.name, 255);
+    const description = sanitizeText(body.description, 1000);
     const is_active = normalizeBooleanToBit(body.is_active, 1);
     const created_by = req.user?.id || null;
 
@@ -188,10 +234,11 @@ const getAllBrands = async (req, res) => {
 const getBrandById = async (req, res) => {
   try {
     const params = req.validatedParams || req.params || {};
-    const id = parseInt(params.id, 10);
-    if (!id || isNaN(id) || id <= 0) {
-      return res.status(400).json(createResponse(false, 'Invalid brand ID'));
+    const validation = validateId(params.id, 'brand ID');
+    if (!validation.valid) {
+      return res.status(400).json(createResponse(false, validation.error));
     }
+    const id = validation.value;
 
     const [rows] = await pool.execute(
       `SELECT id, name, description, is_active, created_by, updated_by, created_at, updated_at
@@ -222,22 +269,23 @@ const updateBrand = async (req, res) => {
   let connection;
   try {
     const params = req.validatedParams || req.params || {};
-    const id = parseInt(params.id, 10);
-    if (!id || isNaN(id) || id <= 0) {
-      return res.status(400).json(createResponse(false, 'Invalid brand ID'));
+    const validation = validateId(params.id, 'brand ID');
+    if (!validation.valid) {
+      return res.status(400).json(createResponse(false, validation.error));
     }
+    const id = validation.value;
 
     const body = req.validatedData || req.body || {};
     const updateData = {};
     const updated_by = req.user?.id || null;
 
     if (Object.prototype.hasOwnProperty.call(body, 'name')) {
-      const v = (body.name || '').trim();
+      const v = sanitizeText(body.name, 255);
       if (!v) return res.status(400).json(createResponse(false, 'Brand name cannot be empty'));
       updateData.name = v;
     }
     if (Object.prototype.hasOwnProperty.call(body, 'description')) {
-      updateData.description = (body.description || '').trim();
+      updateData.description = sanitizeText(body.description, 1000);
     }
     if (Object.prototype.hasOwnProperty.call(body, 'is_active')) {
       updateData.is_active = normalizeBooleanToBit(body.is_active, null);
@@ -323,10 +371,11 @@ const deleteBrand = async (req, res) => {
   let connection;
   try {
     const params = req.validatedParams || req.params || {};
-    const id = parseInt(params.id, 10);
-    if (!id || isNaN(id) || id <= 0) {
-      return res.status(400).json(createResponse(false, 'Invalid brand ID'));
+    const validation = validateId(params.id, 'brand ID');
+    if (!validation.valid) {
+      return res.status(400).json(createResponse(false, validation.error));
     }
+    const id = validation.value;
 
     connection = await pool.getConnection();
     await connection.beginTransaction();

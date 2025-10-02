@@ -9,16 +9,16 @@ const api = axios.create({
   },
 })
 
-// Request interceptor to add auth token
+// Note: Token refresh and authentication handling is now managed by authService.js
+// This api instance will automatically get tokens through axios interceptors set up there
+
+// Request interceptor to add auth token (backup for legacy compatibility)
 api.interceptors.request.use(
   (config) => {
-    // Check for access_token first, then fall back to authToken for compatibility
+    // Primary token source - used by new authService
     const token = localStorage.getItem('access_token') || localStorage.getItem('authToken')
-    if (token) {
+    if (token && !config.headers.Authorization) {
       config.headers.Authorization = `Bearer ${token}`
-      console.log('🔑 Using token from services/api.js:', token.substring(0, 20) + '...')
-    } else {
-      console.log('⚠️ No token found in services/api.js')
     }
     return config
   },
@@ -27,29 +27,20 @@ api.interceptors.request.use(
   }
 )
 
-// Response interceptor to handle common errors
+// Simple error handler - token refresh is handled by authService
 api.interceptors.response.use(
   (response) => {
     return response
   },
   (error) => {
-    if (error.response?.status === 401) {
-      // Token expired or invalid - clear all token types
-      localStorage.removeItem('access_token')
-      localStorage.removeItem('authToken')
-      localStorage.removeItem('auth_token')
-      localStorage.removeItem('refresh_token')
-      localStorage.removeItem('user')
-      window.location.href = '/login'
-    } else if (error.response?.status === 403 && error.response?.data?.message?.includes('malformed')) {
-      // Malformed token - clear everything and redirect
-      localStorage.removeItem('access_token')
-      localStorage.removeItem('authToken')
-      localStorage.removeItem('auth_token')
-      localStorage.removeItem('refresh_token')
-      localStorage.removeItem('user')
-      console.log('🧹 Malformed token detected, clearing storage')
-      window.location.href = '/login'
+    // Let authService handle authentication errors
+    // This interceptor only handles non-auth errors
+    if (error.response?.status !== 401 && error.response?.status !== 403) {
+      console.error('🚫 API Error:', {
+        status: error.response?.status,
+        message: error.response?.data?.message || error.message,
+        url: error.config?.url
+      })
     }
     return Promise.reject(error)
   }

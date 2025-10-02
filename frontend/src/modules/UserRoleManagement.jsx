@@ -178,23 +178,26 @@ const UserRoleManagement = () => {
       
       // Load roles first
       const rolesResponse = await roleService.getAllRoles()
-      const roles = rolesResponse.data || []
+      const roles = rolesResponse.data || rolesResponse || []
       setAllRoles(roles)
 
       // Load actual users from the users service
-      const usersResponse = await usersService.getAll({ limit: 100 })
       let actualUsers = []
       
-      if (usersResponse.success && usersResponse.data?.users) {
-        actualUsers = usersResponse.data.users
-      } else {
-        console.warn('Failed to load users, using default data')
-        // Fallback to mock data if user service fails
-        actualUsers = [
-          { id: 1, username: 'admin' },
-          { id: 2, username: 'manager' },
-          { id: 3, username: 'user1' }
-        ]
+      try {
+        const usersResponse = await usersService.getAll({ limit: 100 })
+        if (usersResponse.success && usersResponse.data?.users) {
+          actualUsers = usersResponse.data.users
+        } else if (usersResponse.data && Array.isArray(usersResponse.data)) {
+          actualUsers = usersResponse.data
+        } else {
+          console.warn('Users response format unexpected:', usersResponse)
+          actualUsers = []
+        }
+      } catch (userError) {
+        console.warn('Failed to load users:', userError)
+        // Don't use fallback data in production, show empty state instead
+        actualUsers = []
       }
       
       // Load actual role data for each user

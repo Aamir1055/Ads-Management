@@ -34,7 +34,7 @@ const getRoleByName = async (role_name) => {
 };
 
 const getModuleByName = async (module_name) => {
-  const [rows] = await pool.query('SELECT * FROM modules WHERE module_name = ?', [module_name]);
+  const [rows] = await pool.query('SELECT * FROM modules WHERE name = ?', [module_name]);
   return rows?.length ? rows[0] : null;
 };
 
@@ -154,16 +154,16 @@ const permissionsController = {
   // POST /api/permissions/modules
   createModule: async (req, res) => {
     try {
-      const { module_name, module_path = null, description = '', is_active = true } = req.body || {};
-      const name = (module_name || '').trim();
-      if (!name) return res.status(400).json(createResponse(false, 'module_name is required'));
+      const { name, display_name, description = '', is_active = true } = req.body || {};
+      const moduleName = (name || '').trim();
+      if (!moduleName) return res.status(400).json(createResponse(false, 'name is required'));
 
-      const existing = await getModuleByName(name);
+      const existing = await getModuleByName(moduleName);
       if (existing) return res.status(409).json(createResponse(false, 'Module already exists'));
 
       const [result] = await pool.query(
-        'INSERT INTO modules (module_name, module_path, description, is_active, created_at) VALUES (?,?,?,?,NOW())',
-        [name, module_path, description, is_active ? 1 : 0]
+        'INSERT INTO modules (name, display_name, description, is_active, created_at) VALUES (?,?,?,?,NOW())',
+        [moduleName, display_name || moduleName, description, is_active ? 1 : 0]
       );
       const [rows] = await pool.query('SELECT * FROM modules WHERE id = ?', [result.insertId]);
   return res.status(201).json(createResponse(true, 'Module created', rows?.length ? rows[0] : null));
@@ -193,13 +193,13 @@ const permissionsController = {
       if (!existing) return res.status(404).json(createResponse(false, 'Module not found'));
 
       const update = {};
-      if (typeof req.body?.module_name === 'string') update.module_name = req.body.module_name.trim();
-      if (typeof req.body?.module_path === 'string' || req.body?.module_path === null) update.module_path = req.body.module_path;
+      if (typeof req.body?.name === 'string') update.name = req.body.name.trim();
+      if (typeof req.body?.display_name === 'string') update.display_name = req.body.display_name.trim();
       if (typeof req.body?.description === 'string') update.description = req.body.description;
       if (typeof req.body?.is_active !== 'undefined') update.is_active = req.body.is_active ? 1 : 0;
 
-      if (update.module_name && update.module_name !== existing.module_name) {
-        const dup = await getModuleByName(update.module_name);
+      if (update.name && update.name !== existing.name) {
+        const dup = await getModuleByName(update.name);
         if (dup) return res.status(409).json(createResponse(false, 'Module name already exists'));
       }
 
@@ -247,17 +247,10 @@ const permissionsController = {
       for (const permission_id of permission_ids) {
         try {
           await pool.query(
-            `INSERT INTO role_permissions (role_id, permission_id, granted_by)
-             VALUES (?, ?, ?)
-             ON DUPLICATE KEY UPDATE granted_by = VALUES(granted_by), granted_at = CURRENT_TIMESTAMP`,
-            [Number(role.id), Number(permission_id), grantedBy]
-          );
-          
-          // Log the action
-          await pool.query(
-            `INSERT INTO permission_audit_log (role_id, permission_id, action, performed_by)
-             VALUES (?, ?, 'GRANT', ?)`,
-            [Number(role.id), Number(permission_id), grantedBy]
+            `INSERT INTO role_permissions (role_id, permission_id)
+             VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE updated_at = CURRENT_TIMESTAMP`,
+            [Number(role.id), Number(permission_id)]
           );
           
           results.push({ role_id: role.id, permission_id: Number(permission_id), status: 'granted' });
@@ -290,19 +283,20 @@ const permissionsController = {
           r.id as role_id,
           r.name as role_name,
           p.id as permission_id,
-          p.permission_name,
-          p.permission_key,
+          p.name as permission_name,
+          p.name as permission_key,
           p.description,
-          m.module_name,
-          rp.granted_by,
-          rp.granted_at
+          p.display_name,
+          p.category,
+          m.name as module_name,
+          rp.created_at as granted_at
         FROM role_permissions rp
         LEFT JOIN roles r ON rp.role_id = r.id
         LEFT JOIN permissions p ON rp.permission_id = p.id
         LEFT JOIN modules m ON p.module_id = m.id
       `;
       if (where.length) sql += ' WHERE ' + where.join(' AND ');
-      sql += ' ORDER BY r.name ASC, m.module_name ASC, p.permission_name ASC';
+      sql += ' ORDER BY r.name ASC, m.name ASC, p.name ASC';
 
       const [rows] = await pool.query(sql, params);
       return res.status(200).json(createResponse(true, `Retrieved ${rows.length} role-permission assignment(s)`, rows || []));
@@ -336,13 +330,6 @@ const permissionsController = {
       if (!result || result.affectedRows === 0) {
         return res.status(404).json(createResponse(false, 'Role permission assignment not found'));
       }
-      
-      // Log the action
-      await pool.query(
-        `INSERT INTO permission_audit_log (role_id, permission_id, action, performed_by)
-         VALUES (?, ?, 'REVOKE', ?)`,
-        [Number(role.id), Number(permission_id), revokedBy]
-      );
       
       return res.status(200).json(createResponse(true, 'Permission revoked from role', { 
         role_id: role.id, 
@@ -540,11 +527,11 @@ const permissionsController = {
   getAllPermissions: async (req, res) => {
     try {
       const [rows] = await pool.query(`
-        SELECT p.*, m.module_name 
+        SELECT p.*, m.name as module_name 
         FROM permissions p
         LEFT JOIN modules m ON p.module_id = m.id
         WHERE p.is_active = 1
-        ORDER BY m.module_name ASC, p.permission_name ASC
+        ORDER BY m.name ASC, p.name ASC
       `);
       return res.status(200).json(createResponse(true, `Retrieved ${rows.length} permissions`, rows));
     } catch (error) {
@@ -762,16 +749,10 @@ const permissionsController = {
       }
 
       const [result] = await pool.query(`
-        INSERT INTO role_permissions (role_id, permission_id, granted_by)
-        VALUES (?, ?, ?)
-        ON DUPLICATE KEY UPDATE granted_by = VALUES(granted_by), granted_at = CURRENT_TIMESTAMP
-      `, [Number(role_id), Number(permission_id), grantedBy]);
-
-      // Log the action
-      await pool.query(`
-        INSERT INTO permission_audit_log (role_id, permission_id, action, performed_by)
-        VALUES (?, ?, 'GRANT', ?)
-      `, [Number(role_id), Number(permission_id), grantedBy]);
+        INSERT INTO role_permissions (role_id, permission_id)
+        VALUES (?, ?)
+        ON DUPLICATE KEY UPDATE updated_at = CURRENT_TIMESTAMP
+      `, [Number(role_id), Number(permission_id)]);
 
       return res.status(200).json(createResponse(true, 'Permission granted to role', {
         role_id: Number(role_id),
@@ -807,12 +788,6 @@ const permissionsController = {
         return res.status(404).json(createResponse(false, 'Role permission not found'));
       }
 
-      // Log the action
-      await pool.query(`
-        INSERT INTO permission_audit_log (role_id, permission_id, action, performed_by)
-        VALUES (?, ?, 'REVOKE', ?)
-      `, [Number(role_id), Number(permission_id), revokedBy]);
-
       return res.status(200).json(createResponse(true, 'Permission revoked from role', {
         role_id: Number(role_id),
         permission_id: Number(permission_id),
@@ -827,39 +802,16 @@ const permissionsController = {
   // GET /api/permissions/audit
   getAuditLog: async (req, res) => {
     try {
-      const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 50));
-      const offset = (page - 1) * limit;
-
-      const [rows] = await pool.query(`
-        SELECT 
-          pal.*,
-          u.username as user_name,
-          r.name as role_name,
-          p.permission_key,
-          pb.username as performed_by_name
-        FROM permission_audit_log pal
-        LEFT JOIN users u ON pal.user_id = u.id
-        LEFT JOIN roles r ON pal.role_id = r.id
-        LEFT JOIN permissions p ON pal.permission_id = p.id
-        LEFT JOIN users pb ON pal.performed_by = pb.id
-        ORDER BY pal.created_at DESC
-        LIMIT ? OFFSET ?
-      `, [limit, offset]);
-
-      // Get total count
-      const [countRows] = await pool.query('SELECT COUNT(*) as total FROM permission_audit_log');
-      const total = countRows[0].total;
-      const totalPages = Math.ceil(total / limit);
-
-      return res.status(200).json(createResponse(true, `Retrieved ${rows.length} audit log entries`, rows, {
+      // Audit log table doesn't exist in current database schema
+      // Return empty result to prevent crashes
+      return res.status(200).json(createResponse(true, 'Audit log feature not available', [], {
         pagination: {
-          currentPage: page,
-          totalPages,
-          totalCount: total,
-          limit,
-          hasNext: page < totalPages,
-          hasPrev: page > 1
+          currentPage: 1,
+          totalPages: 0,
+          totalCount: 0,
+          limit: 50,
+          hasNext: false,
+          hasPrev: false
         }
       }));
     } catch (error) {

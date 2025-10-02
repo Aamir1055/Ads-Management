@@ -27,7 +27,8 @@ const {
   generateReport,
   getFilterOptions,
   getDashboardStats,
-  getChartData
+  getChartData,
+  exportToExcel
 } = require('../controllers/reportController_privacy');
 
 // =============================================================================
@@ -162,6 +163,17 @@ router.get('/charts',
   generateLimiter,
   createPermissionMiddleware.reports.read(), // 🔒 RBAC: reports_read required
   getChartData
+);
+
+/**
+ * GET /api/reports/export
+ * Exports reports to Excel with privacy filtering and dd/mm/yyyy format
+ * - RBAC: Requires reports_export permission
+ */
+router.get('/export', 
+  generateLimiter,
+  createPermissionMiddleware.reports.export(), // 🔒 RBAC: reports_export required
+  exportToExcel
 );
 
 /**

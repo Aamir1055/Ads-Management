@@ -18,7 +18,7 @@ const CampaignTypeForm = ({ isOpen, onClose, onSubmit, editData = null, isLoadin
         type_name: editData.type_name || '',
         description: editData.description || '',
         // Convert database value (1/0) to boolean
-        is_active: editData.is_active !== undefined ? Boolean(editData.is_active) : true
+        is_active: editData.is_active !== undefined ? (editData.is_active === 1 || editData.is_active === true) : true
       })
     } else {
       setFormData({

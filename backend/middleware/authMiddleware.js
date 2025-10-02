@@ -22,7 +22,7 @@ const generateTokens = (userId) => {
 // Store refresh token in database
 const storeRefreshToken = async (userId, tokenId, expiresAt) => {
   await pool.execute(
-    'INSERT INTO refresh_tokens (user_id, token_id, expires_at) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE token_id = VALUES(token_id), expires_at = VALUES(expires_at), created_at = NOW()',
+    'INSERT INTO refresh_tokens (user_id, token_id, expires_at, is_active) VALUES (?, ?, ?, TRUE) ON DUPLICATE KEY UPDATE token_id = VALUES(token_id), expires_at = VALUES(expires_at), is_active = TRUE, updated_at = NOW()',
     [userId, tokenId, expiresAt]
   );
 };
@@ -234,7 +234,11 @@ const refreshAccessToken = async (req, res, next) => {
     
     // Store new refresh token and revoke old one
     const refreshExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+    
+    // Revoke old refresh token
     await revokeRefreshToken(decoded.userId, decoded.tokenId);
+    
+    // Store new refresh token
     await storeRefreshToken(decoded.userId, tokens.tokenId, refreshExpiresAt);
 
     // Send new tokens

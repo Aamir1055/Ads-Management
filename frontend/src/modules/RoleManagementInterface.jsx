@@ -177,23 +177,28 @@ const RoleManagementInterface = () => {
     }
   }, [modules, editingRole, showEditModal, populateEditForm]);
 
-  // Enhanced input validation
+  // Enhanced input validation - EXACTLY match backend validation
   const validateRoleName = useCallback((name) => {
     const errors = [];
     if (!name || !name.trim()) {
       errors.push('Role name is required');
     } else {
-      if (name.trim().length < 3) {
-        errors.push('Role name must be at least 3 characters');
-      }
-      if (name.trim().length > 50) {
-        errors.push('Role name must be less than 50 characters');
+      if (name.trim().length < 3 || name.trim().length > 50) {
+        errors.push('Role name must be between 3 and 50 characters');
       }
       if (!/^[a-zA-Z0-9\s\-_]+$/.test(name.trim())) {
         errors.push('Role name can only contain letters, numbers, spaces, hyphens, and underscores');
       }
     }
     return errors;
+  }, []);
+
+  // Validate description to match backend
+  const validateDescription = useCallback((description) => {
+    if (description && description.trim().length > 255) {
+      return ['Description cannot exceed 255 characters'];
+    }
+    return [];
   }, []);
 
   // Handle RBAC/Permission errors - close modals and show prominent error
@@ -257,7 +262,9 @@ const RoleManagementInterface = () => {
       setErrorMessage('');
       setSuccessMessage('');
       
-      const validationErrors = validateRoleName(newRoleName);
+      const nameErrors = validateRoleName(newRoleName);
+      const descErrors = validateDescription(newRoleDescription);
+      const validationErrors = [...nameErrors, ...descErrors];
       if (validationErrors.length > 0) {
         setErrorMessage(validationErrors.join('. '));
         return;
@@ -304,7 +311,7 @@ const RoleManagementInterface = () => {
         setErrorMessage(`Error creating role: ${err.response?.data?.message || err.message}`);
       }
     }
-  }, [newRoleName, newRoleDescription, selectedPermissions, validateRoleName, loadData, handleRbacError]);
+  }, [newRoleName, newRoleDescription, selectedPermissions, validateRoleName, validateDescription, loadData, handleRbacError]);
 
   // Handle role update
   const handleUpdateRole = useCallback(async () => {
@@ -312,7 +319,9 @@ const RoleManagementInterface = () => {
       setErrorMessage('');
       setSuccessMessage('');
       
-      const validationErrors = validateRoleName(editRoleName);
+      const nameErrors = validateRoleName(editRoleName);
+      const descErrors = validateDescription(editRoleDescription);
+      const validationErrors = [...nameErrors, ...descErrors];
       if (validationErrors.length > 0) {
         setErrorMessage(validationErrors.join('. '));
         return;
@@ -368,7 +377,7 @@ const RoleManagementInterface = () => {
         setErrorMessage(`Error updating role: ${err.response?.data?.message || err.message}`);
       }
     }
-  }, [editRoleName, editRoleDescription, editSelectedPermissions, editingRole, validateRoleName, loadData, handleRbacError]);
+  }, [editRoleName, editRoleDescription, editSelectedPermissions, editingRole, validateRoleName, validateDescription, loadData, handleRbacError]);
 
   // Handle role deletion
   const handleDeleteRole = useCallback(async (roleId, roleName, isSystemRole) => {

@@ -146,7 +146,7 @@ class RoleController {
       
       const { name, display_name, description, level, is_system_role } = req.body;
 
-      // Validation
+      // Enhanced validation
       if (!name || !name.trim()) {
         return res.status(400).json({
           success: false,
@@ -158,6 +158,29 @@ class RoleController {
         return res.status(400).json({
           success: false,
           message: 'Display name is required'
+        });
+      }
+
+      // Validate role name format and length
+      if (name.trim().length < 3 || name.trim().length > 50) {
+        return res.status(400).json({
+          success: false,
+          message: 'Role name must be between 3 and 50 characters'
+        });
+      }
+
+      if (!/^[a-zA-Z0-9\s\-_]+$/.test(name.trim())) {
+        return res.status(400).json({
+          success: false,
+          message: 'Role name can only contain letters, numbers, spaces, hyphens, and underscores'
+        });
+      }
+
+      // Validate description length if provided
+      if (description && description.trim().length > 255) {
+        return res.status(400).json({
+          success: false,
+          message: 'Description cannot exceed 255 characters'
         });
       }
 

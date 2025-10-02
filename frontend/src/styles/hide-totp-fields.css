@@ -1,0 +1,135 @@
+/* 
+ * Hide TOTP Secret fields from user interface
+ * This will hide any form fields or elements containing TOTP secrets
+ * to prevent users from seeing sensitive authentication data
+ */
+
+/* Hide elements by common TOTP-related text content */
+[data-field*="totp" i],
+[data-field*="totp-secret" i],
+[data-field*="totp_secret" i],
+[data-name*="totp" i],
+[data-name*="totp-secret" i],
+[data-name*="totp_secret" i] {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* Hide input fields with TOTP-related names */
+input[name*="totp" i],
+input[name*="totp_secret" i],
+input[name*="totp-secret" i],
+input[id*="totp" i],
+input[id*="totp_secret" i],
+input[id*="totp-secret" i] {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* Hide labels for TOTP fields */
+label[for*="totp" i],
+label[for*="totp_secret" i],
+label[for*="totp-secret" i] {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* Hide any element containing "TOTP Secret" text */
+*:has([data-content*="TOTP Secret"]),
+*:has([title*="TOTP Secret"]),
+*:contains("TOTP Secret") {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* Hide Generate TOTP buttons */
+button:contains("Generate TOTP"),
+button[data-action*="generate-totp" i],
+button[data-action*="generate_totp" i],
+input[type="button"][value*="Generate TOTP" i],
+input[type="submit"][value*="Generate TOTP" i] {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* Hide entire form groups/containers that contain TOTP fields */
+.form-group:has(input[name*="totp" i]),
+.form-field:has(input[name*="totp" i]),
+.field-container:has(input[name*="totp" i]),
+div:has(> input[name*="totp" i]),
+div:has(> label:contains("TOTP Secret")) {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* Hide any container with TOTP-related class names */
+.totp-field,
+.totp-secret-field,
+.totp_secret_field,
+.totp-container,
+.totp_container,
+.generate-totp,
+.generate_totp {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* Hide using CSS content selectors for text-based matching */
+*[class*="totp" i],
+*[class*="totp-secret" i],
+*[class*="totp_secret" i] {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* Additional specific selectors for common form structures */
+tr:has(td:contains("TOTP Secret")),
+tr:has(th:contains("TOTP Secret")),
+.row:has(*:contains("TOTP Secret")),
+.form-row:has(*:contains("TOTP Secret")) {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* Hide any fieldset containing TOTP fields */
+fieldset:has(input[name*="totp" i]),
+fieldset:has(legend:contains("TOTP")),
+fieldset:has(legend:contains("Two-Factor")) {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* CSS for specific admin interfaces that might use TOTP */
+.admin-form .totp,
+.user-form .totp,
+.create-user .totp,
+.edit-user .totp {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* Media queries to ensure hiding works on all screen sizes */
+@media screen and (max-width: 768px) {
+  *[data-field*="totp" i],
+  input[name*="totp" i],
+  button:contains("Generate TOTP") {
+    display: none !important;
+    visibility: hidden !important;
+  }
+}
+
+/* Print styles - also hide in print view */
+@media print {
+  *[data-field*="totp" i],
+  input[name*="totp" i],
+  button:contains("Generate TOTP"),
+  *:contains("TOTP Secret") {
+    display: none !important;
+    visibility: hidden !important;
+  }
+}
+
+/*
+ * Note: Some of the :contains() and :has() selectors above may not work in all browsers
+ * Alternative approach using JavaScript would be more reliable for complex text matching
+ */

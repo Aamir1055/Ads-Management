@@ -25,6 +25,7 @@ const CampaignTypes = () => {
   const [sortOrder, setSortOrder] = useState('desc')
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(10)
+  const [paginationMeta, setPaginationMeta] = useState(null)
 
   // Form states
   const [showForm, setShowForm] = useState(false)
@@ -44,10 +45,8 @@ const CampaignTypes = () => {
       setError(null)
       
       const params = {
-        search: searchTerm,
-        status: filterStatus,
-        sort: sortBy,
-        order: sortOrder,
+        search: searchTerm || undefined,
+        status: filterStatus === 'all' ? undefined : filterStatus,
         page: currentPage,
         limit: itemsPerPage
       }
@@ -56,6 +55,7 @@ const CampaignTypes = () => {
       
       if (response.success) {
         setCampaignTypes(response.data || [])
+        setPaginationMeta(response.meta || null)
       } else {
         setError(response.message || 'Failed to fetch campaign types')
       }
@@ -262,6 +262,20 @@ const CampaignTypes = () => {
         </div>
       </div>
 
+      {/* Results Info */}
+      {paginationMeta && (
+        <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-6">
+          <div className="flex items-center justify-between text-sm text-blue-700">
+            <span>
+              Showing {campaignTypes.length} of {paginationMeta.pagination.totalCount} campaign types
+            </span>
+            <span>
+              Page {paginationMeta.pagination.currentPage} of {paginationMeta.pagination.totalPages}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Error Message */}
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-6">
@@ -359,11 +373,11 @@ const CampaignTypes = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      item.is_active
+                      item.is_active === 1 || item.is_active === true
                         ? 'bg-green-100 text-green-800'
                         : 'bg-red-100 text-red-800'
                     }`}>
-                      {item.is_active ? (
+                      {(item.is_active === 1 || item.is_active === true) ? (
                         <>
                           <CheckCircle className="h-3 w-3 mr-1" />
                           Active
@@ -403,6 +417,55 @@ const CampaignTypes = () => {
           </table>
         )}
       </div>
+
+      {/* Pagination Controls */}
+      {paginationMeta && paginationMeta.pagination.totalPages > 1 && (
+        <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6 mt-4 rounded-b-lg">
+          <div className="flex-1 flex justify-between sm:hidden">
+            <button
+              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+              disabled={!paginationMeta.pagination.hasPrev}
+              className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            <button
+              onClick={() => setCurrentPage(Math.min(paginationMeta.pagination.totalPages, currentPage + 1))}
+              disabled={!paginationMeta.pagination.hasNext}
+              className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
+          <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm text-gray-700">
+                Showing page <span className="font-medium">{currentPage}</span> of{' '}
+                <span className="font-medium">{paginationMeta.pagination.totalPages}</span>
+              </p>
+            </div>
+            <div>
+              <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                <button
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  disabled={!paginationMeta.pagination.hasPrev}
+                  className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                {/* Page numbers could be added here */}
+                <button
+                  onClick={() => setCurrentPage(Math.min(paginationMeta.pagination.totalPages, currentPage + 1))}
+                  disabled={!paginationMeta.pagination.hasNext}
+                  className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </nav>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Campaign Type Form Modal */}
       <CampaignTypeForm

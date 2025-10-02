@@ -219,9 +219,34 @@ exports.loginWith2FA = async (req, res, next) => {
 // @route   POST /api/auth/logout
 // @access  Public
 exports.logout = async (req, res, next) => {
-  res.status(200).json(
-    createResponse(true, 'Logged out successfully')
-  );
+  try {
+    const { refresh_token } = req.body;
+    
+    if (refresh_token) {
+      const { revokeRefreshToken } = require('../middleware/authMiddleware');
+      const jwt = require('jsonwebtoken');
+      const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || 'refresh_token_secret';
+      
+      try {
+        // Decode to get tokenId and userId
+        const decoded = jwt.verify(refresh_token, REFRESH_TOKEN_SECRET);
+        await revokeRefreshToken(decoded.userId, decoded.tokenId);
+        console.log(`🔐 Revoked refresh token for user ${decoded.userId}`);
+      } catch (error) {
+        // Token might be invalid, but we'll still proceed with logout
+        console.warn('Error revoking refresh token during logout:', error.message);
+      }
+    }
+    
+    res.status(200).json(
+      createResponse(true, 'Logged out successfully')
+    );
+  } catch (error) {
+    console.error('Logout error:', error);
+    res.status(500).json(
+      createResponse(false, 'Logout failed', null, ['Internal server error'])
+    );
+  }
 };
 
 // @desc    Get current logged in user

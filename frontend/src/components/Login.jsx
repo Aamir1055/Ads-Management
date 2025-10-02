@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Eye, EyeOff, LogIn } from 'lucide-react'
-import api from '../utils/api'
+import authService from '../services/authService'
 
 const Login = ({ onLoginSuccess }) => {
   const [formData, setFormData] = useState({
@@ -17,51 +17,30 @@ const Login = ({ onLoginSuccess }) => {
     setError('')
 
     try {
-      const response = await api.post('/auth/login', {
-        username: formData.username,
-        password: formData.password
-      })
+      // Use authService for login
+      const response = await authService.login(formData.username, formData.password)
 
-      if (response.data.success) {
-        const { access_token, refresh_token, user } = response.data.data
+      if (response.success) {
+        const { access_token, refresh_token, user } = response.data
         
-        console.log('🔐 Login response received:', {
+        console.log('🔐 Login successful:', {
           has_access_token: !!access_token,
           has_refresh_token: !!refresh_token,
           user_id: user?.id
         })
         
-        // Clear any old tokens first
-        localStorage.removeItem('auth_token')
-        localStorage.removeItem('authToken')
-        
-        // Store new tokens in localStorage
-        if (access_token) {
-          localStorage.setItem('access_token', access_token)
-          console.log('✅ Access token stored:', access_token.substring(0, 20) + '...')
-        } else {
-          console.error('❌ No access token received!')
-        }
-        
-        if (refresh_token) {
-          localStorage.setItem('refresh_token', refresh_token)
-          console.log('✅ Refresh token stored')
-        }
-        
-        localStorage.setItem('user', JSON.stringify(user))
-        
-        // Call success callback
+        // Call success callback with all necessary data
         if (onLoginSuccess) {
-          onLoginSuccess(user, access_token)
+          onLoginSuccess(user, access_token, refresh_token)
         }
         
         alert('Login successful!')
       } else {
-        setError(response.data.message || 'Login failed')
+        setError(response.message || 'Login failed')
       }
     } catch (err) {
       console.error('Login error:', err)
-      setError(err.userMessage || err.response?.data?.message || 'Login failed. Please try again.')
+      setError(err.userMessage || err.response?.data?.message || err.message || 'Login failed. Please try again.')
     } finally {
       setLoading(false)
     }

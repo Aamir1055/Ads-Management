@@ -11,6 +11,73 @@ router.use(authenticateToken);
 
 // Routes for user management with privacy filtering
 
+// GET /api/user-management/profile - Get current user's profile (no additional RBAC needed)
+// IMPORTANT: This must be defined before /:id route to avoid conflicts
+router.get('/profile', async (req, res) => {
+  try {
+    const { pool } = require('../config/database');
+    const userId = req.user.userId || req.user.id;
+
+    const [users] = await pool.execute(`
+      SELECT 
+        u.id,
+        u.username,
+        u.is_active,
+        u.is_2fa_enabled,
+        u.created_at,
+        u.updated_at,
+        r.id as role_id,
+        r.name as role_name,
+        r.display_name as role_display_name,
+        r.level as role_level
+      FROM users u
+      LEFT JOIN roles r ON u.role_id = r.id
+      WHERE u.id = ? AND u.is_active = 1
+    `, [userId]);
+
+    if (users.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'User profile not found',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    const user = users[0];
+    
+    res.json({
+      success: true,
+      message: 'User profile retrieved successfully',
+      timestamp: new Date().toISOString(),
+      data: {
+        user: {
+          id: user.id,
+          username: user.username,
+          is_active: user.is_active === 1,
+          is_2fa_enabled: user.is_2fa_enabled === 1,
+          created_at: user.created_at,
+          updated_at: user.updated_at,
+          role: {
+            id: user.role_id,
+            name: user.role_name,
+            display_name: user.role_display_name,
+            level: user.role_level
+          }
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch user profile',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // GET /api/user-management/roles - Get all available roles (RBAC: users_read required)
 router.get('/roles', 
   createPermissionMiddleware.users.read(), // 🔒 RBAC: users_read required

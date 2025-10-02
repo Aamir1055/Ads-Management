@@ -35,6 +35,7 @@ const userManagementRoutes = require('./routes/userManagementRoutes_privacy');
 const userAccessRoutes = require('./routes/userAccessRoutes');
 const brandRoutes = require('./routes/brandRoutes');
 const roleRoutes = require('./routes/roleRoutes');
+const dashboardRoutes = require('./routes/dashboardRoutes');
 
 const app = express();
 
@@ -216,6 +217,7 @@ app.use('/api/user-management', userManagementRoutes);
 app.use('/api/user-access', userAccessRoutes);
 app.use('/api/brands', brandRoutes);
 app.use('/api/roles', roleRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 // Root
 app.get('/', (req, res) => {
   res.json({

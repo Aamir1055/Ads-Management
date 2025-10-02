@@ -1,4 +1,5 @@
 const { pool } = require('../config/database');
+const XLSX = require('xlsx');
 
 // Response envelope helper
 const createResponse = (success, message, data = null, meta = null) => {
@@ -246,7 +247,7 @@ const reportsController = {
       if (dateTo) { where.push('r.report_date <= ?'); params.push(dateTo); }
       if (month && /^[0-9]{4}-[0-9]{2}$/.test(month)) { where.push('r.report_month = ?'); params.push(month); }
       if (search) {
-        where.push('(r.campaign_name LIKE ? OR r.campaign_type LIKE ? OR b.name LIKE ?)');
+        where.push('(r.campaign_name LIKE ? OR r.campaign_type LIKE ? OR r.brand_name LIKE ?)');
         params.push(search, search, search);
       }
 
@@ -256,7 +257,6 @@ const reportsController = {
       const countSql = `
         SELECT COUNT(*) AS total 
         FROM reports r 
-        LEFT JOIN brands b ON r.brand = b.id 
         ${whereClause}
       `;
 
@@ -270,7 +270,7 @@ const reportsController = {
           r.campaign_name,
           r.campaign_type,
           r.brand as brand_id,
-          b.name as brand_name,
+          r.brand_name as brand_name,
           r.leads,
           r.facebook_result,
           r.zoho_result,
@@ -279,7 +279,6 @@ const reportsController = {
           r.created_at,
           r.updated_at
         FROM reports r
-        LEFT JOIN brands b ON r.brand = b.id
         ${whereClause}
         ORDER BY r.report_date DESC, r.id DESC 
         LIMIT ? OFFSET ?
@@ -317,12 +316,14 @@ const reportsController = {
 
   /**
    * POST /api/reports/sync
-   * Sync campaign_data entries to reports table (1:1 mapping, no grouping)
+   * Sync campaign_data entries to reports table with full rebuild option
+   * Note: Database triggers now automatically sync data, this is for manual rebuild
    */
   syncFromCampaignData: async (req, res) => {
     try {
       const dateFrom = toMysqlDate(req.body.date_from);
       const dateTo = toMysqlDate(req.body.date_to);
+      const fullRebuild = req.body.full_rebuild === true;
 
       if (!dateFrom || !dateTo) {
         return res.status(400).json(createResponse(false, 'date_from and date_to are required'));
@@ -333,58 +334,125 @@ const reportsController = {
         connection = await pool.getConnection();
         await connection.beginTransaction();
 
-        // First, delete existing reports in the date range
-        await connection.query(
-          'DELETE FROM reports WHERE report_date >= ? AND report_date <= ?',
-          [dateFrom, dateTo]
-        );
+        if (fullRebuild) {
+          // Full rebuild: Clear all reports and rebuild from campaign_data
+          await connection.query('TRUNCATE TABLE reports');
+          
+          console.log('[ReportsController] Performing full rebuild of reports table...');
+          
+          // Rebuild entire reports table from campaign_data
+          const rebuildSql = `
+            INSERT INTO reports (
+              report_date,
+              report_month,
+              campaign_id,
+              campaign_name,
+              campaign_type,
+              brand,
+              brand_name,
+              leads,
+              facebook_result,
+              zoho_result,
+              spent,
+              created_by,
+              created_at,
+              updated_at
+            )
+            SELECT 
+              cd.data_date,
+              DATE_FORMAT(cd.data_date, '%Y-%m'),
+              cd.campaign_id,
+              COALESCE(c.name, 'Unknown Campaign'),
+              COALESCE(ct.type_name, 'Unknown Type'),
+              c.brand,
+              COALESCE(b.name, 'Unknown Brand'),
+              (cd.facebook_result + cd.xoho_result),
+              cd.facebook_result,
+              cd.xoho_result,
+              cd.spent,
+              cd.created_by,
+              cd.created_at,
+              cd.updated_at
+            FROM campaign_data cd
+            LEFT JOIN campaigns c ON cd.campaign_id = c.id
+            LEFT JOIN campaign_types ct ON c.campaign_type_id = ct.id
+            LEFT JOIN brands b ON c.brand = b.id
+            ORDER BY cd.data_date DESC, cd.created_at DESC
+          `;
 
-        // Insert all campaign_data entries as individual report entries
-        const insertSql = `
-          INSERT INTO reports (
-            report_date, 
-            report_month, 
-            campaign_id, 
-            campaign_name, 
-            campaign_type, 
-            brand, 
-            leads, 
-            facebook_result, 
-            zoho_result, 
-            spent,
-            created_at,
-            updated_at
-          )
-          SELECT 
-            cd.data_date,
-            DATE_FORMAT(cd.data_date, '%Y-%m'),
-            cd.campaign_id,
-            c.name,
-            ct.type_name,
-            c.brand,  -- Store brand ID
-            (cd.facebook_result + cd.xoho_result),
-            cd.facebook_result,
-            cd.xoho_result,
-            cd.spent,
-            NOW(),
-            NOW()
-          FROM campaign_data cd
-          LEFT JOIN campaigns c ON cd.campaign_id = c.id
-          LEFT JOIN campaign_types ct ON c.campaign_type_id = ct.id
-          WHERE cd.data_date >= ? AND cd.data_date <= ?
-          ORDER BY cd.data_date DESC, cd.id DESC
-        `;
+          const [fullResult] = await connection.query(rebuildSql);
+          
+          await connection.commit();
+          connection.release();
 
-        const [result] = await connection.query(insertSql, [dateFrom, dateTo]);
-        
-        await connection.commit();
-        connection.release();
+          return res.status(200).json(createResponse(true, 'Full reports rebuild completed successfully', {
+            operation: 'full_rebuild',
+            recordsCreated: fullResult.affectedRows,
+            message: 'All reports have been rebuilt from campaign_data. Database triggers will now keep data in sync automatically.'
+          }));
+        } else {
+          // Date range sync: Delete and rebuild specific date range
+          await connection.query(
+            'DELETE FROM reports WHERE report_date >= ? AND report_date <= ?',
+            [dateFrom, dateTo]
+          );
 
-        return res.status(200).json(createResponse(true, 'Reports synced successfully', {
-          dateFrom,
-          dateTo,
-          recordsCreated: result.affectedRows
-        }));
+          console.log(`[ReportsController] Syncing reports for date range: ${dateFrom} to ${dateTo}`);
+
+          // Insert campaign_data entries for the specified date range
+          const insertSql = `
+            INSERT INTO reports (
+              report_date,
+              report_month,
+              campaign_id,
+              campaign_name,
+              campaign_type,
+              brand,
+              brand_name,
+              leads,
+              facebook_result,
+              zoho_result,
+              spent,
+              created_by,
+              created_at,
+              updated_at
+            )
+            SELECT 
+              cd.data_date,
+              DATE_FORMAT(cd.data_date, '%Y-%m'),
+              cd.campaign_id,
+              COALESCE(c.name, 'Unknown Campaign'),
+              COALESCE(ct.type_name, 'Unknown Type'),
+              c.brand,
+              COALESCE(b.name, 'Unknown Brand'),
+              (cd.facebook_result + cd.xoho_result),
+              cd.facebook_result,
+              cd.xoho_result,
+              cd.spent,
+              cd.created_by,
+              cd.created_at,
+              cd.updated_at
+            FROM campaign_data cd
+            LEFT JOIN campaigns c ON cd.campaign_id = c.id
+            LEFT JOIN campaign_types ct ON c.campaign_type_id = ct.id
+            LEFT JOIN brands b ON c.brand = b.id
+            WHERE cd.data_date >= ? AND cd.data_date <= ?
+            ORDER BY cd.data_date DESC, cd.id DESC
+          `;
+
+          const [result] = await connection.query(insertSql, [dateFrom, dateTo]);
+          
+          await connection.commit();
+          connection.release();
+
+          return res.status(200).json(createResponse(true, 'Reports synced successfully', {
+            operation: 'date_range_sync',
+            dateFrom,
+            dateTo,
+            recordsCreated: result.affectedRows,
+            message: 'Date range synced. Database triggers will keep future data in sync automatically.'
+          }));
+        }
 
       } catch (error) {
         if (connection) {
@@ -477,10 +545,8 @@ const reportsController = {
 
       const [rows] = await pool.query(`
         SELECT 
-          r.*,
-          b.name as brand_name
+          r.*
         FROM reports r
-        LEFT JOIN brands b ON r.brand = b.id
         WHERE r.id = ?
       `, [id]);
 
@@ -624,6 +690,143 @@ const reportsController = {
       return res.status(200).json(createResponse(true, 'Report deleted successfully'));
     } catch (error) {
       return handleDbError(error, 'delete report', res);
+    }
+  },
+
+  /**
+   * GET /api/reports/export
+   * Export reports to Excel format
+   */
+  exportToExcel: async (req, res) => {
+    try {
+      const dateFrom = toMysqlDate(req.query.date_from);
+      const dateTo = toMysqlDate(req.query.date_to);
+      const brand = (req.query.brand || '').trim();
+      const campaignId = req.query.campaign_id ? Number(req.query.campaign_id) : null;
+
+      if (!dateFrom || !dateTo) {
+        return res.status(400).json(createResponse(false, 'date_from and date_to are required (YYYY-MM-DD format)'));
+      }
+
+      const where = [];
+      const params = [];
+
+      // Date range filter
+      where.push('cd.data_date >= ?', 'cd.data_date <= ?');
+      params.push(dateFrom, dateTo);
+
+      // Brand filter
+      if (brand) {
+        where.push('b.name = ?');
+        params.push(brand);
+      }
+
+      // Campaign filter
+      if (campaignId) {
+        where.push('cd.campaign_id = ?');
+        params.push(campaignId);
+      }
+
+      const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
+
+      // Query for export data
+      const exportSql = `
+        SELECT
+          DATE_FORMAT(cd.data_date, '%d/%m/%Y') as 'Date',
+          c.name as 'Campaign Name',
+          ct.type_name as 'Campaign Type',
+          COALESCE(b.name, 'Unknown Brand') as 'Brand',
+          cd.card_name as 'Card',
+          cd.facebook_result as 'Facebook Results',
+          cd.xoho_result as 'Zoho Results',
+          (cd.facebook_result + cd.xoho_result) as 'Total Leads',
+          ROUND(cd.spent, 2) as 'Amount Spent (₹)',
+          ROUND(CASE 
+            WHEN (cd.facebook_result + cd.xoho_result) > 0 
+            THEN cd.spent / (cd.facebook_result + cd.xoho_result)
+            ELSE 0 
+          END, 2) as 'Cost Per Lead (₹)',
+          ROUND(CASE 
+            WHEN cd.facebook_result > 0 
+            THEN cd.spent / cd.facebook_result
+            ELSE 0 
+          END, 2) as 'Facebook CPL (₹)',
+          ROUND(CASE 
+            WHEN cd.xoho_result > 0 
+            THEN cd.spent / cd.xoho_result
+            ELSE 0 
+          END, 2) as 'Zoho CPL (₹)'
+        FROM campaign_data cd
+        LEFT JOIN campaigns c ON cd.campaign_id = c.id
+        LEFT JOIN campaign_types ct ON c.campaign_type_id = ct.id
+        LEFT JOIN brands b ON c.brand = b.id
+        ${whereClause}
+        ORDER BY cd.data_date DESC, c.name ASC
+      `;
+
+      // Execute query
+      const [exportData] = await pool.query(exportSql, params);
+
+      if (!exportData || exportData.length === 0) {
+        return res.status(404).json(createResponse(false, 'No data found for the selected criteria'));
+      }
+
+      // Create workbook and worksheet
+      const workbook = XLSX.utils.book_new();
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+
+      // Set column widths for better readability
+      const columnWidths = [
+        { wch: 12 }, // Date
+        { wch: 25 }, // Campaign Name
+        { wch: 20 }, // Campaign Type
+        { wch: 15 }, // Brand
+        { wch: 20 }, // Card
+        { wch: 15 }, // Facebook Results
+        { wch: 12 }, // Zoho Results
+        { wch: 12 }, // Total Leads
+        { wch: 18 }, // Amount Spent
+        { wch: 15 }, // Cost Per Lead
+        { wch: 15 }, // Facebook CPL
+        { wch: 12 }  // Zoho CPL
+      ];
+      worksheet['!cols'] = columnWidths;
+
+      // Add worksheet to workbook
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Campaign Reports');
+
+      // Create summary sheet
+      const summaryData = [
+        { 'Metric': 'Total Records', 'Value': exportData.length },
+        { 'Metric': 'Total Campaigns', 'Value': [...new Set(exportData.map(row => row['Campaign Name']))].length },
+        { 'Metric': 'Total Leads', 'Value': exportData.reduce((sum, row) => sum + (row['Total Leads'] || 0), 0) },
+        { 'Metric': 'Total Spent (₹)', 'Value': exportData.reduce((sum, row) => sum + (row['Amount Spent (₹)'] || 0), 0).toFixed(2) },
+        { 'Metric': 'Average Cost Per Lead (₹)', 'Value': (exportData.reduce((sum, row) => sum + (row['Cost Per Lead (₹)'] || 0), 0) / exportData.length).toFixed(2) },
+        { 'Metric': 'Date Range', 'Value': `${dateFrom} to ${dateTo}` },
+        { 'Metric': 'Export Date', 'Value': new Date().toLocaleDateString('en-IN') },
+        { 'Metric': 'Export Time', 'Value': new Date().toLocaleTimeString('en-IN') }
+      ];
+
+      const summarySheet = XLSX.utils.json_to_sheet(summaryData);
+      summarySheet['!cols'] = [{ wch: 25 }, { wch: 20 }];
+      XLSX.utils.book_append_sheet(workbook, summarySheet, 'Summary');
+
+      // Generate Excel buffer
+      const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+      // Set response headers
+      const filename = `Campaign_Reports_${dateFrom}_to_${dateTo}_${Date.now()}.xlsx`;
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', excelBuffer.length);
+
+      // Send the Excel file
+      return res.send(excelBuffer);
+    } catch (error) {
+      console.error('[ReportsController] exportToExcel error:', error);
+      return res.status(500).json(createResponse(false, 'Failed to export data to Excel', null, 
+        process.env.NODE_ENV === 'development' ? { error: error.message } : null
+      ));
     }
   }
 };

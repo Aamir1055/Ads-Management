@@ -1,10 +1,11 @@
 import axios from 'axios'
+import config from '../config/config'
+import authService from '../services/authService'
 
-const API_BASE_URL = 'http://localhost:5000/api'
-
-// Create axios instance with default config
+// FIXED: Use centralized configuration
 const api = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: config.API_BASE_URL,
+  timeout: config.API_TIMEOUT,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -23,61 +24,98 @@ window.clearAllTokens = () => {
   window.location.href = '/login';
 };
 
-// Clean up old tokens and ensure we're using the correct token
-const cleanupOldTokens = () => {
-  // If we have old tokens but no access_token, clear everything
-  const accessToken = localStorage.getItem('access_token')
-  const oldAuthToken = localStorage.getItem('authToken')
-  const oldToken = localStorage.getItem('auth_token')
-  
-  if (!accessToken && (oldAuthToken || oldToken)) {
-    console.log('Cleaning up old token format, please login again')
-    localStorage.removeItem('authToken')
-    localStorage.removeItem('auth_token')
-    localStorage.removeItem('user')
-    // Redirect to login if not already there
-    if (window.location.pathname !== '/login') {
-      window.location.href = '/login'
+// Request interceptor to add auth token
+api.interceptors.request.use(
+  (config) => {
+    // Get token from localStorage
+    const token = localStorage.getItem('access_token') || localStorage.getItem('authToken')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
     }
-    return null
+    return config
+  },
+  (error) => {
+    return Promise.reject(error)
   }
-  
-  return accessToken
-}
+)
 
-// Add auth token to requests if available
-api.interceptors.request.use((config) => {
-  const token = cleanupOldTokens()
-  console.log('🔑 Token being sent:', token ? `${token.substring(0, 20)}...` : 'No token')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
-  }
-  return config
-})
-
-// Enhanced error handling with user-friendly messages
+// Response interceptor to handle token refresh and errors
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    // Handle different error scenarios
-    if (error.response?.status === 401) {
-      // Clear auth data (all possible token names for compatibility)
-      localStorage.removeItem('access_token')
-      localStorage.removeItem('authToken')
-      localStorage.removeItem('auth_token')
-      localStorage.removeItem('refresh_token')
-      localStorage.removeItem('user')
+  async (error) => {
+    const originalRequest = error.config;
+    
+    // Check if this is a token expiration error and not already a retry
+    if (error.response?.status === 401 && 
+        (error.response?.data?.code === 'TOKEN_EXPIRED' || error.response?.data?.message?.includes('token')) && 
+        !originalRequest._retry) {
       
-      // Show user-friendly message
-      const message = error.response?.data?.message || 'Your session has expired. Please log in again.'
-      
-      // Redirect to login if not already there
-      if (window.location.pathname !== '/login') {
-        // Store the message to show on login page if needed
-        sessionStorage.setItem('loginMessage', message)
-        window.location.href = '/login'
+      console.log('🔄 Token expired, attempting refresh...');
+      originalRequest._retry = true;
+
+      try {
+        // Attempt to refresh the token using the refresh endpoint
+        const refreshToken = localStorage.getItem('refresh_token');
+        
+        if (!refreshToken) {
+          throw new Error('No refresh token available');
+        }
+
+        const response = await fetch('http://localhost:5000/api/auth/refresh', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken })
+        });
+
+        const data = await response.json();
+        
+        if (data.success) {
+          const { accessToken, refreshToken: newRefreshToken } = data.data;
+          
+          // Update stored tokens
+          localStorage.setItem('access_token', accessToken);
+          localStorage.setItem('refresh_token', newRefreshToken);
+          
+          // Update the original request with new token
+          originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+          
+          console.log('✅ Token refreshed successfully');
+          
+          // Retry the original request
+          return api(originalRequest);
+        } else {
+          throw new Error(data.message || 'Token refresh failed');
+        }
+      } catch (refreshError) {
+        console.error('🚫 Token refresh failed:', refreshError);
+        // Clear tokens and redirect to login
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('user');
+        
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
+        return Promise.reject(refreshError);
       }
-    } else if (error.response?.status === 403) {
+    }
+
+    // For other 401 errors or if refresh failed
+    if (error.response?.status === 401) {
+      console.log('🚪 Authentication failed, redirecting to login');
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+      
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+    }
+
+    // Handle other error scenarios
+    if (error.response?.status === 403) {
       // Permission denied - check if it's a token type issue
       const message = error.response?.data?.message || 'Access denied. You don\'t have permission to perform this action.'
       console.error('Permission denied:', message)
@@ -149,28 +187,28 @@ api.interceptors.response.use(
   }
 )
 
-// User API functions
+// FIXED: User API functions - Standardized to use /user-management endpoints
 export const userApi = {
   // Get all users
-  getUsers: () => api.get('/users'),
+  getUsers: () => api.get('/user-management'),
   
   // Create new user
-  createUser: (userData) => api.post('/users', userData),
+  createUser: (userData) => api.post('/user-management', userData),
   
   // Update user
-  updateUser: (userId, userData) => api.put(`/users/${userId}`, userData),
+  updateUser: (userId, userData) => api.put(`/user-management/${userId}`, userData),
   
   // Delete user
-  deleteUser: (userId) => api.delete(`/users/${userId}`),
+  deleteUser: (userId) => api.delete(`/user-management/${userId}`),
   
   // Toggle user status
-  toggleUserStatus: (userId) => api.patch(`/users/${userId}/toggle-status`),
+  toggleUserStatus: (userId) => api.patch(`/user-management/${userId}/toggle-status`),
   
-  // Enable 2FA for user
-  enable2FA: (userId) => api.post(`/users/${userId}/enable-2fa`),
+  // Generate 2FA QR code for user
+  generate2FA: (userId) => api.post(`/user-management/${userId}/generate-2fa`),
   
-  // Disable 2FA
-  disable2FA: (userId) => api.post(`/users/${userId}/disable-2fa`),
+  // Get roles
+  getRoles: () => api.get('/user-management/roles'),
   
   // Legacy 2FA endpoints (kept for compatibility)
   verify2FA: (userId, code) => api.post(`/2fa/verify`, { userId, code }),

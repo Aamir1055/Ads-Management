@@ -1,4 +1,5 @@
 const { pool } = require('../config/database');
+const XLSX = require('xlsx');
 
 // Response envelope
 const createResponse = (success, message, data = null, meta = null) => {
@@ -918,6 +919,168 @@ const reportsController = {
       }));
     } catch (error) {
       return handleDbError(error, 'get chart data', res);
+    }
+  },
+
+  /**
+   * GET /api/reports/export
+   * Export reports to Excel format with privacy filtering and dd/mm/yyyy date format
+   */
+  exportToExcel: async (req, res) => {
+    try {
+      const dateFrom = toMysqlDate(req.query.date_from);
+      const dateTo = toMysqlDate(req.query.date_to);
+      const brand = (req.query.brand || '').trim();
+      const campaignId = req.query.campaign_id ? Number(req.query.campaign_id) : null;
+
+      if (!dateFrom || !dateTo) {
+        return res.status(400).json(createResponse(false, 'date_from and date_to are required (YYYY-MM-DD format)'));
+      }
+
+      const where = [];
+      const params = [];
+
+      // Date range filter
+      where.push('cd.data_date >= ?', 'cd.data_date <= ?');
+      params.push(dateFrom, dateTo);
+
+      // Add privacy filtering for non-admins
+      const isAdmin = req.user.role && (req.user.role.level >= 8 || req.user.role.name === 'super_admin' || req.user.role.name === 'admin');
+      if (!isAdmin) {
+        where.push('cd.created_by = ?');
+        params.push(req.user.id);
+      }
+
+      // Brand filter
+      if (brand) {
+        where.push('b.name = ?');
+        params.push(brand);
+      }
+
+      // Campaign filter
+      if (campaignId) {
+        where.push('cd.campaign_id = ?');
+        params.push(campaignId);
+      }
+
+      const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
+
+      // Query for export data with dd/mm/yyyy format
+      const exportSql = `
+        SELECT
+          DATE_FORMAT(cd.data_date, '%d/%m/%Y') as 'Date',
+          c.name as 'Campaign Name',
+          ct.type_name as 'Campaign Type',
+          COALESCE(b.name, 'Unknown Brand') as 'Brand',
+          cd.card_name as 'Card',
+          cd.facebook_result as 'Facebook Results',
+          cd.xoho_result as 'Zoho Results',
+          (cd.facebook_result + cd.xoho_result) as 'Total Leads',
+          ROUND(cd.spent, 2) as 'Amount Spent (₹)',
+          ROUND(CASE 
+            WHEN (cd.facebook_result + cd.xoho_result) > 0 
+            THEN cd.spent / (cd.facebook_result + cd.xoho_result)
+            ELSE 0 
+          END, 2) as 'Cost Per Lead (₹)',
+          ROUND(CASE 
+            WHEN cd.facebook_result > 0 
+            THEN cd.spent / cd.facebook_result
+            ELSE 0 
+          END, 2) as 'Facebook CPL (₹)',
+          ROUND(CASE 
+            WHEN cd.xoho_result > 0 
+            THEN cd.spent / cd.xoho_result
+            ELSE 0 
+          END, 2) as 'Zoho CPL (₹)'
+        FROM campaign_data cd
+        LEFT JOIN campaigns c ON cd.campaign_id = c.id
+        LEFT JOIN campaign_types ct ON c.campaign_type_id = ct.id
+        LEFT JOIN brands b ON c.brand = b.id
+        ${whereClause}
+        ORDER BY cd.data_date DESC, c.name ASC
+      `;
+
+      // Execute query
+      const [exportData] = await pool.query(exportSql, params);
+
+      if (!exportData || exportData.length === 0) {
+        return res.status(404).json(createResponse(false, 'No data found for the selected criteria'));
+      }
+
+      // Create workbook and worksheet
+      const workbook = XLSX.utils.book_new();
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+
+      // Set column widths for better readability
+      const columnWidths = [
+        { wch: 12 }, // Date
+        { wch: 25 }, // Campaign Name
+        { wch: 20 }, // Campaign Type
+        { wch: 15 }, // Brand
+        { wch: 20 }, // Card
+        { wch: 15 }, // Facebook Results
+        { wch: 12 }, // Zoho Results
+        { wch: 12 }, // Total Leads
+        { wch: 18 }, // Amount Spent
+        { wch: 15 }, // Cost Per Lead
+        { wch: 15 }, // Facebook CPL
+        { wch: 12 }  // Zoho CPL
+      ];
+      worksheet['!cols'] = columnWidths;
+
+      // Add worksheet to workbook
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Campaign Reports');
+
+      // Create summary sheet with dd/mm/yyyy date format
+      const formatDateDDMMYYYY = (dateStr) => {
+        const date = new Date(dateStr);
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        return `${day}/${month}/${year}`;
+      };
+
+      // Calculate summary values safely
+      const totalLeads = exportData.reduce((sum, row) => sum + (Number(row['Total Leads']) || 0), 0);
+      const totalSpent = exportData.reduce((sum, row) => sum + (Number(row['Amount Spent (₹)']) || 0), 0);
+      const totalCostPerLead = exportData.reduce((sum, row) => sum + (Number(row['Cost Per Lead (₹)']) || 0), 0);
+      const avgCostPerLead = exportData.length > 0 ? totalCostPerLead / exportData.length : 0;
+
+      const summaryData = [
+        { 'Metric': 'Total Records', 'Value': exportData.length },
+        { 'Metric': 'Total Campaigns', 'Value': [...new Set(exportData.map(row => row['Campaign Name']))].length },
+        { 'Metric': 'Total Leads', 'Value': totalLeads },
+        { 'Metric': 'Total Spent (₹)', 'Value': totalSpent.toFixed(2) },
+        { 'Metric': 'Average Cost Per Lead (₹)', 'Value': avgCostPerLead.toFixed(2) },
+        { 'Metric': 'Date Range', 'Value': `${formatDateDDMMYYYY(dateFrom)} to ${formatDateDDMMYYYY(dateTo)}` },
+        { 'Metric': 'Export Date', 'Value': formatDateDDMMYYYY(new Date()) },
+        { 'Metric': 'Export Time', 'Value': new Date().toLocaleTimeString('en-IN') },
+        { 'Metric': 'Exported By', 'Value': req.user.username || 'Unknown User' }
+      ];
+
+      const summarySheet = XLSX.utils.json_to_sheet(summaryData);
+      summarySheet['!cols'] = [{ wch: 25 }, { wch: 20 }];
+      XLSX.utils.book_append_sheet(workbook, summarySheet, 'Summary');
+
+      // Generate Excel buffer
+      const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+      // Set response headers with dd/mm/yyyy format in filename
+      const filenameDateFrom = formatDateDDMMYYYY(dateFrom).replace(/\//g, '-');
+      const filenameDateTo = formatDateDDMMYYYY(dateTo).replace(/\//g, '-');
+      const filename = `Campaign_Reports_${filenameDateFrom}_to_${filenameDateTo}_${Date.now()}.xlsx`;
+      
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', excelBuffer.length);
+
+      // Send the Excel file
+      return res.send(excelBuffer);
+    } catch (error) {
+      console.error('[ReportsController Privacy] exportToExcel error:', error);
+      return res.status(500).json(createResponse(false, 'Failed to export data to Excel', null, 
+        process.env.NODE_ENV === 'development' ? { error: error.message } : null
+      ));
     }
   }
 };

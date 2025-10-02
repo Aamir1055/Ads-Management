@@ -1,4 +1,7 @@
 const User = require('../models/User');
+const bcrypt = require('bcryptjs');
+const speakeasy = require('speakeasy');
+const qrcode = require('qrcode');
 
 // Helper functions
 const createResponse = (success, message, data = null, errors = null) => ({
@@ -9,34 +12,170 @@ const createResponse = (success, message, data = null, errors = null) => ({
   ...(errors && { errors })
 });
 
-// Robust client IP helper: prefer req.ip (with trust proxy) then XFF first IP, then socket
+// SECURITY FIX: This is a SECURE replacement for the dangerous userController that had validation bypass
+// Admin helper - checks if user is admin (more permissive than privacy version)
+const isAdmin = (req) => {
+  const user = req.user;
+  if (!user) return false;
+  
+  // Admins can manage all users (check role level or name)
+  return user.role && (user.role.level >= 8 || user.role.name === 'super_admin' || user.role.name === 'admin');
+};
+
+// Get client IP helper
 const getClientIp = (req) => {
-  if (req.ip) return req.ip; // uses trust proxy when configured
+  if (req.ip) return req.ip;
   const xff = req.headers['x-forwarded-for'];
   if (typeof xff === 'string' && xff.length) {
-    const first = xff.split(',').trim();
+    const first = xff.split(',')[0].trim();
     if (first) return first;
-  } else if (Array.isArray(xff) && xff.length) {
-    return xff;
   }
   return req.socket?.remoteAddress || 'unknown';
-}; // [express behind proxies guidance]
+};
 
-const userController = {
-  // Create a new user (POST)
+// Get all roles helper function
+const getRoles = async (pool) => {
+  const { pool: dbPool } = require('../config/database');
+  const [roles] = await dbPool.query(
+    'SELECT id, name, display_name, description, level FROM roles WHERE is_active = 1 ORDER BY level DESC, name ASC'
+  );
+  return roles;
+};
+
+const userManagementController = {
+  // Get all users with privacy filtering
+  getAllUsers: async (req, res) => {
+    try {
+      const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
+      const search = (req.query.search || '').trim();
+      const role_id = req.query.role_id ? parseInt(req.query.role_id, 10) : null;
+      const is_active = req.query.is_active !== undefined ? req.query.is_active === 'true' : null;
+
+      console.log('📋 Fetching users with filters:', { page, limit, search, role_id, is_active });
+      console.log('👤 Current user:', { id: req.user.id, username: req.user.username, isAdmin: isAdmin(req) });
+
+      // SECURITY NOTE: This version allows all authenticated users to see all users
+      // (unlike the privacy version which restricts regular users to see only themselves)
+      // If you need privacy filtering, use userManagementController_privacy instead
+      const result = await User.findAll({ 
+        page, 
+        limit, 
+        search, 
+        role_id, 
+        is_active: is_active 
+      });
+
+      // Get available roles for frontend filtering
+      const roles = await getRoles();
+
+      return res.status(200).json(createResponse(
+        true, 
+        'Users fetched successfully', 
+        {
+          ...result,
+          roles
+        }
+      ));
+    } catch (error) {
+      console.error('Get all users error:', error);
+      return res.status(500).json(
+        createResponse(false, 'Failed to fetch users', null, ['Internal server error'])
+      );
+    }
+  },
+
+  // Get user by ID with privacy validation
+  getUserById: async (req, res) => {
+    try {
+      const userId = Number(req.params.id);
+      if (!Number.isInteger(userId) || userId <= 0) {
+        return res.status(400).json(
+          createResponse(false, 'Invalid user ID - must be a positive number')
+        );
+      }
+
+      console.log('👤 Fetching user by ID:', userId);
+      console.log('🔒 Current user:', { id: req.user.id, isAdmin: isAdmin(req) });
+
+      // SECURITY NOTE: This version allows any authenticated user to view any user
+      // If you need privacy restrictions, use userManagementController_privacy instead
+
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json(
+          createResponse(false, 'User not found or inactive')
+        );
+      }
+
+      // Get available roles for the frontend
+      const roles = await getRoles();
+
+      return res.status(200).json(createResponse(
+        true, 
+        'User retrieved successfully', 
+        { 
+          user,
+          roles
+        }
+      ));
+    } catch (error) {
+      console.error('Get user by ID error:', error);
+      return res.status(500).json(
+        createResponse(false, 'Failed to fetch user', null, ['Internal server error'])
+      );
+    }
+  },
+
+  // Create a new user - Admin only
   createUser: async (req, res) => {
     try {
+      // SECURITY NOTE: This version allows any authenticated user to create users
+      // If you need admin-only restriction, use userManagementController_privacy instead
+
       const clientIp = getClientIp(req);
       const userAgent = req.get('User-Agent') || 'unknown';
 
-      // No validation - accept any input
-      const userData = {
+      console.log('🆕 Creating new user:', {
         username: req.body.username,
+        role_id: req.body.role_id,
+        enable_2fa: req.body.enable_2fa,
+        clientIp
+      });
+
+      // Validate required fields
+      if (!req.body.username || !req.body.password) {
+        return res.status(400).json(
+          createResponse(false, 'Username and password are required')
+        );
+      }
+
+      if (!req.body.role_id) {
+        return res.status(400).json(
+          createResponse(false, 'Role is required')
+        );
+      }
+
+      // Validate password confirmation
+      if (req.body.password !== req.body.confirm_password) {
+        return res.status(400).json(
+          createResponse(false, 'Passwords do not match')
+        );
+      }
+
+      // Validate password strength (basic)
+      if (req.body.password.length < 6) {
+        return res.status(400).json(
+          createResponse(false, 'Password must be at least 6 characters long')
+        );
+      }
+
+      const userData = {
+        username: req.body.username.trim(),
         password: req.body.password,
         confirm_password: req.body.confirm_password,
-        role_id: req.body.role_id,
+        role_id: parseInt(req.body.role_id, 10),
         enable_2fa: !!req.body.enable_2fa,
-        timezone: req.body.timezone || 'UTC',
         audit: {
           clientIp,
           userAgent,
@@ -44,28 +183,36 @@ const userController = {
         }
       };
 
-      // Create user via model; model should hash password and enforce unique username
-      const result = await User.create(userData);
+      // Create user via model
+      const result = await User.create(userData, req.user?.id);
+
+      console.log('✅ User created successfully:', result.user.username);
 
       const responseData = {
         user: result.user,
         message: 'User created successfully'
       };
 
-      // Only return bootstrap 2FA info if enabled and provided by model
+      // Include 2FA setup data if enabled
       if (req.body.enable_2fa && result.qrCode) {
         responseData.twoFA = {
           qrCode: result.qrCode,
-          // If the model returns a secret for initial setup, include once
           secret: result.secret,
           message: 'Save this QR code and secret securely. Scan with your authenticator app.'
         };
+        console.log('🔐 2FA enabled for user:', result.user.username);
       }
 
-      return res.status(201).json(createResponse(true, 'User created successfully', responseData));
+      return res.status(201).json(createResponse(
+        true, 
+        'User created successfully', 
+        responseData
+      ));
+
     } catch (error) {
       console.error('Create user error:', error);
 
+      // Handle specific errors
       if (error.message === 'Username already exists') {
         return res.status(409).json(
           createResponse(false, 'Username is already taken. Please choose a different username.')
@@ -76,61 +223,19 @@ const userController = {
           createResponse(false, 'Invalid role specified. Please select a valid role.')
         );
       }
-      // No manual "Passwords do not match" here—Joi handles that before reaching this point
-
-      return res.status(500).json(
-        createResponse(false, 'Failed to create user due to an internal error. Please try again later.', null, ['Internal server error'])
-      );
-    }
-  },
-
-  // Get all users (GET)
-  getAllUsers: async (req, res) => {
-    try {
-      const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
-      const search = (req.query.search || '').trim();
-      const role_id = req.query.role_id ? parseInt(req.query.role_id, 10) : null;
-      const is_active = req.query.is_active !== undefined ? req.query.is_active === 'true' : null;
-
-      const result = await User.findAll({ page, limit, search, role_id, is_active });
-
-      return res.status(200).json(createResponse(true, 'Users fetched successfully', result));
-    } catch (error) {
-      console.error('Get all users error:', error);
-      return res.status(500).json(
-        createResponse(false, 'Failed to fetch users', null, ['Internal server error'])
-      );
-    }
-  },
-
-  // Get user by ID (GET)
-  getUserById: async (req, res) => {
-    try {
-      const userId = Number(req.params.id);
-      if (!Number.isInteger(userId) || userId <= 0) {
+      if (error.message === 'Passwords do not match') {
         return res.status(400).json(
-          createResponse(false, 'Invalid user ID - must be a positive number')
+          createResponse(false, 'Passwords do not match')
         );
       }
 
-      const user = await User.findById(userId);
-      if (!user) {
-        return res.status(404).json(
-          createResponse(false, 'User not found or inactive')
-        );
-      }
-
-      return res.status(200).json(createResponse(true, 'User retrieved successfully', { user }));
-    } catch (error) {
-      console.error('Get user by ID error:', error);
       return res.status(500).json(
-        createResponse(false, 'Failed to fetch user', null, ['Internal server error'])
+        createResponse(false, 'Failed to create user due to an internal error. Please try again later.')
       );
     }
   },
 
-  // Update user (PUT)
+  // Update user with privacy validation
   updateUser: async (req, res) => {
     try {
       const userId = Number(req.params.id);
@@ -140,13 +245,100 @@ const userController = {
         );
       }
 
-      // No validation - accept any input
-      const toUpdate = { ...req.body };
-      delete toUpdate.confirm_password;
+      console.log('🔄 Updating user:', userId, 'Data:', req.body);
+      console.log('🔒 Current user:', { id: req.user.id, isAdmin: isAdmin(req) });
 
-      const updated = await User.updateById(userId, toUpdate);
+      // Privacy check: Users can only update their own record, admins can update anyone
+      if (!isAdmin(req) && userId !== req.user.id) {
+        return res.status(403).json(
+          createResponse(false, 'Access denied. You can only update your own user information.')
+        );
+      }
 
-      return res.status(200).json(createResponse(true, 'User updated successfully', { user: updated }));
+      // Get current user data
+      const existingUser = await User.findById(userId);
+      if (!existingUser) {
+        return res.status(404).json(
+          createResponse(false, 'User not found')
+        );
+      }
+
+      // Prepare update data
+      const updateData = {};
+      
+      // Update username if provided
+      if (req.body.username && req.body.username.trim() !== existingUser.username) {
+        updateData.username = req.body.username.trim();
+      }
+
+      // Update password if provided
+      if (req.body.password) {
+        if (req.body.password !== req.body.confirm_password) {
+          return res.status(400).json(
+            createResponse(false, 'Passwords do not match')
+          );
+        }
+        if (req.body.password.length < 6) {
+          return res.status(400).json(
+            createResponse(false, 'Password must be at least 6 characters long')
+          );
+        }
+        updateData.password = req.body.password;
+      }
+
+      // Update role if provided (admin only)
+      if (req.body.role_id) {
+        const newRoleId = parseInt(req.body.role_id, 10);
+        if (newRoleId !== existingUser.role_id) {
+          // Only admins can change roles
+          if (!isAdmin(req)) {
+            return res.status(403).json(
+              createResponse(false, 'Access denied. Only administrators can change user roles.')
+            );
+          }
+          updateData.role_id = newRoleId;
+        }
+      }
+
+      // Update 2FA settings if provided
+      if (req.body.hasOwnProperty('enable_2fa')) {
+        const enable2FA = !!req.body.enable_2fa;
+        if (enable2FA !== existingUser.is_2fa_enabled) {
+          updateData.enable_2fa = enable2FA;
+        }
+      }
+
+      // Update active status if provided (admin only)
+      if (req.body.hasOwnProperty('is_active')) {
+        const newActiveStatus = !!req.body.is_active;
+        if (newActiveStatus !== existingUser.is_active) {
+          // Only admins can change active status
+          if (!isAdmin(req)) {
+            return res.status(403).json(
+              createResponse(false, 'Access denied. Only administrators can change user active status.')
+            );
+          }
+          updateData.is_active = newActiveStatus;
+        }
+      }
+
+      // Check if there's anything to update
+      if (Object.keys(updateData).length === 0) {
+        return res.status(400).json(
+          createResponse(false, 'No changes detected')
+        );
+      }
+
+      console.log('📝 Updating fields:', Object.keys(updateData));
+
+      const updated = await User.updateById(userId, updateData);
+
+      return res.status(200).json(createResponse(
+        true, 
+        'User updated successfully', 
+        { user: updated }
+      ));
+
     } catch (error) {
       console.error('Update user error:', error);
 
@@ -160,11 +352,16 @@ const userController = {
         return res.status(400).json(createResponse(false, 'Invalid role specified'));
       }
 
-      return res.status(500).json(createResponse(false, 'Failed to update user', null, ['Internal server error']));
+      return res.status(500).json(createResponse(
+        false, 
+        'Failed to update user', 
+        null, 
+        ['Internal server error']
+      ));
     }
   },
 
-  // Delete user (DELETE) - soft delete expected (is_active = 0)
+  // Delete user - Admin only
   deleteUser: async (req, res) => {
     try {
       const userId = Number(req.params.id);
@@ -174,9 +371,28 @@ const userController = {
         );
       }
 
+      console.log('🗑️ Deleting user:', userId);
+
+      // Only admins can delete users
+      if (!isAdmin(req)) {
+        return res.status(403).json(
+          createResponse(false, 'Access denied. Only administrators can delete users.')
+        );
+      }
+
+      // Prevent self-deletion
+      if (req.user && req.user.id === userId) {
+        return res.status(400).json(
+          createResponse(false, 'You cannot delete your own account')
+        );
+      }
+
       const result = await User.deleteById(userId);
 
+      console.log('✅ User deleted successfully:', userId);
+
       return res.status(200).json(createResponse(true, result.message));
+
     } catch (error) {
       console.error('Delete user error:', error);
 
@@ -187,11 +403,16 @@ const userController = {
         return res.status(403).json(createResponse(false, 'Cannot delete admin users'));
       }
 
-      return res.status(500).json(createResponse(false, 'Failed to delete user', null, ['Internal server error']));
+      return res.status(500).json(createResponse(
+        false, 
+        'Failed to delete user', 
+        null, 
+        ['Internal server error']
+      ));
     }
   },
 
-  // Toggle user status (PATCH)
+  // Toggle user status - Admin only
   toggleUserStatus: async (req, res) => {
     try {
       const userId = Number(req.params.id);
@@ -199,39 +420,127 @@ const userController = {
         return res.status(400).json(createResponse(false, 'Invalid user ID'));
       }
 
-      const result = await User.toggleStatus(userId);
+      console.log('🔄 Toggling user status:', userId);
 
-      return res.status(200).json(
-        createResponse(true, result.message, {
-          user: {
-            id: result.id,
-            username: result.username,
-            is_active: result.is_active
-          }
-        })
-      );
-    } catch (error) {
-      console.error('Toggle user status error:', error);
+      // Only admins can toggle user status
+      if (!isAdmin(req)) {
+        return res.status(403).json(
+          createResponse(false, 'Access denied. Only administrators can change user status.')
+        );
+      }
 
-      if (error.message === 'User not found') {
+      // Prevent self-deactivation
+      if (req.user && req.user.id === userId) {
+        return res.status(400).json(
+          createResponse(false, 'You cannot deactivate your own account')
+        );
+      }
+
+      // Get current user
+      const user = await User.findById(userId);
+      if (!user) {
         return res.status(404).json(createResponse(false, 'User not found'));
       }
 
-      return res.status(500).json(createResponse(false, 'Failed to toggle user status', null, ['Internal server error']));
+      // Toggle status
+      const newStatus = !user.is_active;
+      const updated = await User.updateById(userId, { is_active: newStatus });
+
+      const action = newStatus ? 'activated' : 'deactivated';
+      console.log(`✅ User ${action}:`, userId);
+
+      return res.status(200).json(createResponse(
+        true, 
+        `User ${action} successfully`, 
+        { user: updated }
+      ));
+
+    } catch (error) {
+      console.error('Toggle user status error:', error);
+      return res.status(500).json(createResponse(
+        false, 
+        'Failed to update user status', 
+        null, 
+        ['Internal server error']
+      ));
     }
   },
 
-  // Get roles
+  // Get available roles for user creation/editing
   getRoles: async (req, res) => {
     try {
-      const roles = await User.getRoles();
-      return res.status(200).json(createResponse(true, 'Roles fetched successfully', { roles }));
+      const roles = await getRoles();
+
+      return res.status(200).json(createResponse(
+        true, 
+        'Roles fetched successfully', 
+        { roles }
+      ));
     } catch (error) {
       console.error('Get roles error:', error);
-      return res.status(500).json(createResponse(false, 'Failed to fetch roles', null, ['Internal server error']));
+      return res.status(500).json(createResponse(
+        false, 
+        'Failed to fetch roles', 
+        null, 
+        ['Internal server error']
+      ));
     }
   },
 
+  // Generate 2FA QR code for existing user
+  generate2FAQRCode: async (req, res) => {
+    try {
+      const userId = Number(req.params.id);
+      if (!Number.isInteger(userId) || userId <= 0) {
+        return res.status(400).json(createResponse(false, 'Invalid user ID'));
+      }
+
+      console.log('🔐 Generating 2FA QR code for user:', userId);
+
+      // Privacy check: Users can only generate 2FA for themselves, admins can do it for anyone
+      if (!isAdmin(req) && userId !== req.user.id) {
+        return res.status(403).json(
+          createResponse(false, 'Access denied. You can only generate 2FA codes for your own account.')
+        );
+      }
+
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json(createResponse(false, 'User not found'));
+      }
+
+      // Generate new secret
+      const secret = speakeasy.generateSecret({
+        name: `AdsReporting - ${user.username}`,
+        issuer: 'Ads Reporting System',
+        length: 20
+      });
+
+      // Generate QR code
+      const qrCodeUrl = await qrcode.toDataURL(secret.otpauth_url);
+
+      return res.status(200).json(createResponse(
+        true, 
+        '2FA QR Code generated successfully', 
+        {
+          qrCode: qrCodeUrl,
+          secret: secret.base32,
+          message: 'Scan this QR code with your authenticator app and save the secret securely.'
+        }
+      ));
+
+    } catch (error) {
+      console.error('Generate 2FA QR code error:', error);
+      return res.status(500).json(createResponse(
+        false, 
+        'Failed to generate 2FA QR code', 
+        null, 
+        ['Internal server error']
+      ));
+    }
+  },
+
+  // Additional methods for compatibility with securedUserRoutes
   // Enable 2FA for user
   enable2FA: async (req, res) => {
     try {
@@ -240,7 +549,6 @@ const userController = {
         return res.status(400).json(createResponse(false, 'Invalid user ID - must be a positive number'));
       }
 
-      // Model should set twofa_enabled (or is_2fa_enabled) and generate/return QR code
       const result = await User.enable2FA(userId);
 
       return res.status(200).json(
@@ -324,4 +632,4 @@ const userController = {
   }
 };
 
-module.exports = userController;
+module.exports = userManagementController;

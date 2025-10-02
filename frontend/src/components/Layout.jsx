@@ -74,8 +74,7 @@ const Layout = ({ children }) => {
       'Campaign',
       'Cards',
       'Cards Users',
-      'Report',
-      'Report Analytics'
+      'Report'
     ];
     
     // Map backend names to our expected names
@@ -83,8 +82,7 @@ const Layout = ({ children }) => {
       'Campaign Types': 'Campaign Type',
       'Campaigns': 'Campaign',
       'Card Users': 'Cards Users',
-      'Reports': 'Report',
-      'Report Analytics': 'Report Analytics'
+      'Reports': 'Report'
     };
     
     const getOrderIndex = (name) => {
@@ -134,7 +132,6 @@ const Layout = ({ children }) => {
     { name: 'Cards', href: '/cards', icon: CreditCard },
     { name: 'Cards Users', href: '/card-users', icon: UserCheck },
     { name: 'Report', href: '/reports-table', icon: FileText },
-    { name: 'Report Analytics', href: '/report-analytics', icon: BarChart3 },
   ]
   
   const navigation = sortNavigationItems(baseNavigation)

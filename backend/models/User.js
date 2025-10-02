@@ -1,7 +1,27 @@
+const pool = require('../config/database').pool;
 const bcrypt = require('bcryptjs');
-const { pool } = require('../config/database');
 const speakeasy = require('speakeasy');
 const qrcode = require('qrcode');
+
+// SECURITY FIX: Input sanitization helper functions
+const sanitizeInput = (input) => {
+  if (typeof input === 'string') {
+    return input.trim();
+  }
+  return input;
+};
+
+const sanitizeUserData = (userData) => {
+  const sanitized = {};
+  for (const [key, value] of Object.entries(userData)) {
+    if (key === 'username' || key === 'timezone') {
+      sanitized[key] = sanitizeInput(value);
+    } else {
+      sanitized[key] = value;
+    }
+  }
+  return sanitized;
+};
 const crypto = require('crypto');
 
 /**
@@ -36,6 +56,9 @@ class User {
     const connection = await pool.getConnection();
     
     try {
+      // SECURITY FIX: Sanitize input data
+      const sanitizedData = sanitizeUserData(userData);
+      
       const { 
         username, 
         password, 
@@ -43,7 +66,7 @@ class User {
         role_id, 
         enable_2fa = false,
         temp_2fa_key = null // For using pre-generated temporary 2FA setup
-      } = userData;
+      } = sanitizedData;
 
       // Validate passwords match
       if (password !== confirm_password) {
@@ -77,11 +100,24 @@ class User {
       const saltRounds = 12;
       const hashed_password = await bcrypt.hash(password, saltRounds);
 
-      // 2FA will be enabled but secret will be generated during first login
+      // Generate TOTP secret if 2FA is enabled
       let auth_token = null;
+      let qrCodeUrl = null;
+      let secretBase32 = null;
       
-      // Do not generate 2FA secret during user creation
-      // It will be generated during the user's first login attempt
+      if (enable_2fa) {
+        const secret = speakeasy.generateSecret({
+          name: `AdsReporting - ${username}`,
+          issuer: 'Ads Reporting System',
+          length: 20
+        });
+        
+        auth_token = secret.base32;
+        secretBase32 = secret.base32;
+        qrCodeUrl = await qrcode.toDataURL(secret.otpauth_url);
+        
+        console.log('🔐 Generated 2FA secret for new user:', username);
+      }
 
       // Insert user
       const [result] = await connection.query(
@@ -91,7 +127,7 @@ class User {
           is_active, created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`,
         [
-          username.trim(),
+          username,
           hashed_password, 
           role_id, 
           auth_token, 
@@ -104,7 +140,7 @@ class User {
 
       // Log the creation in audit trail
       await User._logAudit(connection, userId, 'USER_CREATED', null, {
-        username: username.trim(),
+        username: username,
         role_id: role_id,
         enable_2fa: enable_2fa
       }, null, null, performedBy);
@@ -115,7 +151,9 @@ class User {
       const user = await User.findById(userId);
       
       return {
-        user
+        user,
+        qrCode: qrCodeUrl,
+        secret: secretBase32
       };
 
     } catch (error) {
@@ -250,6 +288,9 @@ class User {
     const connection = await pool.getConnection();
     
     try {
+      // SECURITY FIX: Sanitize input data
+      const sanitizedData = sanitizeUserData(updateData);
+      
       // Check if user exists
       const user = await User.findById(id);
       if (!user) {
@@ -257,10 +298,10 @@ class User {
       }
 
       // Check for username conflicts if username is being updated
-      if (updateData.username && updateData.username !== user.username) {
+      if (sanitizedData.username && sanitizedData.username !== user.username) {
         const [existingUsers] = await connection.query(
           'SELECT id FROM users WHERE LOWER(username) = LOWER(?) AND id != ?',
-          [updateData.username, id]
+          [sanitizedData.username, id]
         );
         if (existingUsers.length > 0) {
           throw new Error('Username already exists');
@@ -268,10 +309,10 @@ class User {
       }
 
       // Check if role exists if role is being updated
-      if (updateData.role_id) {
+      if (sanitizedData.role_id) {
         const [roles] = await connection.query(
           'SELECT id FROM roles WHERE id = ?',
-          [updateData.role_id]
+          [sanitizedData.role_id]
         );
         if (roles.length === 0) {
           throw new Error('Invalid role specified');
@@ -285,16 +326,23 @@ class User {
       const fieldsToUpdate = {};
       
       for (const field of allowedFields) {
-        if (updateData[field] !== undefined) {
+        if (sanitizedData[field] !== undefined) {
           if (field === 'password') {
+            // CRITICAL FIX: Validate password confirmation before hashing
+            if (!sanitizedData.confirm_password || sanitizedData[field] !== sanitizedData.confirm_password) {
+              throw new Error('Passwords do not match');
+            }
+            if (sanitizedData[field].length < 6) {
+              throw new Error('Password must be at least 6 characters long');
+            }
             // Hash the new password if provided
             const saltRounds = 12;
-            fieldsToUpdate['hashed_password'] = await bcrypt.hash(updateData[field], saltRounds);
+            fieldsToUpdate['hashed_password'] = await bcrypt.hash(sanitizedData[field], saltRounds);
           } else if (field === 'enable_2fa') {
             // Map enable_2fa to is_2fa_enabled column name
-            fieldsToUpdate['is_2fa_enabled'] = updateData[field];
+            fieldsToUpdate['is_2fa_enabled'] = sanitizedData[field];
           } else {
-            fieldsToUpdate[field] = updateData[field];
+            fieldsToUpdate[field] = sanitizedData[field];
           }
         }
       }

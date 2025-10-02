@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react'
-import api from '../utils/api'
+import authService from '../services/authService'
 
 const AuthContext = createContext()
 
@@ -20,27 +20,32 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const initAuth = () => {
       try {
-        // Check for access_token first, then fall back to authToken
-        const storedToken = localStorage.getItem('access_token') || localStorage.getItem('authToken')
-        const storedUser = localStorage.getItem('user')
-        
-        if (storedToken && storedUser) {
-          setToken(storedToken)
-          setUser(JSON.parse(storedUser))
+        // Use authService to check authentication
+        if (authService.isAuthenticated()) {
+          const storedUser = authService.getStoredUser()
+          const storedToken = authService.getAccessToken()
           
-          // If we found an old authToken, migrate it to access_token
-          if (localStorage.getItem('authToken') && !localStorage.getItem('access_token')) {
-            console.log('Migrating authToken to access_token')
-            localStorage.setItem('access_token', storedToken)
-            localStorage.removeItem('authToken')
+          if (storedToken && storedUser) {
+            setToken(storedToken)
+            setUser(storedUser)
+            
+            // Check if token needs refresh
+            authService.checkAndRefreshToken()
+            
+            console.log('✅ User authenticated from stored tokens')
+          } else {
+            console.log('⚠️ Invalid stored auth data, clearing...')
+            authService.clearAuthData()
           }
+        } else {
+          console.log('❤️ No valid authentication found')
+          // Don't aggressively clear data - let the user try to login
+          // authService.clearAuthData()
         }
       } catch (error) {
         console.error('Error loading auth from localStorage:', error)
         // Clear invalid data
-        localStorage.removeItem('authToken')
-        localStorage.removeItem('access_token')
-        localStorage.removeItem('user')
+        authService.clearAuthData()
       } finally {
         setLoading(false)
       }
@@ -49,36 +54,64 @@ export const AuthProvider = ({ children }) => {
     initAuth()
   }, [])
 
-  const login = (userData, authToken) => {
+  const login = (userData, authToken, refreshToken) => {
+    console.log('🔐 AuthContext login called:', { 
+      hasUser: !!userData, 
+      hasToken: !!authToken, 
+      hasRefresh: !!refreshToken 
+    })
+    
+    // Set local state immediately
     setUser(userData)
     setToken(authToken)
-    // Store as access_token for consistency
-    localStorage.setItem('access_token', authToken)
-    localStorage.setItem('user', JSON.stringify(userData))
-    // Remove old token format if it exists
+    
+    // Use authService to set auth data properly
+    if (refreshToken) {
+      authService.setAuthData(authToken, refreshToken, userData)
+    } else {
+      // Fallback for backward compatibility
+      localStorage.setItem('access_token', authToken)
+      localStorage.setItem('user', JSON.stringify(userData))
+    }
+    
+    // Check token expiration
+    authService.checkAndRefreshToken()
+    
+    // Remove old token formats if they exist
     localStorage.removeItem('authToken')
+    
+    console.log('✅ AuthContext login completed')
   }
 
-  const logout = () => {
+  const logout = async () => {
     setUser(null)
     setToken(null)
-    // Clear all possible token formats
-    localStorage.removeItem('access_token')
-    localStorage.removeItem('authToken')
-    localStorage.removeItem('auth_token')
-    localStorage.removeItem('refresh_token')
-    localStorage.removeItem('user')
     
-    // Optionally call logout endpoint
+    // Use authService for proper logout
     try {
-      api.post('/auth/logout')
+      await authService.logout()
     } catch (error) {
-      console.error('Error calling logout endpoint:', error)
+      console.error('Error during logout:', error)
+      // Even if logout fails, clear local state
+      authService.clearAuthData()
     }
   }
 
   const isAuthenticated = () => {
-    return !!(user && token)
+    // Primary check: use authService which checks localStorage
+    const serviceAuth = authService.isAuthenticated()
+    
+    // Secondary check: local state (for immediate UI updates)
+    const stateAuth = !!(user && token)
+    
+    // Return true if either check passes (allows for immediate UI updates after login)
+    const result = serviceAuth || stateAuth
+    
+    if (!result && serviceAuth !== stateAuth) {
+      console.log('🔍 Auth state mismatch:', { serviceAuth, stateAuth, hasUser: !!user, hasToken: !!token })
+    }
+    
+    return result
   }
 
   const hasRole = (roleName) => {
@@ -105,8 +138,8 @@ export const AuthProvider = ({ children }) => {
       return Boolean(user.permissions[permission])
     }
     
-    // For now, return true for authenticated users if no specific permission system
-    return true
+    // FIXED: Be restrictive by default if no permission system available
+    return false
   }
 
   const value = {

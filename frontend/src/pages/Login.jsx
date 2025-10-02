@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Target, Shield, ShieldCheck } from 'lucide-react'
 import { twoFactorApi } from '../utils/api'
 import { clearAllTokens, handleAuthError } from '../utils/tokenCleanup'
+import { useAuth } from '../contexts/AuthContext'
 
 const Login = () => {
+  const { login: contextLogin } = useAuth()
   const [formData, setFormData] = useState({
     username: '',
     password: '',
@@ -109,10 +111,10 @@ const Login = () => {
             } else {
               // Login successful without 2FA
               console.log('Login successful, storing token and navigating...')
-              // Store with consistent token key - fix: use access_token from API
-              localStorage.setItem('access_token', data.data.access_token)
-              localStorage.setItem('authToken', data.data.access_token)
-              localStorage.setItem('user', JSON.stringify(data.data.user))
+              
+              // Use AuthContext login function to properly set state
+              contextLogin(data.data.user, data.data.access_token, data.data.refresh_token)
+              
               navigate('/dashboard')
             }
           } else {
@@ -130,13 +132,15 @@ const Login = () => {
             // Fallback to demo authentication if API is not available
             if (formData.username === 'admin' && formData.password === 'password') {
               const token = 'demo-token-' + Date.now()
-              localStorage.setItem('access_token', token)
-              localStorage.setItem('authToken', token)
-              localStorage.setItem('user', JSON.stringify({ 
+              const demoUser = { 
                 id: 1, 
                 username: formData.username, 
-                role_id: 1 
-              }))
+                role_id: 1,
+                role_name: 'admin'
+              }
+              
+              // Use AuthContext login function
+              contextLogin(demoUser, token, null)
               navigate('/dashboard')
             } else {
               setError('API unavailable. Use demo credentials: admin/password')
@@ -192,12 +196,10 @@ const Login = () => {
           console.log('2FA API response:', data)
 
           if (data.success) {
-            const { access_token, user } = data.data
+            const { access_token, refresh_token, user } = data.data
             
-            // Store tokens with consistent keys
-            localStorage.setItem('access_token', access_token)
-            localStorage.setItem('authToken', access_token)
-            localStorage.setItem('user', JSON.stringify(user))
+            // Use AuthContext login function
+            contextLogin(user, access_token, refresh_token)
             
             console.log('2FA verification successful, navigating to dashboard')
             navigate('/dashboard')
@@ -212,14 +214,16 @@ const Login = () => {
           // Fallback to demo 2FA
           if (formData.twofa_code === '123456') {
             const token = 'demo-token-2fa-' + Date.now()
-            localStorage.setItem('access_token', token)
-            localStorage.setItem('authToken', token)
-            localStorage.setItem('user', JSON.stringify({
+            const demoUser = {
               id: 1, 
               username: formData.username, 
               role_id: 1,
+              role_name: 'admin',
               has_2fa: true 
-            }))
+            }
+            
+            // Use AuthContext login function
+            contextLogin(demoUser, token, null)
             navigate('/dashboard')
           } else {
             setError('API unavailable. Demo 2FA code: 123456')
@@ -246,12 +250,10 @@ const Login = () => {
           console.log('2FA setup completion API response:', data)
 
           if (data.success) {
-            const { access_token, user } = data.data
+            const { access_token, refresh_token, user } = data.data
             
-            // Store tokens with consistent keys
-            localStorage.setItem('access_token', access_token)
-            localStorage.setItem('authToken', access_token)
-            localStorage.setItem('user', JSON.stringify(user))
+            // Use AuthContext login function
+            contextLogin(user, access_token, refresh_token)
             
             console.log('2FA setup completed successfully, navigating to dashboard')
             navigate('/dashboard')

@@ -229,6 +229,24 @@ const campaignController = {
         );
       }
 
+      if (!brand) {
+        return res.status(400).json(
+          createResponse(false, 'Brand is required')
+        );
+      }
+
+      // Check if brand exists (brands are master data accessible to all)
+      const [brandCheck] = await pool.execute(
+        'SELECT id FROM brands WHERE id = ? AND is_active = 1',
+        [brand]
+      );
+
+      if (brandCheck.length === 0) {
+        return res.status(400).json(
+          createResponse(false, 'Invalid brand')
+        );
+      }
+
       // Check if campaign type exists (campaign types are now master data accessible to all)
       const [typeCheck] = await pool.execute(
         'SELECT id FROM campaign_types WHERE id = ? AND is_active = 1',
@@ -266,12 +284,34 @@ const campaignController = {
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
       `;
       
+      // Validate age values
+      const parsedMinAge = min_age ? parseInt(min_age) : null;
+      const parsedMaxAge = max_age ? parseInt(max_age) : null;
+      
+      if (parsedMinAge !== null && (parsedMinAge < 0 || parsedMinAge > 100)) {
+        return res.status(400).json(
+          createResponse(false, 'Minimum age must be between 0 and 100')
+        );
+      }
+      
+      if (parsedMaxAge !== null && (parsedMaxAge < 0 || parsedMaxAge > 100)) {
+        return res.status(400).json(
+          createResponse(false, 'Maximum age must be between 0 and 100')
+        );
+      }
+      
+      if (parsedMinAge && parsedMaxAge && parsedMinAge > parsedMaxAge) {
+        return res.status(400).json(
+          createResponse(false, 'Minimum age cannot be greater than maximum age')
+        );
+      }
+
       const params = [
         name.trim(),
         persona && persona.length > 0 ? JSON.stringify(persona) : null, // Store persona as JSON array
         gender && gender.length > 0 ? JSON.stringify(gender) : null,
-        min_age ? parseInt(min_age) : null,
-        max_age ? parseInt(max_age) : null,
+        parsedMinAge,
+        parsedMaxAge,
         location && location.length > 0 ? JSON.stringify(location) : null, // Store location as JSON array
         creatives || 'image',
         parseInt(campaign_type_id),
@@ -399,13 +439,36 @@ const campaignController = {
       }
 
       if (min_age !== undefined) {
+        const parsedMinAge = min_age ? parseInt(min_age) : null;
+        if (parsedMinAge !== null && (parsedMinAge < 0 || parsedMinAge > 100)) {
+          return res.status(400).json(
+            createResponse(false, 'Minimum age must be between 0 and 100')
+          );
+        }
         updateFields.push('min_age = ?');
-        params.push(min_age ? parseInt(min_age) : null);
+        params.push(parsedMinAge);
       }
 
       if (max_age !== undefined) {
+        const parsedMaxAge = max_age ? parseInt(max_age) : null;
+        if (parsedMaxAge !== null && (parsedMaxAge < 0 || parsedMaxAge > 100)) {
+          return res.status(400).json(
+            createResponse(false, 'Maximum age must be between 0 and 100')
+          );
+        }
         updateFields.push('max_age = ?');
-        params.push(max_age ? parseInt(max_age) : null);
+        params.push(parsedMaxAge);
+      }
+
+      // Validate age range consistency
+      if (min_age !== undefined && max_age !== undefined) {
+        const parsedMinAge = min_age ? parseInt(min_age) : null;
+        const parsedMaxAge = max_age ? parseInt(max_age) : null;
+        if (parsedMinAge && parsedMaxAge && parsedMinAge > parsedMaxAge) {
+          return res.status(400).json(
+            createResponse(false, 'Minimum age cannot be greater than maximum age')
+          );
+        }
       }
 
       if (location !== undefined) {
@@ -436,6 +499,19 @@ const campaignController = {
       }
 
       if (brand !== undefined) {
+        if (brand && brand !== null) {
+          // Check if brand exists (brands are master data accessible to all)
+          const [brandCheck] = await pool.execute(
+            'SELECT id FROM brands WHERE id = ? AND is_active = 1',
+            [brand]
+          );
+
+          if (brandCheck.length === 0) {
+            return res.status(400).json(
+              createResponse(false, 'Invalid brand')
+            );
+          }
+        }
         updateFields.push('brand = ?');
         params.push(brand ? parseInt(brand) : null); // Store brand as integer ID
       }

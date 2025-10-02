@@ -32,13 +32,27 @@ const handleDatabaseError = (error, operation = 'database operation') => {
     };
   }
 
+  if (error && error.code === 'ECONNREFUSED') {
+    return {
+      statusCode: 503,
+      response: createResponse(false, 'Database connection failed. Please try again later.')
+    };
+  }
+
+  if (error && error.code === 'ER_ACCESS_DENIED_ERROR') {
+    return {
+      statusCode: 500,
+      response: createResponse(false, 'Database access denied. Please contact administrator.')
+    };
+  }
+
   return {
     statusCode: 500,
     response: createResponse(
       false,
       'Database error occurred. Please try again later.',
       null,
-      process.env.NODE_ENV === 'development' ? { error: error.message } : null
+      process.env.NODE_ENV === 'development' ? { error: error.message, code: error.code } : null
     )
   };
 };

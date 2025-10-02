@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { PermissionProvider } from './contexts/PermissionContext'
@@ -17,6 +17,8 @@ import CardUsers from './pages/CardUsers'
 import Reports from './pages/Reports'
 import ReportsTable from './pages/ReportsTable'
 import ReportAnalyticsPage from './pages/ReportAnalyticsPage'
+import { initTotpFieldHiding } from './utils/hideTotpFields'
+import './styles/hide-totp-fields.css'
 
 // Create a component to handle authentication redirect logic
 const AuthenticatedRedirect = () => {
@@ -25,6 +27,12 @@ const AuthenticatedRedirect = () => {
 };
 
 function App() {
+  // Initialize TOTP field hiding when the app loads
+  useEffect(() => {
+    console.log('🔒 App: Initializing TOTP field hiding...');
+    initTotpFieldHiding();
+  }, []);
+
   return (
     <AuthProvider>
       <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>

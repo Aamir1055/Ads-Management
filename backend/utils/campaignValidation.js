@@ -81,7 +81,8 @@ const validateCreateCampaign = [
     .withMessage('Creatives must be one of: video, image, carousel, collection'),
   
   body('campaign_type_id')
-    .optional()
+    .notEmpty()
+    .withMessage('Campaign type is required')
     .isInt({ min: 1 })
     .withMessage('Campaign type ID must be a positive integer'),
   

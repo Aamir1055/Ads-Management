@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Token Refresh Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+        .button {
+            background-color: #007bff;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 5px;
+        }
+        .button:hover {
+            background-color: #0056b3;
+        }
+        .button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+        .warning { color: #ffc107; }
+        .info { color: #17a2b8; }
+        
+        #log {
+            background-color: #000;
+            color: #00ff00;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Token Refresh Test</h1>
+        <p>This page tests the refresh token functionality for the Ads Reporting Software.</p>
+        
+        <div class="test-section">
+            <h3>Current Status</h3>
+            <p><strong>Access Token:</strong> <span id="access-token-status">Checking...</span></p>
+            <p><strong>Refresh Token:</strong> <span id="refresh-token-status">Checking...</span></p>
+            <p><strong>User:</strong> <span id="user-status">Checking...</span></p>
+        </div>
+        
+        <div class="test-section">
+            <h3>Manual Tests</h3>
+            <button class="button" onclick="clearTokens()">Clear All Tokens</button>
+            <button class="button" onclick="loginUser()">Login</button>
+            <button class="button" onclick="testApiCall()">Test API Call</button>
+            <button class="button" onclick="refreshTokenManually()">Refresh Token</button>
+            <button class="button" onclick="testExpiredToken()">Test Expired Token</button>
+            <button class="button" onclick="runFullTest()">Run Full Test</button>
+        </div>
+        
+        <div class="test-section">
+            <h3>Test Log</h3>
+            <button class="button" onclick="clearLog()">Clear Log</button>
+            <div id="log"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:5000/api';
+        const TEST_USER = { username: 'admin', password: 'password' };
+        
+        // Logging functions
+        function log(message, type = 'info') {
+            const logElement = document.getElementById('log');
+            const timestamp = new Date().toISOString();
+            const colorClass = type === 'success' ? 'success' : 
+                              type === 'error' ? 'error' : 
+                              type === 'warning' ? 'warning' : 'info';
+            
+            logElement.innerHTML += `<span class="${colorClass}">[${timestamp}] ${message}</span>\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(`[${timestamp}] ${message}`);
+        }
+        
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+        
+        // Status update functions
+        function updateStatus() {
+            const accessToken = localStorage.getItem('access_token');
+            const refreshToken = localStorage.getItem('refresh_token');
+            const user = localStorage.getItem('user');
+            
+            document.getElementById('access-token-status').innerHTML = 
+                accessToken ? `<span class="success">Present (${accessToken.substring(0, 20)}...)</span>` : 
+                             '<span class="error">Missing</span>';
+            
+            document.getElementById('refresh-token-status').innerHTML = 
+                refreshToken ? `<span class="success">Present (${refreshToken.substring(0, 20)}...)</span>` : 
+                              '<span class="error">Missing</span>';
+            
+            document.getElementById('user-status').innerHTML = 
+                user ? `<span class="success">${JSON.parse(user).username}</span>` : 
+                      '<span class="error">Not logged in</span>';
+        }
+        
+        // Token management functions
+        function clearTokens() {
+            const keysToRemove = ['access_token', 'refresh_token', 'auth_token', 'authToken', 'user'];
+            keysToRemove.forEach(key => localStorage.removeItem(key));
+            sessionStorage.clear();
+            log('🧹 All tokens cleared');
+            updateStatus();
+        }
+        
+        async function loginUser() {
+            try {
+                log('🔑 Attempting login...');
+                
+                const response = await fetch(`${API_BASE_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(TEST_USER)
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    const { access_token, refresh_token, user } = data.data;
+                    
+                    localStorage.setItem('access_token', access_token);
+                    localStorage.setItem('refresh_token', refresh_token);
+                    localStorage.setItem('user', JSON.stringify(user));
+                    
+                    log('✅ Login successful!', 'success');
+                    log(`📋 User: ${user.username}, Role: ${user.role_id}`);
+                } else {
+                    throw new Error(data.message || 'Login failed');
+                }
+            } catch (error) {
+                log(`❌ Login failed: ${error.message}`, 'error');
+            }
+            updateStatus();
+        }
+        
+        async function testApiCall() {
+            try {
+                const token = localStorage.getItem('access_token');
+                if (!token) {
+                    throw new Error('No access token available');
+                }
+                
+                log('📡 Testing API call...');
+                
+                const response = await fetch(`${API_BASE_URL}/auth/me`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    log('✅ API call successful!', 'success');
+                    log(`📋 API returned user: ${data.data.user.username}`);
+                } else if (response.status === 401 && data.code === 'TOKEN_EXPIRED') {
+                    log('⚠️ Token expired - this is where automatic refresh would kick in', 'warning');
+                } else {
+                    throw new Error(data.message || `API call failed (${response.status})`);
+                }
+            } catch (error) {
+                log(`❌ API call failed: ${error.message}`, 'error');
+            }
+        }
+        
+        async function refreshTokenManually() {
+            try {
+                const refreshToken = localStorage.getItem('refresh_token');
+                if (!refreshToken) {
+                    throw new Error('No refresh token available');
+                }
+                
+                log('🔄 Manually refreshing token...');
+                
+                const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ refreshToken })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    const { accessToken, refreshToken: newRefreshToken } = data.data;
+                    
+                    localStorage.setItem('access_token', accessToken);
+                    localStorage.setItem('refresh_token', newRefreshToken);
+                    
+                    log('✅ Token refresh successful!', 'success');
+                    log(`📋 New access token: ${accessToken.substring(0, 20)}...`);
+                } else {
+                    throw new Error(data.message || 'Token refresh failed');
+                }
+            } catch (error) {
+                log(`❌ Token refresh failed: ${error.message}`, 'error');
+            }
+            updateStatus();
+        }
+        
+        function testExpiredToken() {
+            try {
+                const token = localStorage.getItem('access_token');
+                if (!token) {
+                    throw new Error('No access token available');
+                }
+                
+                // Create an expired token (this is a hack for testing)
+                const parts = token.split('.');
+                const payload = JSON.parse(atob(parts[1]));
+                payload.exp = Math.floor(Date.now() / 1000) - 60; // 1 minute ago
+                
+                const expiredToken = parts[0] + '.' + btoa(JSON.stringify(payload)) + '.' + parts[2];
+                localStorage.setItem('access_token', expiredToken);
+                
+                log('⏰ Created expired token for testing', 'warning');
+                log('📝 Now try "Test API Call" - it should show TOKEN_EXPIRED');
+            } catch (error) {
+                log(`❌ Failed to create expired token: ${error.message}`, 'error');
+            }
+            updateStatus();
+        }
+        
+        async function runFullTest() {
+            log('🚀 Starting full test sequence...', 'info');
+            
+            try {
+                // Step 1: Clear tokens
+                clearTokens();
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // Step 2: Login
+                await loginUser();
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // Step 3: Test API call
+                await testApiCall();
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // Step 4: Refresh token
+                await refreshTokenManually();
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // Step 5: Test API call again
+                await testApiCall();
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // Step 6: Test expired token
+                testExpiredToken();
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // Step 7: Try API call with expired token
+                await testApiCall();
+                
+                log('🎉 Full test sequence completed!', 'success');
+                
+            } catch (error) {
+                log(`💥 Full test failed: ${error.message}`, 'error');
+            }
+        }
+        
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            log('🔐 Token Refresh Test Page Loaded');
+            log('📋 Backend URL: ' + API_BASE_URL);
+            updateStatus();
+            
+            // Auto-run test if requested
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('autorun') === 'true') {
+                setTimeout(runFullTest, 1000);
+            }
+        });
+        
+        // Update status every 5 seconds
+        setInterval(updateStatus, 5000);
+    </script>
+</body>
+</html>

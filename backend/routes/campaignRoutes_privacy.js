@@ -21,8 +21,12 @@ const {
   createCampaign,
   updateCampaign,
   deleteCampaign,
-  toggleCampaignStatus
+  toggleCampaignStatus,
+  getCampaignStats,
+  getCampaignsByBrand
 } = require('../controllers/campaignController_privacy');
+
+// Note: updateCampaign is already imported above for activate/deactivate functionality
 
 // =============================================================================
 // MIDDLEWARE
@@ -122,6 +126,30 @@ router.get('/',
 );
 
 /**
+ * GET /api/campaigns/stats
+ * Gets campaign statistics (user-based filtering)
+ * - RBAC: Requires campaigns_read permission
+ * - Frontend compatibility endpoint
+ */
+router.get('/stats', 
+  listLimiter,
+  createPermissionMiddleware.campaigns.read(), // 🔒 RBAC: campaigns_read required
+  getCampaignStats
+);
+
+/**
+ * GET /api/campaigns/by-brand/:brandId
+ * Gets campaigns filtered by brand (user-based filtering)
+ * - RBAC: Requires campaigns_read permission
+ * - Frontend compatibility endpoint
+ */
+router.get('/by-brand/:brandId', 
+  listLimiter,
+  createPermissionMiddleware.campaigns.read(), // 🔒 RBAC: campaigns_read required
+  getCampaignsByBrand
+);
+
+/**
  * GET /api/campaigns/:id
  * Gets single campaign with ownership validation
  * - RBAC: Requires campaigns_read permission
@@ -181,6 +209,18 @@ router.patch('/:id/toggle-status',
 );
 
 /**
+ * PUT /api/campaigns/:id/toggle-status
+ * Toggles campaign status with ownership validation (frontend compatibility)
+ * - RBAC: Requires campaigns_update permission
+ */
+router.put('/:id/toggle-status', 
+  updateLimiter,
+  createPermissionMiddleware.campaigns.update(), // 🔒 RBAC: campaigns_update required
+  validateOwnership('campaigns', 'created_by', 'id'), 
+  toggleCampaignStatus
+);
+
+/**
  * PUT /api/campaigns/:id/toggle-enabled
  * Toggles campaign enabled/disabled status with ownership validation
  * - RBAC: Requires campaigns_update permission
@@ -191,6 +231,50 @@ router.put('/:id/toggle-enabled',
   createPermissionMiddleware.campaigns.update(), // 🔒 RBAC: campaigns_update required
   validateOwnership('campaigns', 'created_by', 'id'), 
   toggleCampaignStatus // Uses same controller method
+);
+
+/**
+ * PUT /api/campaigns/:id/activate
+ * Activates a campaign (sets is_enabled = true) with ownership validation
+ * - RBAC: Requires campaigns_update permission
+ * - Frontend compatibility endpoint
+ */
+router.put('/:id/activate', 
+  updateLimiter,
+  createPermissionMiddleware.campaigns.update(), // 🔒 RBAC: campaigns_update required
+  validateOwnership('campaigns', 'created_by', 'id'),
+  async (req, res, next) => {
+    try {
+      // Override the request body to force activation (is_enabled = true)
+      req.body = { is_enabled: true };
+      req.forceStatus = true; // Signal that we want to force a specific status
+      return updateCampaign(req, res);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * PUT /api/campaigns/:id/deactivate
+ * Deactivates a campaign (sets is_enabled = false) with ownership validation
+ * - RBAC: Requires campaigns_update permission
+ * - Frontend compatibility endpoint
+ */
+router.put('/:id/deactivate', 
+  updateLimiter,
+  createPermissionMiddleware.campaigns.update(), // 🔒 RBAC: campaigns_update required
+  validateOwnership('campaigns', 'created_by', 'id'),
+  async (req, res, next) => {
+    try {
+      // Override the request body to force deactivation (is_enabled = false)
+      req.body = { is_enabled: false };
+      req.forceStatus = false; // Signal that we want to force a specific status
+      return updateCampaign(req, res);
+    } catch (error) {
+      next(error);
+    }
+  }
 );
 
 // =============================================================================
@@ -205,11 +289,16 @@ router.use((req, res) => {
     availableRoutes: {
       'GET /campaigns': 'Get all campaigns (filtered by user)',
       'POST /campaigns': 'Create new campaign (auto-assigned to user)',
+      'GET /campaigns/stats': 'Get campaign statistics (filtered by user)',
+      'GET /campaigns/by-brand/:brandId': 'Get campaigns by brand (filtered by user)',
       'GET /campaigns/:id': 'Get campaign by ID (ownership validated)',
       'PUT /campaigns/:id': 'Update campaign (ownership validated)',
       'DELETE /campaigns/:id': 'Delete campaign (ownership validated)',
       'PATCH /campaigns/:id/toggle-status': 'Toggle campaign status (ownership validated)',
-      'PUT /campaigns/:id/toggle-enabled': 'Toggle campaign enabled/disabled status (ownership validated)'
+      'PUT /campaigns/:id/toggle-status': 'Toggle campaign status (ownership validated)',
+      'PUT /campaigns/:id/toggle-enabled': 'Toggle campaign enabled/disabled status (ownership validated)',
+      'PUT /campaigns/:id/activate': 'Activate campaign (ownership validated)',
+      'PUT /campaigns/:id/deactivate': 'Deactivate campaign (ownership validated)'
     }
   });
 });

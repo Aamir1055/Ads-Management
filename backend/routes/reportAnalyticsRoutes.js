@@ -127,6 +127,67 @@ router.use(enhanceUserContext);
 // Analytics Routes
 // ----------------------------------------------------------------------------
 
+// Root Analytics Endpoint
+// GET /api/analytics
+router.get('/', async (req, res) => {
+  try {
+    const { pool } = require('../config/database');
+    
+    // Get basic analytics data
+    const [basicStats] = await pool.execute(`
+      SELECT 
+        COUNT(DISTINCT r.campaign_id) as total_campaigns,
+        COUNT(*) as total_reports,
+        SUM(r.leads) as total_leads,
+        SUM(r.spent) as total_spent
+      FROM reports r
+      WHERE r.id IS NOT NULL
+      LIMIT 1
+    `);
+
+    const stats = basicStats[0] || {
+      total_campaigns: 0,
+      total_reports: 0, 
+      total_leads: 0,
+      total_spent: 0
+    };
+
+    res.json({
+      success: true,
+      message: 'Analytics data retrieved successfully',
+      timestamp: new Date().toISOString(),
+      data: {
+        overview: {
+          totalCampaigns: Number(stats.total_campaigns || 0),
+          totalReports: Number(stats.total_reports || 0),
+          totalLeads: Number(stats.total_leads || 0),
+          totalSpent: Number(stats.total_spent || 0)
+        },
+        user: req.analytics || {
+          userId: req.user?.userId,
+          role: req.user?.role_name || 'user'
+        },
+        availableEndpoints: {
+          dashboard: '/api/analytics/dashboard',
+          timeSeries: '/api/analytics/charts/time-series',
+          campaignPerformance: '/api/analytics/charts/campaign-performance',
+          brandAnalysis: '/api/analytics/charts/brand-analysis',
+          trends: '/api/analytics/insights/trends'
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Analytics root error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch analytics data',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // Dashboard Overview
 // GET /api/analytics/dashboard
 router.get('/dashboard', dashboardLimiter, getDashboardOverview);

@@ -13,7 +13,8 @@ const {
   generateReport,       // GET /generate
   getFilterOptions,     // GET /filters
   getDashboardStats,    // GET /dashboard
-  getChartData          // GET /charts
+  getChartData,         // GET /charts
+  exportToExcel         // GET /export
 } = require('../controllers/reportController');
 
 const { authenticateToken } = require('../middleware/authMiddleware');
@@ -118,13 +119,16 @@ router.get('/dashboard', readLimiter, modulePermissions.reports.read, getDashboa
 // Get chart-ready datasets (requires read permission)
 router.get('/charts', readLimiter, modulePermissions.reports.read, getChartData);
 
+// Export reports to Excel (requires read permission) - MUST come before /:id
+router.get('/export', readLimiter, modulePermissions.reports.read, exportToExcel);
+
 // List reports (requires read permission)
 router.get('/', readLimiter, modulePermissions.reports.read, getAll);
 
 // Create a new report (requires create permission)
 router.post('/', buildLimiter, modulePermissions.reports.create, createReport);
 
-// Get a single report row by id (requires read permission)
+// Get a single report row by id (requires read permission) - MUST come after specific routes
 router.get('/:id', readLimiter, modulePermissions.reports.read, getById);
 
 // Update an existing report by id (requires update permission)
@@ -149,6 +153,7 @@ router.use((req, res) => {
       'GET /api/reports/filters': 'Get available filter options (brands, campaigns, date ranges)',
 'GET /api/reports/dashboard': 'Get dashboard statistics and overview',
       'GET /api/reports/charts?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD': 'Get normalized datasets for charts',
+      'GET /api/reports/export?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD': 'Export reports to Excel file',
       'GET /api/reports': 'List reports (filters: campaign_id, date_from, date_to, month, search; pagination: page, limit)',
       'POST /api/reports': 'Create a new report (manual entry)',
       'GET /api/reports/:id': 'Get a single report row by id',

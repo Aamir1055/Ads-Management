@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+// SECURITY FIX: Use safe secure userController (replacement for dangerous version)
 const {
   createUser,
   getAllUsers,

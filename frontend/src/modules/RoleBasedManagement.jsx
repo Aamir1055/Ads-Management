@@ -83,10 +83,18 @@ const RoleBasedManagement = () => {
 
   const groupedPermsByModule = useMemo(() => {
     const map = {}
-    for (const perm of permissions) {
-      const moduleKey = perm.module_key || perm.module || 'general'
-      if (!map[moduleKey]) map[moduleKey] = []
-      map[moduleKey].push(perm)
+    if (Array.isArray(permissions)) {
+      for (const perm of permissions) {
+        // Handle different possible property names for module
+        const moduleKey = perm.module_key || perm.module_name || perm.module || 'general'
+        if (!map[moduleKey]) {
+          map[moduleKey] = {
+            name: moduleKey,
+            permissions: []
+          }
+        }
+        map[moduleKey].permissions.push(perm)
+      }
     }
     return map
   }, [permissions])

@@ -18,8 +18,10 @@ import {
 } from 'lucide-react';
 import { formatDate } from '../utils/dateUtils';
 import { handleAccessDenied, isAccessDeniedError, getAccessDeniedMessageProps } from '../utils/accessDeniedHandler';
+import config from '../config/config';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+// FIXED: Use centralized configuration
+const API_BASE_URL = config.API_BASE_URL;
 
 // Modal Component
 const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
@@ -335,13 +337,16 @@ const UserManagement = () => {
 
   // API functions
   const getAuthHeader = () => {
-    const token = localStorage.getItem('access_token') || localStorage.getItem('authToken');
-    console.log('🔍 Debug Auth Header:', {
-      access_token: localStorage.getItem('access_token'),
-      authToken: localStorage.getItem('authToken'),
-      finalToken: token,
-      hasToken: !!token
-    });
+    // FIXED: Standardize token usage to centralized config
+    const token = localStorage.getItem(config.TOKEN_KEY) || (config.DEBUG ? localStorage.getItem('authToken') : null);
+    if (config.DEBUG) {
+      console.log('🔍 Debug Auth Header:', {
+        access_token: localStorage.getItem(config.TOKEN_KEY),
+        authToken: localStorage.getItem('authToken'),
+        finalToken: token,
+        hasToken: !!token
+      });
+    }
     return token ? { Authorization: `Bearer ${token}` } : {};
   };
 
@@ -403,7 +408,11 @@ const UserManagement = () => {
       const data = await response.json();
       
       if (data.success) {
-        setMessage({ type: 'success', content: 'User created successfully! If 2FA is enabled, the user will set it up during their first login.' });
+        let successMessage = 'User created successfully!';
+        if (userData.enable_2fa) {
+          successMessage += ' 2FA has been enabled and the secret has been generated automatically. The user will configure their authenticator app during first login.';
+        }
+        setMessage({ type: 'success', content: successMessage });
         setShowUserModal(false);
         await fetchUsers();
       } else {
@@ -412,23 +421,22 @@ const UserManagement = () => {
     } catch (error) {
       console.error('Error creating user:', error);
       
-      // Handle access denied errors - show in modal instead of closing
-      if (isAccessDeniedError(error)) {
-        const errorResponse = error?.response;
-        const errorData = errorResponse?.data;
-        let accessDeniedMessage = '';
-        
-        if (errorResponse?.status === 403) {
-          accessDeniedMessage = errorData?.message || 'Access denied. You do not have permission to create users.';
-        } else if (errorResponse?.status === 401) {
-          accessDeniedMessage = 'Authentication required. Please log in first.';
-        } else {
-          accessDeniedMessage = errorData?.message || error?.message || 'Access denied while creating user';
-        }
-        
-        setModalAccessDeniedMessage(accessDeniedMessage);
+      // Handle access denied errors - normalize error from fetch vs axios
+      const normalized = (() => {
+        // axios-style error
+        if (error && error.response) return { status: error.response.status, message: error.response.data?.message || error.message }
+        // fetch-style error (we already parsed body above when possible)
+        return { status: undefined, message: error?.message }
+      })();
+
+      if (normalized.status === 403) {
+        setModalAccessDeniedMessage(normalized.message || 'Access denied. You do not have permission to create users.');
+      } else if (normalized.status === 401) {
+        setModalAccessDeniedMessage('Authentication required. Please log in first.');
+      } else if (isAccessDeniedError(error)) {
+        setModalAccessDeniedMessage(normalized.message || 'Access denied while creating user');
       } else {
-        setMessage({ type: 'error', content: 'Failed to create user' });
+        setMessage({ type: 'error', content: normalized.message || 'Failed to create user' });
       }
     } finally {
       setIsSubmitting(false);
@@ -463,24 +471,21 @@ const UserManagement = () => {
     } catch (error) {
       console.error('Error updating user:', error);
       
-      // Handle access denied errors - show in modal instead of closing
-      if (isAccessDeniedError(error)) {
-        const errorResponse = error?.response;
-        const errorData = errorResponse?.data;
-        let accessDeniedMessage = '';
-        
-        if (errorResponse?.status === 403) {
-          accessDeniedMessage = errorData?.message || 'Access denied. You do not have permission to update users.';
-        } else if (errorResponse?.status === 401) {
-          accessDeniedMessage = 'Authentication required. Please log in first.';
-        } else {
-          accessDeniedMessage = errorData?.message || error?.message || 'Access denied while updating user';
-        }
-        
-        setModalAccessDeniedMessage(accessDeniedMessage);
+      // Handle access denied errors - normalize error from fetch vs axios
+      const normalized = (() => {
+        if (error && error.response) return { status: error.response.status, message: error.response.data?.message || error.message }
+        return { status: undefined, message: error?.message }
+      })();
+
+      if (normalized.status === 403) {
+        setModalAccessDeniedMessage(normalized.message || 'Access denied. You do not have permission to update users.');
+      } else if (normalized.status === 401) {
+        setModalAccessDeniedMessage('Authentication required. Please log in first.');
+      } else if (isAccessDeniedError(error)) {
+        setModalAccessDeniedMessage(normalized.message || 'Access denied while updating user');
       } else {
         // Show error in modal, not on main page
-        setModalError(error?.response?.data?.message || error?.message || 'Failed to update user');
+        setModalError(normalized.message || 'Failed to update user');
       }
     } finally {
       setIsSubmitting(false);
@@ -559,12 +564,15 @@ const UserManagement = () => {
   }, []);
 
   useEffect(() => {
+    let timer;
     if (message.content && !message.isAccessDenied) { // Don't auto-close access denied messages
-      const timer = setTimeout(() => {
+      timer = setTimeout(() => {
         setMessage({ type: '', content: '', isAccessDenied: false });
       }, 5000);
-      return () => clearTimeout(timer);
     }
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
   }, [message]);
 
   if (loading) {

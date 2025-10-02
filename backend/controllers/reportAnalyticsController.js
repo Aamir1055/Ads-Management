@@ -85,9 +85,16 @@ const reportAnalyticsController = {
           COUNT(DISTINCT r.campaign_id) as campaigns_count,
           SUM(r.leads) as total_leads,
           SUM(r.spent) as total_spent,
-          AVG(r.cost_per_lead) as avg_cost_per_lead,
+          COALESCE(
+            CASE 
+              WHEN SUM(r.leads) > 0 THEN SUM(r.spent) / SUM(r.leads)
+              ELSE 0
+            END, 0
+          ) as avg_cost_per_lead,
           SUM(r.facebook_result) as facebook_results,
-          SUM(r.zoho_result) as zoho_results
+          SUM(r.zoho_result) as zoho_results,
+          AVG(r.facebook_cost_per_lead) as avg_facebook_cost_per_lead,
+          AVG(r.zoho_cost_per_lead) as avg_zoho_cost_per_lead
         FROM reports r
         ${monthWhere}
       `, monthParams);
@@ -123,12 +130,22 @@ const reportAnalyticsController = {
           r.campaign_id,
           r.campaign_name,
           r.brand,
+          r.brand_name,
           SUM(r.leads) as total_leads,
           SUM(r.spent) as total_spent,
-          AVG(r.cost_per_lead) as avg_cost_per_lead
+          SUM(r.facebook_result) as facebook_results,
+          SUM(r.zoho_result) as zoho_results,
+          AVG(r.facebook_cost_per_lead) as avg_facebook_cost_per_lead,
+          AVG(r.zoho_cost_per_lead) as avg_zoho_cost_per_lead,
+          COALESCE(
+            CASE 
+              WHEN SUM(r.leads) > 0 THEN SUM(r.spent) / SUM(r.leads)
+              ELSE 0
+            END, 0
+          ) as avg_cost_per_lead
         FROM reports r
         ${monthWhere}
-        GROUP BY r.campaign_id, r.campaign_name, r.brand
+        GROUP BY r.campaign_id, r.campaign_name, r.brand, r.brand_name
         ORDER BY total_leads DESC
         LIMIT 5
       `, monthParams);
@@ -137,12 +154,17 @@ const reportAnalyticsController = {
       const [brandPerformance] = await pool.query(`
         SELECT
           COALESCE(r.brand, 'Unknown') as brand,
+          COALESCE(r.brand_name, 'Unknown Brand') as brand_name,
           SUM(r.leads) as total_leads,
           SUM(r.spent) as total_spent,
+          SUM(r.facebook_result) as facebook_results,
+          SUM(r.zoho_result) as zoho_results,
+          AVG(r.facebook_cost_per_lead) as avg_facebook_cost_per_lead,
+          AVG(r.zoho_cost_per_lead) as avg_zoho_cost_per_lead,
           COUNT(DISTINCT r.campaign_id) as campaigns_count
         FROM reports r
         ${monthWhere}
-        GROUP BY r.brand
+        GROUP BY r.brand, r.brand_name
         ORDER BY total_leads DESC
         LIMIT 10
       `, monthParams);
@@ -170,7 +192,9 @@ const reportAnalyticsController = {
           totalSpent: Number(currentStats.total_spent || 0),
           avgCostPerLead: Number(currentStats.avg_cost_per_lead || 0),
           facebookResults: Number(currentStats.facebook_results || 0),
-          zohoResults: Number(currentStats.zoho_results || 0)
+          zohoResults: Number(currentStats.zoho_results || 0),
+          avgFacebookCostPerLead: Number(currentStats.avg_facebook_cost_per_lead || 0),
+          avgZohoCostPerLead: Number(currentStats.avg_zoho_cost_per_lead || 0)
         },
         dailyComparison: {
           today: {

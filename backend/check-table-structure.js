@@ -12,7 +12,7 @@ async function checkTableStructure() {
     console.log('🔍 CHECKING TABLE STRUCTURES');
     console.log('============================\n');
 
-    const tables = ['roles', 'permissions', 'modules', 'role_permissions', 'user_roles', 'users'];
+    const tables = ['campaigns', 'reports', 'campaign_types', 'roles', 'permissions', 'modules'];
     
     for (const table of tables) {
       console.log(`📋 ${table} table structure:`);

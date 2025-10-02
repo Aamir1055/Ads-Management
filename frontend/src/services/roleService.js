@@ -179,10 +179,16 @@ export const roleService = {
     }
   },
 
-  // Update role
+  // Update role - Use permissions controller endpoint
   updateRole: async (roleId, roleData) => {
     try {
-      const response = await api.put(`/permissions/roles/${roleId}`, roleData)
+      // Convert frontend format to backend expected format
+      const backendData = {
+        role_name: roleData.name, // Backend expects role_name
+        description: roleData.description,
+        is_active: roleData.is_active !== undefined ? roleData.is_active : true
+      }
+      const response = await api.put(`/permissions/roles/${roleId}`, backendData)
       return response.data
     } catch (error) {
       console.error('Error updating role:', error)
@@ -193,9 +199,9 @@ export const roleService = {
   // Update role with permissions
   updateRoleWithPermissions: async (roleId, roleName, description, permissions = []) => {
     try {
-      // First update the role details
+      // First update the role details using permissions controller
       const roleResponse = await api.put(`/permissions/roles/${roleId}`, {
-        name: roleName,
+        role_name: roleName, // Backend expects role_name
         description: description
       })
       

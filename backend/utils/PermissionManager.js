@@ -271,25 +271,27 @@ class PermissionManager {
         }
     }
 
-    /**
-     * Get all available roles
-     * @returns {Promise<Array>}
-     */
-    static async getAllRoles() {
-        try {
-            const [rows] = await pool.query(`
-                SELECT id, name, description, level, is_system_role, is_active
-                FROM roles
-                WHERE is_active = 1
-                ORDER BY level DESC, name
-            `);
-            
-            return rows;
-        } catch (error) {
-            console.error('Error getting all roles:', error);
-            return [];
-        }
+  /**
+   * Get all available roles for dropdown/selection
+   * @param {boolean} includeInactive - Whether to include inactive roles
+   * @returns {Promise<Array>}
+   */
+  static async getAllAvailableRoles(includeInactive = false) {
+    try {
+      const query = `
+        SELECT id, name, description, level, is_system_role, is_active
+        FROM roles
+        ${includeInactive ? '' : 'WHERE is_active = 1'}
+        ORDER BY level DESC, name
+      `;
+      
+      const [rows] = await pool.query(query);
+      return rows;
+    } catch (error) {
+      console.error('Error getting all available roles:', error);
+      return [];
     }
+  }
 
     /**
      * Get all permissions for a role

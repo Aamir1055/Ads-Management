@@ -2,10 +2,12 @@ const express = require('express');
 const router = express.Router();
 const { login, loginWith2FA, logout, getMe, validateCredentials } = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
+const { refreshAccessToken } = require('../middleware/authMiddleware');
 
 // Public routes
 router.post('/login', login);
 router.post('/login-2fa', loginWith2FA);
+router.post('/refresh', refreshAccessToken);
 router.post('/logout', logout);
 
 // Protected routes

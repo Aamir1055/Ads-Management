@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Auth State</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .section { margin-bottom: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
+        .token { word-break: break-all; font-family: monospace; background: #f5f5f5; padding: 5px; }
+        .success { color: green; }
+        .error { color: red; }
+        .warning { color: orange; }
+        button { margin: 5px; padding: 10px 15px; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Authentication State Debugger</h1>
+    
+    <div class="section">
+        <h3>Current Tokens</h3>
+        <p><strong>Access Token:</strong> <span id="access-token">Checking...</span></p>
+        <p><strong>Refresh Token:</strong> <span id="refresh-token">Checking...</span></p>
+        <p><strong>Legacy AuthToken:</strong> <span id="auth-token">Checking...</span></p>
+        <p><strong>User Data:</strong> <span id="user-data">Checking...</span></p>
+    </div>
+
+    <div class="section">
+        <h3>Actions</h3>
+        <button onclick="refreshStatus()">🔄 Refresh Status</button>
+        <button onclick="clearAllTokens()">🧹 Clear All Tokens</button>
+        <button onclick="testLogin()">🔑 Test Login</button>
+        <button onclick="testApiCall()">📡 Test API Call</button>
+        <button onclick="testTokenRefresh()">🔄 Test Token Refresh</button>
+    </div>
+
+    <div class="section">
+        <h3>Test Log</h3>
+        <div id="log" style="background: #000; color: #0f0; padding: 10px; height: 200px; overflow-y: scroll; font-family: monospace;"></div>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:5000/api';
+        
+        function log(message, type = 'info') {
+            const logEl = document.getElementById('log');
+            const timestamp = new Date().toISOString();
+            const color = type === 'error' ? '#f00' : type === 'success' ? '#0f0' : type === 'warning' ? '#fa0' : '#0ff';
+            logEl.innerHTML += `<span style="color: ${color}">[${timestamp}] ${message}</span>\n`;
+            logEl.scrollTop = logEl.scrollHeight;
+            console.log(`[${timestamp}] ${message}`);
+        }
+        
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+        
+        function refreshStatus() {
+            const accessToken = localStorage.getItem('access_token');
+            const refreshToken = localStorage.getItem('refresh_token');
+            const authToken = localStorage.getItem('authToken');
+            const userData = localStorage.getItem('user');
+            
+            document.getElementById('access-token').innerHTML = accessToken ? 
+                `<span class="success">Present (${accessToken.substring(0, 30)}...)</span>` : 
+                '<span class="error">Missing</span>';
+                
+            document.getElementById('refresh-token').innerHTML = refreshToken ? 
+                `<span class="success">Present (${refreshToken.substring(0, 30)}...)</span>` : 
+                '<span class="error">Missing</span>';
+                
+            document.getElementById('auth-token').innerHTML = authToken ? 
+                `<span class="warning">Present (${authToken.substring(0, 30)}...)</span>` : 
+                '<span class="success">Not present (good)</span>';
+                
+            document.getElementById('user-data').innerHTML = userData ? 
+                `<span class="success">Present: ${JSON.parse(userData).username || 'Unknown'}</span>` : 
+                '<span class="error">Missing</span>';
+                
+            log('Status refreshed');
+        }
+        
+        function clearAllTokens() {
+            const keys = ['access_token', 'refresh_token', 'authToken', 'auth_token', 'user'];
+            keys.forEach(key => localStorage.removeItem(key));
+            sessionStorage.clear();
+            log('All tokens cleared', 'warning');
+            refreshStatus();
+        }
+        
+        async function testLogin() {
+            try {
+                log('Attempting login...', 'info');
+                
+                const response = await fetch(`${API_BASE_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: 'admin', password: 'password' })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    const { access_token, refresh_token, user } = data.data;
+                    
+                    localStorage.setItem('access_token', access_token);
+                    localStorage.setItem('refresh_token', refresh_token);
+                    localStorage.setItem('user', JSON.stringify(user));
+                    
+                    log('Login successful!', 'success');
+                    log(`User: ${user.username}, Role: ${user.role_id}`, 'success');
+                } else {
+                    log(`Login failed: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                log(`Login error: ${error.message}`, 'error');
+            }
+            
+            refreshStatus();
+        }
+        
+        async function testApiCall() {
+            try {
+                const token = localStorage.getItem('access_token');
+                if (!token) {
+                    log('No access token - login first', 'error');
+                    return;
+                }
+                
+                log('Testing API call...', 'info');
+                
+                const response = await fetch(`${API_BASE_URL}/auth/me`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    log('API call successful!', 'success');
+                    log(`API returned: ${data.data.user.username}`, 'success');
+                } else if (response.status === 401) {
+                    log(`API call failed with 401: ${data.message || data.code}`, 'error');
+                } else {
+                    log(`API call failed: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                log(`API call error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testTokenRefresh() {
+            try {
+                const refreshToken = localStorage.getItem('refresh_token');
+                if (!refreshToken) {
+                    log('No refresh token available', 'error');
+                    return;
+                }
+                
+                log('Testing token refresh...', 'info');
+                
+                const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ refreshToken })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    const { accessToken, refreshToken: newRefreshToken } = data.data;
+                    
+                    localStorage.setItem('access_token', accessToken);
+                    localStorage.setItem('refresh_token', newRefreshToken);
+                    
+                    log('Token refresh successful!', 'success');
+                    log(`New access token: ${accessToken.substring(0, 30)}...`, 'success');
+                } else {
+                    log(`Token refresh failed: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                log(`Token refresh error: ${error.message}`, 'error');
+            }
+            
+            refreshStatus();
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            log('Auth State Debugger loaded', 'info');
+            refreshStatus();
+            
+            // Auto-refresh status every 10 seconds
+            setInterval(refreshStatus, 10000);
+        });
+    </script>
+</body>
+</html>
