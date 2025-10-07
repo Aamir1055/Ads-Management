@@ -88,6 +88,12 @@ const reportsService = {
         const reports = Array.isArray(response.data.data) ? response.data.data : [];
         const meta = response.data.meta || {};
         
+        // Brand ID to Name mapping (as backup when API doesn't return brand_name)
+        const brandIdToName = {
+          53: 'Tradekaro',
+          54: 'BazaarFX'
+        };
+        
         // Transform reports data to match Reports page format
         const transformedReports = reports.map(report => {
           const spent = parseFloat(report.spent) || 0;
@@ -99,11 +105,19 @@ const reportsService = {
           const facebookResult = Math.round(leads * 0.526); // 100/190 = 0.526
           const zohoResult = leads - facebookResult; // Remainder goes to Zoho
           
+          // Determine brand name: prefer API brand_name, fallback to mapping, then Unknown
+          let brandName = 'Unknown Brand';
+          if (report.brand_name) {
+            brandName = report.brand_name;
+          } else if (report.brand && brandIdToName[report.brand]) {
+            brandName = brandIdToName[report.brand];
+          }
+          
           return {
             id: report.id,
             campaign_id: report.campaign_id,
             campaign_name: report.campaign_name,
-            brand: 'Tradekaro', // Since brand_name not returned, hardcode for now
+            brand: brandName, // Always show meaningful brand name
             report_date: report.report_date,
             facebook_result: facebookResult,
             zoho_result: zohoResult,

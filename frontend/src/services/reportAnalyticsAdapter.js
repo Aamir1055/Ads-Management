@@ -67,7 +67,7 @@ export const fetchAnalyticsData = async (filters) => {
 
         // Brand analysis data
         byBrand: brandResult.data.brands.map(brand => ({
-          brand: brand.brand || 'Unknown',
+          brand: brand.brand_name || 'Unknown', // Prefer brand name; avoid showing numeric IDs
           leads: brand.totalLeads,
           spent: brand.totalSpent
         }))
@@ -103,15 +103,15 @@ export const fetchFilterOptions = async () => {
       throw new Error(result.message || 'Failed to load filter options');
     }
 
-    // Transform brands and campaigns for dropdown lists
+    // Transform brands and campaigns for dropdown lists (show names, never numeric IDs)
     return {
       success: true,
       data: {
-        brands: result.data.brandPerformance.map(brand => brand.brand || 'Unknown'),
+        brands: result.data.brandPerformance.map(brand => brand.brand_name || 'Unknown'),
         campaigns: result.data.topCampaigns.map(campaign => ({
           id: campaign.campaign_id,
           name: campaign.campaign_name,
-          brand: campaign.brand
+          brand: campaign.brand_name || 'Unknown'
         })),
         dateRange: {
           min: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 1 year ago

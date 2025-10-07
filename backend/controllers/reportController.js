@@ -270,7 +270,7 @@ const reportsController = {
           r.campaign_name,
           r.campaign_type,
           r.brand as brand_id,
-          r.brand_name as brand_name,
+          COALESCE(r.brand_name, b.name, 'Unknown Brand') as brand_name,
           r.leads,
           r.facebook_result,
           r.zoho_result,
@@ -279,6 +279,7 @@ const reportsController = {
           r.created_at,
           r.updated_at
         FROM reports r
+        LEFT JOIN brands b ON r.brand = b.id
         ${whereClause}
         ORDER BY r.report_date DESC, r.id DESC 
         LIMIT ? OFFSET ?
@@ -288,6 +289,20 @@ const reportsController = {
       const totalCount = Number(countRows[0]?.total || 0);
 
       const [rows] = await pool.query(dataSql, [...params, limit, offset]);
+      
+      // DEBUG: Log the actual query results to see if brand_name is present
+      console.log('[DEBUG] Reports API - Query returned', rows?.length || 0, 'rows');
+      if (rows && rows.length > 0) {
+        console.log('[DEBUG] First row keys:', Object.keys(rows[0]));
+        console.log('[DEBUG] First row brand_name:', rows[0].brand_name, '(type:', typeof rows[0].brand_name, ')');
+        console.log('[DEBUG] First row sample:', {
+          id: rows[0].id,
+          campaign_name: rows[0].campaign_name,
+          brand: rows[0].brand,
+          brand_name: rows[0].brand_name
+        });
+      }
+      
       const totalPages = Math.max(1, Math.ceil(totalCount / limit));
 
       const meta = {
@@ -308,7 +323,23 @@ const reportsController = {
         }
       };
 
-      return res.status(200).json(createResponse(true, `Retrieved ${rows?.length || 0} report row(s)`, rows || [], meta));
+      // DEBUG: Log what's being sent in the response
+      console.log('[DEBUG] Final response data - rows length:', rows?.length || 0);
+      if (rows && rows.length > 0) {
+        console.log('[DEBUG] Final response - first row sample:', {
+          id: rows[0].id,
+          campaign_name: rows[0].campaign_name,
+          brand_id: rows[0].brand_id,
+          brand_name: rows[0].brand_name,
+          hasOwnProperty_brand_name: rows[0].hasOwnProperty('brand_name')
+        });
+      }
+      
+      const responseData = rows || [];
+      console.log('[DEBUG] Response data type:', typeof responseData);
+      console.log('[DEBUG] Response is array:', Array.isArray(responseData));
+      
+      return res.status(200).json(createResponse(true, `Retrieved ${rows?.length || 0} report row(s)`, responseData, meta));
     } catch (error) {
       return handleDbError(error, 'retrieve reports', res);
     }
