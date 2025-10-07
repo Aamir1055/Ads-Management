@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Target } from 'lucide-react'
+import config from '../config/config'
 
 const LoginSimple = () => {
   const [formData, setFormData] = useState({
@@ -26,7 +27,7 @@ const LoginSimple = () => {
     try {
       // Step 1: Try backend API first
       
-      const response = await fetch('http://localhost:5000/api/auth/login', {
+      const response = await fetch(`${config.API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

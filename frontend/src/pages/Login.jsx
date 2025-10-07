@@ -4,6 +4,7 @@ import { Eye, EyeOff, Target, Shield, ShieldCheck } from 'lucide-react'
 import { twoFactorApi } from '../utils/api'
 import { clearAllTokens, handleAuthError } from '../utils/tokenCleanup'
 import { useAuth } from '../contexts/AuthContext'
+import config from '../config/config'
 
 const Login = () => {
   const { login: contextLogin } = useAuth()
@@ -77,7 +78,7 @@ const Login = () => {
         // Production mode - real API call
         console.log('Making API call to backend...')
         try {
-          const response = await fetch('http://localhost:5000/api/auth/login', {
+          const response = await fetch(`${config.API_BASE_URL}/auth/login`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -181,7 +182,7 @@ const Login = () => {
         try {
           console.log('Making 2FA API call with user ID:', userId, 'token:', formData.twofa_code)
           
-          const response = await fetch('http://localhost:5000/api/auth/login-2fa', {
+          const response = await fetch(`${config.API_BASE_URL}/auth/login-2fa`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -235,7 +236,7 @@ const Login = () => {
         try {
           console.log('Completing 2FA setup with user ID:', userId, 'token:', formData.twofa_code)
           
-          const response = await fetch('http://localhost:5000/api/auth/login-2fa', {
+          const response = await fetch(`${config.API_BASE_URL}/auth/login-2fa`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

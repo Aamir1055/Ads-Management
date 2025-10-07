@@ -3,7 +3,7 @@ const { pool, testConnection } = require('./config/database');
 const ReportAnalyticsWebSocket = require('./websocket/reportAnalyticsSocket');
 require('dotenv').config();
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT;
 let server; // HTTP server instance
 let analyticsWS = null; // WebSocket server instance
 let forceCloseTimer = null;

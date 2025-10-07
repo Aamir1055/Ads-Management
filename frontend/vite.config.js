@@ -5,10 +5,10 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
-    port: 3000,
+    port: process.env.VITE_PORT || process.env.PORT,
     proxy: {
       '/api': {
-        target: 'http://localhost:5000', // Node.js backend server
+        target: process.env.VITE_API_PROXY_TARGET, // Node.js backend server
         changeOrigin: true,
         secure: false,
       },
