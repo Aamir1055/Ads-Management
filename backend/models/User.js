@@ -100,24 +100,11 @@ class User {
       const saltRounds = 12;
       const hashed_password = await bcrypt.hash(password, saltRounds);
 
-      // Generate TOTP secret if 2FA is enabled
-      let auth_token = null;
-      let qrCodeUrl = null;
-      let secretBase32 = null;
-      
-      if (enable_2fa) {
-        const secret = speakeasy.generateSecret({
-          name: `AdsReporting - ${username}`,
-          issuer: 'Ads Reporting System',
-          length: 20
-        });
-        
-        auth_token = secret.base32;
-        secretBase32 = secret.base32;
-        qrCodeUrl = await qrcode.toDataURL(secret.otpauth_url);
-        
-        console.log('🔐 Generated 2FA secret for new user:', username);
-      }
+      // IMPORTANT: Do NOT generate/store 2FA secret on user creation.
+      // We only mark whether 2FA is enabled and defer secret generation
+      // to first login via generate2FASetup(). This ensures the QR code
+      // is shown at first login rather than pre-provisioning a secret.
+      let auth_token = null; // must remain NULL on create when enable_2fa is true
 
       // Insert user
       const [result] = await connection.query(
@@ -130,8 +117,8 @@ class User {
           username,
           hashed_password, 
           role_id, 
-          auth_token, 
-          enable_2fa, 
+          auth_token, // always NULL at creation time
+          enable_2fa ? 1 : 0,
           true
         ]
       );
@@ -142,7 +129,7 @@ class User {
       await User._logAudit(connection, userId, 'USER_CREATED', null, {
         username: username,
         role_id: role_id,
-        enable_2fa: enable_2fa
+        enable_2fa: !!enable_2fa
       }, null, null, performedBy);
 
       await connection.commit();
@@ -152,8 +139,9 @@ class User {
       
       return {
         user,
-        qrCode: qrCodeUrl,
-        secret: secretBase32
+        // No QR or secret at creation; they will be generated on first login
+        qrCode: null,
+        secret: null
       };
 
     } catch (error) {
