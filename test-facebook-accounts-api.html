@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facebook Accounts API Tester</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .endpoint { 
+            border: 1px solid #ddd; 
+            margin: 20px 0; 
+            padding: 20px; 
+            border-radius: 5px; 
+            background-color: #f9f9f9;
+        }
+        .response { 
+            background: #f0f0f0; 
+            padding: 10px; 
+            margin: 10px 0; 
+            border-radius: 3px; 
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        button { 
+            background: #007cba; 
+            color: white; 
+            border: none; 
+            padding: 10px 20px; 
+            border-radius: 3px; 
+            cursor: pointer;
+            margin: 5px 5px 5px 0;
+        }
+        button:hover { background: #005a8b; }
+        .error { color: red; }
+        .success { color: green; }
+        input, textarea { 
+            padding: 8px; 
+            margin: 5px 0; 
+            border: 1px solid #ccc; 
+            border-radius: 3px; 
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .form-group { margin: 10px 0; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .token-input { background: #f0f8ff; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Facebook Accounts API Tester</h1>
+        <p>Base URL: <strong>http://localhost:5000</strong></p>
+        
+        <!-- Authentication Token -->
+        <div class="endpoint">
+            <h3>🔐 Authentication Token</h3>
+            <div class="form-group">
+                <label for="authToken">Bearer Token (required for all requests):</label>
+                <input type="text" id="authToken" class="token-input" placeholder="Enter your JWT access token here">
+                <small>Login first to get your token, then paste it here.</small>
+            </div>
+        </div>
+
+        <!-- Login Endpoint (for getting token) -->
+        <div class="endpoint">
+            <h3>🔑 Login (Get Token)</h3>
+            <div class="form-group">
+                <label for="loginEmail">Email:</label>
+                <input type="email" id="loginEmail" placeholder="your-email@example.com">
+            </div>
+            <div class="form-group">
+                <label for="loginPassword">Password:</label>
+                <input type="password" id="loginPassword" placeholder="your-password">
+            </div>
+            <button onclick="login()">Login</button>
+            <div class="response" id="loginResponse"></div>
+        </div>
+
+        <!-- Get All Facebook Accounts -->
+        <div class="endpoint">
+            <h3>📋 GET /api/facebook-accounts</h3>
+            <p>Get all Facebook accounts with pagination</p>
+            <div class="form-group">
+                <label for="getPage">Page:</label>
+                <input type="number" id="getPage" value="1" min="1">
+            </div>
+            <div class="form-group">
+                <label for="getLimit">Limit:</label>
+                <input type="number" id="getLimit" value="10" min="1" max="100">
+            </div>
+            <div class="form-group">
+                <label for="getStatus">Status:</label>
+                <select id="getStatus">
+                    <option value="">All</option>
+                    <option value="enabled">Enabled</option>
+                    <option value="disabled">Disabled</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="getSearch">Search:</label>
+                <input type="text" id="getSearch" placeholder="Search by email or phone">
+            </div>
+            <button onclick="getAllAccounts()">Get All Accounts</button>
+            <div class="response" id="getAllResponse"></div>
+        </div>
+
+        <!-- Get Facebook Account by ID -->
+        <div class="endpoint">
+            <h3>🔍 GET /api/facebook-accounts/:id</h3>
+            <p>Get a specific Facebook account by ID</p>
+            <div class="form-group">
+                <label for="getByIdId">Account ID:</label>
+                <input type="number" id="getByIdId" placeholder="Enter account ID" min="1">
+            </div>
+            <button onclick="getAccountById()">Get Account by ID</button>
+            <div class="response" id="getByIdResponse"></div>
+        </div>
+
+        <!-- Create Facebook Account -->
+        <div class="endpoint">
+            <h3>➕ POST /api/facebook-accounts</h3>
+            <p>Create a new Facebook account</p>
+            <div class="form-group">
+                <label for="createEmail">Email (required):</label>
+                <input type="email" id="createEmail" placeholder="facebook.account@example.com" required>
+            </div>
+            <div class="form-group">
+                <label for="createPassword">Password (required):</label>
+                <input type="password" id="createPassword" placeholder="Strong123!" required>
+            </div>
+            <div class="form-group">
+                <label for="createAuthenticator">Authenticator (optional):</label>
+                <textarea id="createAuthenticator" placeholder="2FA authenticator details or backup codes"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="createPhoneNumber">Phone Number (optional):</label>
+                <input type="tel" id="createPhoneNumber" placeholder="+1234567890">
+            </div>
+            <div class="form-group">
+                <label for="createStatus">Status:</label>
+                <select id="createStatus">
+                    <option value="enabled">Enabled</option>
+                    <option value="disabled">Disabled</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="createIdImage">ID Image (optional):</label>
+                <input type="file" id="createIdImage" accept="image/*">
+            </div>
+            <button onclick="createAccount()">Create Account</button>
+            <div class="response" id="createResponse"></div>
+        </div>
+
+        <!-- Update Facebook Account -->
+        <div class="endpoint">
+            <h3>✏️ PUT /api/facebook-accounts/:id</h3>
+            <p>Update an existing Facebook account</p>
+            <div class="form-group">
+                <label for="updateId">Account ID (required):</label>
+                <input type="number" id="updateId" placeholder="Enter account ID to update" min="1" required>
+            </div>
+            <div class="form-group">
+                <label for="updateEmail">Email:</label>
+                <input type="email" id="updateEmail" placeholder="updated.email@example.com">
+            </div>
+            <div class="form-group">
+                <label for="updatePassword">New Password:</label>
+                <input type="password" id="updatePassword" placeholder="NewPassword123!">
+            </div>
+            <div class="form-group">
+                <label for="updateAuthenticator">Authenticator:</label>
+                <textarea id="updateAuthenticator" placeholder="Updated authenticator details"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="updatePhoneNumber">Phone Number:</label>
+                <input type="tel" id="updatePhoneNumber" placeholder="+1234567890">
+            </div>
+            <div class="form-group">
+                <label for="updateStatus">Status:</label>
+                <select id="updateStatus">
+                    <option value="">Keep Current</option>
+                    <option value="enabled">Enabled</option>
+                    <option value="disabled">Disabled</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="updateIdImage">New ID Image:</label>
+                <input type="file" id="updateIdImage" accept="image/*">
+            </div>
+            <button onclick="updateAccount()">Update Account</button>
+            <div class="response" id="updateResponse"></div>
+        </div>
+
+        <!-- Toggle Account Status -->
+        <div class="endpoint">
+            <h3>🔄 PATCH /api/facebook-accounts/:id/toggle-status</h3>
+            <p>Toggle account status between enabled/disabled</p>
+            <div class="form-group">
+                <label for="toggleId">Account ID:</label>
+                <input type="number" id="toggleId" placeholder="Enter account ID" min="1">
+            </div>
+            <button onclick="toggleAccountStatus()">Toggle Status</button>
+            <div class="response" id="toggleResponse"></div>
+        </div>
+
+        <!-- Delete Facebook Account -->
+        <div class="endpoint">
+            <h3>🗑️ DELETE /api/facebook-accounts/:id</h3>
+            <p>Delete a Facebook account</p>
+            <div class="form-group">
+                <label for="deleteId">Account ID:</label>
+                <input type="number" id="deleteId" placeholder="Enter account ID to delete" min="1">
+            </div>
+            <button onclick="deleteAccount()" style="background-color: #dc3545;">Delete Account</button>
+            <div class="response" id="deleteResponse"></div>
+        </div>
+
+        <!-- Get Account Statistics -->
+        <div class="endpoint">
+            <h3>📊 GET /api/facebook-accounts/stats</h3>
+            <p>Get Facebook accounts statistics</p>
+            <button onclick="getAccountStats()">Get Statistics</button>
+            <div class="response" id="statsResponse"></div>
+        </div>
+
+    </div>
+
+    <script>
+        const BASE_URL = 'http://localhost:5000';
+
+        // Helper function to get auth headers
+        function getAuthHeaders() {
+            const token = document.getElementById('authToken').value.trim();
+            if (!token) {
+                alert('Please enter your authentication token first!');
+                return null;
+            }
+            return {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            };
+        }
+
+        // Helper function to display response
+        function displayResponse(elementId, response, data) {
+            const element = document.getElementById(elementId);
+            const statusClass = response.status >= 200 && response.status < 300 ? 'success' : 'error';
+            element.className = `response ${statusClass}`;
+            element.textContent = JSON.stringify(data, null, 2);
+        }
+
+        // Login function
+        async function login() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+
+            if (!email || !password) {
+                alert('Please enter both email and password');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${BASE_URL}/api/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await response.json();
+                displayResponse('loginResponse', response, data);
+
+                // Auto-fill token if login successful
+                if (response.ok && data.data && data.data.accessToken) {
+                    document.getElementById('authToken').value = data.data.accessToken;
+                }
+            } catch (error) {
+                displayResponse('loginResponse', { status: 0 }, { error: error.message });
+            }
+        }
+
+        // Get all accounts
+        async function getAllAccounts() {
+            const headers = getAuthHeaders();
+            if (!headers) return;
+
+            const page = document.getElementById('getPage').value || 1;
+            const limit = document.getElementById('getLimit').value || 10;
+            const status = document.getElementById('getStatus').value;
+            const search = document.getElementById('getSearch').value;
+
+            const params = new URLSearchParams();
+            params.append('page', page);
+            params.append('limit', limit);
+            if (status) params.append('status', status);
+            if (search) params.append('search', search);
+
+            try {
+                const response = await fetch(`${BASE_URL}/api/facebook-accounts?${params}`, {
+                    method: 'GET',
+                    headers
+                });
+                
+                const data = await response.json();
+                displayResponse('getAllResponse', response, data);
+            } catch (error) {
+                displayResponse('getAllResponse', { status: 0 }, { error: error.message });
+            }
+        }
+
+        // Get account by ID
+        async function getAccountById() {
+            const headers = getAuthHeaders();
+            if (!headers) return;
+
+            const id = document.getElementById('getByIdId').value;
+            if (!id) {
+                alert('Please enter an account ID');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${BASE_URL}/api/facebook-accounts/${id}`, {
+                    method: 'GET',
+                    headers
+                });
+                
+                const data = await response.json();
+                displayResponse('getByIdResponse', response, data);
+            } catch (error) {
+                displayResponse('getByIdResponse', { status: 0 }, { error: error.message });
+            }
+        }
+
+        // Create account
+        async function createAccount() {
+            const token = document.getElementById('authToken').value.trim();
+            if (!token) {
+                alert('Please enter your authentication token first!');
+                return;
+            }
+
+            const email = document.getElementById('createEmail').value;
+            const password = document.getElementById('createPassword').value;
+            
+            if (!email || !password) {
+                alert('Email and password are required');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('email', email);
+            formData.append('password', password);
+            
+            const authenticator = document.getElementById('createAuthenticator').value;
+            if (authenticator) formData.append('authenticator', authenticator);
+            
+            const phoneNumber = document.getElementById('createPhoneNumber').value;
+            if (phoneNumber) formData.append('phone_number', phoneNumber);
+            
+            const status = document.getElementById('createStatus').value;
+            if (status) formData.append('status', status);
+            
+            const idImage = document.getElementById('createIdImage').files[0];
+            if (idImage) formData.append('id_image', idImage);
+
+            try {
+                const response = await fetch(`${BASE_URL}/api/facebook-accounts`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: formData
+                });
+                
+                const data = await response.json();
+                displayResponse('createResponse', response, data);
+            } catch (error) {
+                displayResponse('createResponse', { status: 0 }, { error: error.message });
+            }
+        }
+
+        // Update account
+        async function updateAccount() {
+            const token = document.getElementById('authToken').value.trim();
+            if (!token) {
+                alert('Please enter your authentication token first!');
+                return;
+            }
+
+            const id = document.getElementById('updateId').value;
+            if (!id) {
+                alert('Please enter an account ID to update');
+                return;
+            }
+
+            const formData = new FormData();
+            
+            const email = document.getElementById('updateEmail').value;
+            if (email) formData.append('email', email);
+            
+            const password = document.getElementById('updatePassword').value;
+            if (password) formData.append('password', password);
+            
+            const authenticator = document.getElementById('updateAuthenticator').value;
+            if (authenticator) formData.append('authenticator', authenticator);
+            
+            const phoneNumber = document.getElementById('updatePhoneNumber').value;
+            if (phoneNumber) formData.append('phone_number', phoneNumber);
+            
+            const status = document.getElementById('updateStatus').value;
+            if (status) formData.append('status', status);
+            
+            const idImage = document.getElementById('updateIdImage').files[0];
+            if (idImage) formData.append('id_image', idImage);
+
+            try {
+                const response = await fetch(`${BASE_URL}/api/facebook-accounts/${id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: formData
+                });
+                
+                const data = await response.json();
+                displayResponse('updateResponse', response, data);
+            } catch (error) {
+                displayResponse('updateResponse', { status: 0 }, { error: error.message });
+            }
+        }
+
+        // Toggle account status
+        async function toggleAccountStatus() {
+            const headers = getAuthHeaders();
+            if (!headers) return;
+
+            const id = document.getElementById('toggleId').value;
+            if (!id) {
+                alert('Please enter an account ID');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${BASE_URL}/api/facebook-accounts/${id}/toggle-status`, {
+                    method: 'PATCH',
+                    headers
+                });
+                
+                const data = await response.json();
+                displayResponse('toggleResponse', response, data);
+            } catch (error) {
+                displayResponse('toggleResponse', { status: 0 }, { error: error.message });
+            }
+        }
+
+        // Delete account
+        async function deleteAccount() {
+            const headers = getAuthHeaders();
+            if (!headers) return;
+
+            const id = document.getElementById('deleteId').value;
+            if (!id) {
+                alert('Please enter an account ID to delete');
+                return;
+            }
+
+            if (!confirm(`Are you sure you want to delete account ID ${id}? This action cannot be undone.`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${BASE_URL}/api/facebook-accounts/${id}`, {
+                    method: 'DELETE',
+                    headers
+                });
+                
+                const data = await response.json();
+                displayResponse('deleteResponse', response, data);
+            } catch (error) {
+                displayResponse('deleteResponse', { status: 0 }, { error: error.message });
+            }
+        }
+
+        // Get account statistics
+        async function getAccountStats() {
+            const headers = getAuthHeaders();
+            if (!headers) return;
+
+            try {
+                const response = await fetch(`${BASE_URL}/api/facebook-accounts/stats`, {
+                    method: 'GET',
+                    headers
+                });
+                
+                const data = await response.json();
+                displayResponse('statsResponse', response, data);
+            } catch (error) {
+                displayResponse('statsResponse', { status: 0 }, { error: error.message });
+            }
+        }
+    </script>
+</body>
+</html>

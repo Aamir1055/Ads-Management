@@ -40,6 +40,7 @@ router.get('/modules', async (req, res) => {
       'analytics': '/report-analytics',
       'roles': '/role-management', // Fixed: was 'permissions', should be 'roles'
       'permissions': '/role-management', // Keep both for compatibility
+      'facebook_accounts': '/facebook-accounts', // Add Facebook Accounts module
       'settings': '/settings'
     };
 
@@ -80,6 +81,7 @@ router.get('/modules', async (req, res) => {
           { name: 'Campaigns', href: '/campaigns', icon: 'Target', allowed: allowedModules.includes('campaigns') },
           { name: 'Cards', href: '/cards', icon: 'CreditCard', allowed: allowedModules.includes('cards') },
           { name: 'Card Users', href: '/card-users', icon: 'UserCheck', allowed: allowedModules.includes('card_users') },
+          { name: 'Facebook Accounts', href: '/facebook-accounts', icon: 'Facebook', allowed: allowedModules.includes('facebook_accounts') },
           { name: 'Reports', href: '/reports-table', icon: 'FileText', allowed: allowedModules.includes('reports') },
           { name: 'Report Analytics', href: '/report-analytics', icon: 'BarChart3', allowed: allowedModules.includes('analytics') || allowedModules.includes('reports') }
         ].filter(item => item.allowed) // Only return allowed navigation items

@@ -36,6 +36,8 @@ const userAccessRoutes = require('./routes/userAccessRoutes');
 const brandRoutes = require('./routes/brandRoutes');
 const roleRoutes = require('./routes/roleRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
+const facebookAccountRoutes = require('./routes/facebookAccountRoutes');
+const facebookPageRoutes = require('./routes/facebookPageRoutes');
 
 const app = express();
 
@@ -218,6 +220,8 @@ app.use('/api/user-access', userAccessRoutes);
 app.use('/api/brands', brandRoutes);
 app.use('/api/roles', roleRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/facebook-accounts', facebookAccountRoutes);
+app.use('/api/facebook-pages', facebookPageRoutes);
 // Root
 app.get('/', (req, res) => {
   res.json({
@@ -239,7 +243,9 @@ app.get('/', (req, res) => {
       analytics: '/api/analytics',
       cards: '/api/cards',
       cardUsers: '/api/card-users',
-      brands: '/api/brands'
+      brands: '/api/brands',
+      facebookAccounts: '/api/facebook-accounts',
+      facebookPages: '/api/facebook-pages'
     },
     support: {
       documentation: '/api/docs',

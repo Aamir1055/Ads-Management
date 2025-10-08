@@ -17,6 +17,8 @@ import CardUsers from './pages/CardUsers'
 import Reports from './pages/Reports'
 import ReportsTable from './pages/ReportsTable'
 import ReportAnalyticsPage from './pages/ReportAnalyticsPage'
+import FacebookAccounts from './pages/FacebookAccounts'
+import FacebookPages from './pages/FacebookPages'
 import { initTotpFieldHiding } from './utils/hideTotpFields'
 import './styles/hide-totp-fields.css'
 
@@ -148,6 +150,24 @@ function App() {
               <PermissionProvider>
                 <Layout>
                   <ReportAnalyticsPage />
+                </Layout>
+              </PermissionProvider>
+            </ProtectedRoute>
+          } />
+          <Route path="/facebook-accounts" element={
+            <ProtectedRoute>
+              <PermissionProvider>
+                <Layout>
+                  <FacebookAccounts />
+                </Layout>
+              </PermissionProvider>
+            </ProtectedRoute>
+          } />
+          <Route path="/facebook-pages" element={
+            <ProtectedRoute>
+              <PermissionProvider>
+                <Layout>
+                  <FacebookPages />
                 </Layout>
               </PermissionProvider>
             </ProtectedRoute>

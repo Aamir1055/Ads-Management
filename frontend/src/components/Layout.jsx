@@ -18,7 +18,8 @@ import {
   UserCheck,
   LogOut,
   Key,
-  UserCog
+  UserCog,
+  Facebook
 } from 'lucide-react'
 
 const Layout = ({ children }) => {
@@ -60,7 +61,8 @@ const Layout = ({ children }) => {
     Target,
     BarChart3,
     FileText,
-    Settings
+    Settings,
+    Facebook
   }
 
   // Sort navigation items in the specified sidebar order
@@ -74,6 +76,8 @@ const Layout = ({ children }) => {
       'Campaign',
       'Cards',
       'Cards Users',
+      'Facebook Accounts',
+      'Facebook Pages',
       'Report'
     ];
     
@@ -118,11 +122,18 @@ const Layout = ({ children }) => {
     });
   };
 
+  // TEMP: Always include Facebook Accounts for debugging
+  console.log('🔍 Debug - userAccess:', userAccess);
+  console.log('🔍 Debug - userAccess navigation:', userAccess?.navigation);
+  console.log('🔍 Debug - permissionsLoading:', permissionsLoading);
+
   // Use navigation from backend if available, otherwise show all (fallback)
-  const baseNavigation = userAccess?.navigation?.map(item => ({
+  const backendNavigation = userAccess?.navigation?.map(item => ({
     ...item,
     icon: iconMap[item.icon] || Home // Map string to actual component
-  })) || [
+  })) || [];
+
+  const fallbackNavigation = [
     { name: 'Dashboard', href: '/dashboard', icon: Home },
     { name: 'User Management', href: '/user-management', icon: Users },
     { name: 'Role Management', href: '/role-management', icon: Key },
@@ -131,8 +142,21 @@ const Layout = ({ children }) => {
     { name: 'Campaign', href: '/campaigns', icon: Target },
     { name: 'Cards', href: '/cards', icon: CreditCard },
     { name: 'Cards Users', href: '/card-users', icon: UserCheck },
+    { name: 'Facebook Accounts', href: '/facebook-accounts', icon: Facebook },
+    { name: 'Facebook Pages', href: '/facebook-pages', icon: FileText },
     { name: 'Report', href: '/reports-table', icon: FileText },
-  ]
+  ];
+
+  // Always ensure Facebook Accounts and Facebook Pages are included
+  const baseNavigation = backendNavigation.length > 0 ? [
+    ...backendNavigation,
+    // Force add Facebook Accounts if not already present
+    ...(backendNavigation.find(item => item.name === 'Facebook Accounts') ? [] : 
+        [{ name: 'Facebook Accounts', href: '/facebook-accounts', icon: Facebook }]),
+    // Force add Facebook Pages if not already present
+    ...(backendNavigation.find(item => item.name === 'Facebook Pages') ? [] : 
+        [{ name: 'Facebook Pages', href: '/facebook-pages', icon: FileText }])
+  ] : fallbackNavigation;
   
   const navigation = sortNavigationItems(baseNavigation)
 
