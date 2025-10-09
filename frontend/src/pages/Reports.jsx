@@ -1,33 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import reportsService from '../services/reportsService';
-import brandService from '../services/brandService';
-import campaignService from '../services/campaignService';
-import ReportGenerationModal from '../components/modals/ReportGenerationModal';
 import LoadingSkeleton from '../components/LoadingSkeleton';
 import ErrorAlert from '../components/common/ErrorAlert';
 
 const Reports = () => {
   // Data states
   const [reports, setReports] = useState([]);
-  const [brands, setBrands] = useState([]);
-  const [campaigns, setCampaigns] = useState([]);
+  const [availableCampaigns, setAvailableCampaigns] = useState([]);
+  const [availableBrands, setAvailableBrands] = useState([]);
   
   // UI states
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedReports, setSelectedReports] = useState([]);
   
-  // Modal states
-  const [showGenerateModal, setShowGenerateModal] = useState(false);
-  const [showSyncModal, setShowSyncModal] = useState(false);
-  
   // Filter and pagination states
   const [filters, setFilters] = useState({
-    campaign_id: '',
-    brand_id: '',
+    campaign_name: '',
+    brand_name: '',
+    date_preset: '',
     date_from: '',
-    date_to: '',
-    report_month: ''
+    date_to: ''
   });
   
   const [pagination, setPagination] = useState({
@@ -39,12 +32,79 @@ const Reports = () => {
     hasPrev: false
   });
 
-  // Load initial data
+  // Load filtered data only when filters change (not on initial mount)
   useEffect(() => {
-    loadReports();
-    loadBrands();
-    loadCampaigns();
+    if (filters.date_from || filters.date_to || filters.campaign_name || filters.brand_name || pagination.page > 1) {
+      loadReports();
+    }
   }, [filters, pagination.page, pagination.limit]);
+
+  // Load all reports initially to populate dropdowns
+  useEffect(() => {
+    loadAllReports();
+  }, []);
+
+  const loadAllReports = async () => {
+    try {
+      setLoading(true);
+      const params = {
+        page: 1,
+        limit: 1000 // Get all reports for dropdown population
+      };
+
+      console.log('Loading all reports for dropdowns with params:', params);
+      const response = await reportsService.getAllReports(params);
+      console.log('All reports response:', response);
+      
+      if (response.success) {
+        const reportsData = response.data || [];
+        
+        // Extract unique campaigns and brands from the reports data
+        const uniqueCampaigns = [...new Set(reportsData
+          .map(report => report.campaign_name)
+          .filter(name => name && name !== '-' && name !== null && name !== undefined)
+        )].sort();
+        
+        const uniqueBrands = [...new Set(reportsData
+          .map(report => report.brand_name)
+          .filter(name => name && name !== '-' && name !== null && name !== undefined)
+        )].sort();
+        
+        console.log('Extracted unique campaigns:', uniqueCampaigns);
+        console.log('Extracted unique brands:', uniqueBrands);
+        
+        setAvailableCampaigns(uniqueCampaigns);
+        setAvailableBrands(uniqueBrands);
+        
+        // If no filters are set, show all data
+        if (!filters.date_from && !filters.date_to && !filters.campaign_name && !filters.brand_name) {
+          setReports(reportsData.slice(0, pagination.limit));
+          setPagination(prev => ({
+            ...prev,
+            totalCount: reportsData.length,
+            totalPages: Math.ceil(reportsData.length / pagination.limit),
+            hasNext: reportsData.length > pagination.limit,
+            hasPrev: false
+          }));
+        }
+        
+        setError('');
+      } else {
+        setError(response.message || 'Failed to load reports');
+        setReports([]);
+        setAvailableCampaigns([]);
+        setAvailableBrands([]);
+      }
+    } catch (error) {
+      console.error('Error loading all reports:', error);
+      setError(error.message || 'Failed to load reports');
+      setReports([]);
+      setAvailableCampaigns([]);
+      setAvailableBrands([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loadReports = async () => {
     try {
@@ -57,10 +117,15 @@ const Reports = () => {
         )
       };
 
+      console.log('Loading reports with params:', params);
+      console.log('Current filters:', filters);
       const response = await reportsService.getAllReports(params);
+      console.log('Reports response:', response);
       
       if (response.success) {
-        setReports(response.data || []);
+        const reportsData = response.data || [];
+        setReports(reportsData);
+        
         if (response.meta?.pagination) {
           setPagination(prev => ({
             ...prev,
@@ -81,26 +146,50 @@ const Reports = () => {
     }
   };
 
-  const loadBrands = async () => {
-    try {
-      const response = await brandService.getAllBrands();
-      if (response.success) {
-        setBrands(response.data || []);
-      }
-    } catch (error) {
-      console.error('Error loading brands:', error);
+  // Date preset handler
+  const handleDatePreset = (preset) => {
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    let dateFrom, dateTo;
+    
+    switch (preset) {
+      case 'today':
+        dateFrom = dateTo = today.toISOString().split('T')[0];
+        break;
+      case 'yesterday':
+        dateFrom = dateTo = yesterday.toISOString().split('T')[0];
+        break;
+      case 'last7days':
+        const last7Days = new Date(today);
+        last7Days.setDate(last7Days.getDate() - 7);
+        dateFrom = last7Days.toISOString().split('T')[0];
+        dateTo = today.toISOString().split('T')[0];
+        break;
+      case 'lastMonth':
+        const lastMonth = new Date(today);
+        lastMonth.setMonth(lastMonth.getMonth() - 1);
+        dateFrom = lastMonth.toISOString().split('T')[0];
+        dateTo = today.toISOString().split('T')[0];
+        break;
+      case 'last3Months':
+        const last3Months = new Date(today);
+        last3Months.setMonth(last3Months.getMonth() - 3);
+        dateFrom = last3Months.toISOString().split('T')[0];
+        dateTo = today.toISOString().split('T')[0];
+        break;
+      default:
+        return;
     }
-  };
-
-  const loadCampaigns = async () => {
-    try {
-      const response = await campaignService.getAllCampaigns();
-      if (response.success) {
-        setCampaigns(response.data || []);
-      }
-    } catch (error) {
-      console.error('Error loading campaigns:', error);
-    }
+    
+    setFilters(prev => ({
+      ...prev,
+      date_preset: preset,
+      date_from: dateFrom,
+      date_to: dateTo
+    }));
+    setPagination(prev => ({ ...prev, page: 1 }));
   };
 
   const handleFilterChange = (name, value) => {
@@ -113,13 +202,15 @@ const Reports = () => {
 
   const handleClearFilters = () => {
     setFilters({
-      campaign_id: '',
-      brand_id: '',
+      campaign_name: '',
+      brand_name: '',
+      date_preset: '',
       date_from: '',
-      date_to: '',
-      report_month: ''
+      date_to: ''
     });
     setPagination(prev => ({ ...prev, page: 1 }));
+    // Reload all data when filters are cleared
+    loadAllReports();
   };
 
   const handlePageChange = (newPage) => {
@@ -138,7 +229,7 @@ const Reports = () => {
     if (selectedReports.length === reports.length) {
       setSelectedReports([]);
     } else {
-      setSelectedReports(reports.map(report => report.id));
+      setSelectedReports(reports.map((report, index) => report.id || `${report.campaign_id}-${report.report_date}-${index}`));
     }
   };
 
@@ -200,6 +291,31 @@ const Reports = () => {
     return formatCurrency(cost);
   };
 
+  // Date conversion helpers
+  const formatDateToDisplay = (backendDate) => {
+    if (!backendDate) return '';
+    const date = new Date(backendDate + 'T00:00:00'); // Add time to avoid timezone issues
+    return date.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+  };
+
+  const convertDisplayToBackend = (displayDate) => {
+    if (!displayDate) return '';
+    const regex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
+    const match = displayDate.match(regex);
+    if (match) {
+      const day = match[1].padStart(2, '0');
+      const month = match[2].padStart(2, '0');
+      const year = match[3];
+      return `${year}-${month}-${day}`;
+    }
+    return '';
+  };
+
+
   if (loading && reports.length === 0) {
     return (
       <div className="p-6">
@@ -227,29 +343,9 @@ const Reports = () => {
       {/* Action Buttons */}
       <div className="mb-6 flex flex-wrap gap-3">
         <button
-          onClick={() => setShowGenerateModal(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium transition-colors flex items-center"
-        >
-          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Generate Reports
-        </button>
-        
-        <button
-          onClick={() => setShowSyncModal(true)}
-          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md font-medium transition-colors flex items-center"
-        >
-          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          Sync Reports
-        </button>
-
-        <button
-          onClick={loadReports}
+          onClick={loadAllReports}
           disabled={loading}
-          className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-md font-medium transition-colors flex items-center disabled:opacity-50"
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium transition-colors flex items-center disabled:opacity-50"
         >
           <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -272,18 +368,46 @@ const Reports = () => {
 
       {/* Filters */}
       <div className="mb-6 bg-gray-50 p-4 rounded-lg">
+        {/* Date Presets */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Quick Date Filters</label>
+          <div className="flex flex-wrap gap-2">
+            {[
+              { value: 'today', label: 'Today' },
+              { value: 'yesterday', label: 'Yesterday' },
+              { value: 'last7days', label: 'Last 7 Days' },
+              { value: 'lastMonth', label: 'Last Month' },
+              { value: 'last3Months', label: 'Last 3 Months' }
+            ].map((preset) => (
+              <button
+                key={preset.value}
+                type="button"
+                onClick={() => handleDatePreset(preset.value)}
+                className={`px-3 py-1 text-xs border rounded-md transition-colors ${
+                  filters.date_preset === preset.value
+                    ? 'bg-blue-100 border-blue-300 text-blue-700'
+                    : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Filter Controls */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Brand</label>
             <select
-              value={filters.brand_id}
-              onChange={(e) => handleFilterChange('brand_id', e.target.value)}
+              value={filters.brand_name}
+              onChange={(e) => handleFilterChange('brand_name', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">All Brands</option>
-              {brands.map((brand) => (
-                <option key={brand.id} value={brand.id}>
-                  {brand.name}
+              {availableBrands.map((brandName) => (
+                <option key={brandName} value={brandName}>
+                  {brandName}
                 </option>
               ))}
             </select>
@@ -292,39 +416,125 @@ const Reports = () => {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Campaign</label>
             <select
-              value={filters.campaign_id}
-              onChange={(e) => handleFilterChange('campaign_id', e.target.value)}
+              value={filters.campaign_name}
+              onChange={(e) => handleFilterChange('campaign_name', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">All Campaigns</option>
-              {campaigns
-                .filter(campaign => !filters.brand_id || campaign.brand_id == filters.brand_id)
-                .map((campaign) => (
-                <option key={campaign.id} value={campaign.id}>
-                  {campaign.name}
+              {availableCampaigns.map((campaignName) => (
+                <option key={campaignName} value={campaignName}>
+                  {campaignName}
                 </option>
               ))}
             </select>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">From Date</label>
-            <input
-              type="date"
-              value={filters.date_from}
-              onChange={(e) => handleFilterChange('date_from', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <label className="block text-sm font-medium text-gray-700 mb-1">From Date (dd/mm/yyyy)</label>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="dd/mm/yyyy"
+                value={filters.date_from ? formatDateToDisplay(filters.date_from) : ''}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Allow only numbers and forward slashes
+                  const cleanValue = value.replace(/[^0-9/]/g, '');
+                  // Auto-format as user types
+                  let formatted = cleanValue;
+                  if (cleanValue.length >= 2 && !cleanValue.includes('/')) {
+                    formatted = cleanValue.slice(0, 2) + '/' + cleanValue.slice(2);
+                  }
+                  if (cleanValue.length >= 5 && cleanValue.split('/').length === 2) {
+                    const parts = cleanValue.split('/');
+                    formatted = parts[0] + '/' + parts[1].slice(0, 2) + '/' + parts[1].slice(2);
+                  }
+                  if (formatted.length <= 10) {
+                    // Convert dd/mm/yyyy to yyyy-mm-dd for backend
+                    const backendDate = convertDisplayToBackend(formatted);
+                    handleFilterChange('date_from', backendDate);
+                    handleFilterChange('date_preset', ''); // Clear preset when manual date is set
+                  }
+                }}
+                onBlur={(e) => {
+                  // Validate format on blur
+                  const value = e.target.value;
+                  const regex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
+                  if (value && !regex.test(value)) {
+                    alert('Please enter date in dd/mm/yyyy format');
+                  }
+                }}
+                className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <input
+                type="date"
+                value={filters.date_from}
+                onChange={(e) => {
+                  handleFilterChange('date_from', e.target.value);
+                  handleFilterChange('date_preset', '');
+                }}
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 opacity-0 w-6 h-6 cursor-pointer"
+                onFocus={(e) => e.target.showPicker && e.target.showPicker()}
+                style={{ pointerEvents: 'all' }}
+              />
+              <svg className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">To Date</label>
-            <input
-              type="date"
-              value={filters.date_to}
-              onChange={(e) => handleFilterChange('date_to', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <label className="block text-sm font-medium text-gray-700 mb-1">To Date (dd/mm/yyyy)</label>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="dd/mm/yyyy"
+                value={filters.date_to ? formatDateToDisplay(filters.date_to) : ''}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Allow only numbers and forward slashes
+                  const cleanValue = value.replace(/[^0-9/]/g, '');
+                  // Auto-format as user types
+                  let formatted = cleanValue;
+                  if (cleanValue.length >= 2 && !cleanValue.includes('/')) {
+                    formatted = cleanValue.slice(0, 2) + '/' + cleanValue.slice(2);
+                  }
+                  if (cleanValue.length >= 5 && cleanValue.split('/').length === 2) {
+                    const parts = cleanValue.split('/');
+                    formatted = parts[0] + '/' + parts[1].slice(0, 2) + '/' + parts[1].slice(2);
+                  }
+                  if (formatted.length <= 10) {
+                    // Convert dd/mm/yyyy to yyyy-mm-dd for backend
+                    const backendDate = convertDisplayToBackend(formatted);
+                    handleFilterChange('date_to', backendDate);
+                    handleFilterChange('date_preset', ''); // Clear preset when manual date is set
+                  }
+                }}
+                onBlur={(e) => {
+                  // Validate format on blur
+                  const value = e.target.value;
+                  const regex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
+                  if (value && !regex.test(value)) {
+                    alert('Please enter date in dd/mm/yyyy format');
+                  }
+                }}
+                className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <input
+                type="date"
+                value={filters.date_to}
+                onChange={(e) => {
+                  handleFilterChange('date_to', e.target.value);
+                  handleFilterChange('date_preset', '');
+                }}
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 opacity-0 w-6 h-6 cursor-pointer"
+                onFocus={(e) => e.target.showPicker && e.target.showPicker()}
+                style={{ pointerEvents: 'all' }}
+              />
+              <svg className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </div>
           </div>
 
           <div className="flex items-end">
@@ -406,18 +616,21 @@ const Reports = () => {
                     Zoho Cost Per Lead
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Total Cost Per Lead
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {reports.map((report) => (
-                  <tr key={report.id} className="hover:bg-gray-50">
+                {reports.map((report, index) => (
+                  <tr key={report.id || `${report.campaign_id}-${report.report_date}-${index}`} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <input
                         type="checkbox"
-                        checked={selectedReports.includes(report.id)}
-                        onChange={() => handleSelectReport(report.id)}
+                        checked={selectedReports.includes(report.id || `${report.campaign_id}-${report.report_date}-${index}`)}
+                        onChange={() => handleSelectReport(report.id || `${report.campaign_id}-${report.report_date}-${index}`)}
                         className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                       />
                     </td>
@@ -448,9 +661,12 @@ const Reports = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {formatCurrency(report.zoho_cost_per_lead || (report.amount_spend || report.spent || 0) / (report.zoho_leads || report.zoho_result || 1))}
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
+                      {formatCurrency(report.total_cost_per_lead || 0)}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <button
-                        onClick={() => handleDeleteReport(report.id)}
+                        onClick={() => handleDeleteReport(report.id || `${report.campaign_id}-${report.report_date}-${index}`)}
                         className="text-red-600 hover:text-red-900 ml-2"
                         title="Delete report"
                       >
@@ -526,28 +742,7 @@ const Reports = () => {
         )}
       </div>
 
-      {/* Modals */}
-      <ReportGenerationModal
-        isOpen={showGenerateModal}
-        onClose={() => setShowGenerateModal(false)}
-        onSuccess={() => {
-          loadReports();
-          setShowGenerateModal(false);
-        }}
-        mode="generate"
-        title="Generate Reports"
-      />
 
-      <ReportGenerationModal
-        isOpen={showSyncModal}
-        onClose={() => setShowSyncModal(false)}
-        onSuccess={() => {
-          loadReports();
-          setShowSyncModal(false);
-        }}
-        mode="sync"
-        title="Sync Reports to Database"
-      />
     </div>
   );
 };

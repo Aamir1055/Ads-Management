@@ -48,7 +48,25 @@ class ReportService {
             WHEN SUM(cd.xoho_result) > 0 
             THEN ROUND(SUM(cd.spent) / SUM(cd.xoho_result), 2)
             ELSE NULL
-          END as zoho_cost_per_lead
+          END as zoho_cost_per_lead,
+          
+          -- Calculate total cost per lead (sum of Facebook and Zoho cost per lead)
+          ROUND(
+            COALESCE(
+              CASE 
+                WHEN SUM(cd.facebook_result) > 0 
+                THEN SUM(cd.spent) / SUM(cd.facebook_result)
+                ELSE 0
+              END, 0
+            ) + 
+            COALESCE(
+              CASE 
+                WHEN SUM(cd.xoho_result) > 0 
+                THEN SUM(cd.spent) / SUM(cd.xoho_result)
+                ELSE 0
+              END, 0
+            ), 2
+          ) as total_cost_per_lead
           
         FROM campaign_data cd
         LEFT JOIN campaigns c ON cd.campaign_id = c.id
@@ -96,6 +114,7 @@ class ReportService {
         amount_spend: parseFloat(row.amount_spend) || 0.00,
         facebook_cost_per_lead: row.facebook_cost_per_lead ? parseFloat(row.facebook_cost_per_lead) : null,
         zoho_cost_per_lead: row.zoho_cost_per_lead ? parseFloat(row.zoho_cost_per_lead) : null,
+        total_cost_per_lead: row.total_cost_per_lead ? parseFloat(row.total_cost_per_lead) : 0,
         
         // Keep backward compatibility with old field names for now
         leads: parseInt(row.total_leads) || 0,

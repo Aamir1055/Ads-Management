@@ -42,6 +42,16 @@ class Report {
         params.push(filters.brand_id);
       }
 
+      if (filters.campaign_name) {
+        whereClause += ' AND r.campaign_name = ?';
+        params.push(filters.campaign_name);
+      }
+
+      if (filters.brand_name) {
+        whereClause += ' AND r.brand_name = ?';
+        params.push(filters.brand_name);
+      }
+
       if (filters.date_from) {
         whereClause += ' AND r.report_date >= ?';
         params.push(filters.date_from);
@@ -97,6 +107,16 @@ class Report {
       if (filters.brand_id) {
         whereClause += ' AND r.brand = ?';
         params.push(filters.brand_id);
+      }
+
+      if (filters.campaign_name) {
+        whereClause += ' AND r.campaign_name = ?';
+        params.push(filters.campaign_name);
+      }
+
+      if (filters.brand_name) {
+        whereClause += ' AND r.brand_name = ?';
+        params.push(filters.brand_name);
       }
 
       if (filters.date_from) {

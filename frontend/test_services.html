@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Service Test</title>
+</head>
+<body>
+    <h1>Service Test</h1>
+    <div id="results">
+        <p>Check the console for service loading results...</p>
+        <div id="brands">Brands: Loading...</div>
+        <div id="campaigns">Campaigns: Loading...</div>
+        <div id="reports">Reports: Loading...</div>
+    </div>
+
+    <script>
+        console.log('🧪 Testing Services...');
+        
+        // Test API endpoints directly  
+        // Frontend runs on 3000, backend on 5000
+        const FRONTEND_URL = 'http://localhost:3000';
+        const BACKEND_URL = 'http://localhost:5000';
+        
+        async function testBrands() {
+            try {
+                console.log('🏷️ Testing brands endpoint...');
+                const response = await fetch(`${BACKEND_URL}/api/brands`);
+                const data = await response.json();
+                console.log('Brands response:', data);
+                document.getElementById('brands').innerHTML = `Brands: ${JSON.stringify(data)}`;
+            } catch (error) {
+                console.error('Brands error:', error);
+                document.getElementById('brands').innerHTML = `Brands: Error - ${error.message}`;
+            }
+        }
+        
+        async function testCampaigns() {
+            try {
+                console.log('📋 Testing campaigns endpoint...');
+                const response = await fetch(`${BACKEND_URL}/api/campaigns`);
+                const data = await response.json();
+                console.log('Campaigns response:', data);
+                document.getElementById('campaigns').innerHTML = `Campaigns: ${JSON.stringify(data)}`;
+            } catch (error) {
+                console.error('Campaigns error:', error);
+                document.getElementById('campaigns').innerHTML = `Campaigns: Error - ${error.message}`;
+            }
+        }
+        
+        async function testReports() {
+            try {
+                console.log('📊 Testing reports endpoint...');
+                const response = await fetch(`${BACKEND_URL}/api/reports/generate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        dateFrom: '2025-10-06',
+                        dateTo: '2025-10-09'
+                    })
+                });
+                const data = await response.json();
+                console.log('Reports response:', data);
+                document.getElementById('reports').innerHTML = `Reports: ${data.success ? 'Success' : 'Failed'} - ${data.message}`;
+            } catch (error) {
+                console.error('Reports error:', error);
+                document.getElementById('reports').innerHTML = `Reports: Error - ${error.message}`;
+            }
+        }
+        
+        // Run tests
+        testBrands();
+        testCampaigns();
+        testReports();
+    </script>
+</body>
+</html>

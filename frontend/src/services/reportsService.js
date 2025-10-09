@@ -40,6 +40,20 @@ const reportsService = {
   // ============================================================================
 
   /**
+   * Convert dd/mm/yyyy to yyyy-mm-dd format for API
+   * @param {string} dateStr - Date in dd/mm/yyyy format
+   */
+  convertDateFormat: (dateStr) => {
+    if (!dateStr) return '';
+    const parts = dateStr.split('/');
+    if (parts.length === 3) {
+      const [day, month, year] = parts;
+      return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    }
+    return dateStr; // Return as is if not in expected format
+  },
+
+  /**
    * Get all reports with pagination and filters
    * @param {Object} params - Query parameters for filtering and pagination
    */
@@ -57,9 +71,13 @@ const reportsService = {
         return reportsService.formatDate(date);
       })();
       
+      // Convert dates from dd/mm/yyyy to yyyy-mm-dd format
+      const dateFrom = date_from ? reportsService.convertDateFormat(date_from) : defaultDateFrom;
+      const dateTo = date_to ? reportsService.convertDateFormat(date_to) : defaultDateTo;
+      
       const generateParams = {
-        dateFrom: date_from || defaultDateFrom,
-        dateTo: date_to || defaultDateTo
+        dateFrom,
+        dateTo
       };
       
       if (campaign_id) generateParams.campaignId = campaign_id;

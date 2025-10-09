@@ -10,6 +10,25 @@ const ReportGenerationModal = ({
   mode = 'generate', // 'generate' or 'sync'
   title
 }) => {
+  // Date conversion helper functions
+  const convertToDisplayFormat = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+  };
+
+  const convertToInputFormat = (dateString) => {
+    if (!dateString) return '';
+    const parts = dateString.split('/');
+    if (parts.length === 3) {
+      return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+    }
+    return dateString;
+  };
   const [formData, setFormData] = useState({
     dateFrom: '',
     dateTo: '',
@@ -47,23 +66,35 @@ const ReportGenerationModal = ({
 
   const loadBrands = async () => {
     try {
-      const response = await brandService.getAllBrands();
+      console.log('Modal: Loading brands...');
+      const response = await brandService.getAll();
+      console.log('Modal: Brands response:', response);
       if (response.success) {
-        setBrands(response.data || []);
+        console.log('Modal: Setting brands data:', response.data);
+        setBrands(Array.isArray(response.data) ? response.data : []);
+      } else {
+        setBrands([]);
       }
     } catch (error) {
-      console.error('Error loading brands:', error);
+      console.error('Modal: Error loading brands:', error);
+      setBrands([]);
     }
   };
 
   const loadCampaigns = async () => {
     try {
-      const response = await campaignService.getAllCampaigns();
+      console.log('Modal: Loading campaigns...');
+      const response = await campaignService.getCampaigns();
+      console.log('Modal: Campaigns response:', response);
       if (response.success) {
-        setCampaigns(response.data || []);
+        console.log('Modal: Setting campaigns data:', response.data);
+        setCampaigns(Array.isArray(response.data) ? response.data : []);
+      } else {
+        setCampaigns([]);
       }
     } catch (error) {
-      console.error('Error loading campaigns:', error);
+      console.error('Modal: Error loading campaigns:', error);
+      setCampaigns([]);
     }
   };
 
@@ -213,34 +244,52 @@ const ReportGenerationModal = ({
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
               <label htmlFor="dateFrom" className="block text-sm font-medium text-gray-700 mb-2">
-                Start Date *
+                Start Date * (dd/mm/yyyy)
               </label>
-              <input
-                type="date"
-                id="dateFrom"
-                name="dateFrom"
-                value={formData.dateFrom}
-                onChange={handleInputChange}
-                required
-                disabled={loading}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-              />
+              <div className="relative">
+                <input
+                  type="date"
+                  id="dateFrom"
+                  name="dateFrom"
+                  value={formData.dateFrom}
+                  onChange={handleInputChange}
+                  required
+                  disabled={loading}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                  style={{
+                    colorScheme: 'light',
+                    position: 'relative',
+                    padding: '8px 12px',
+                    fontSize: '14px'
+                  }}
+                  onFocus={(e) => e.target.showPicker && e.target.showPicker()}
+                />
+              </div>
             </div>
 
             <div>
               <label htmlFor="dateTo" className="block text-sm font-medium text-gray-700 mb-2">
-                End Date *
+                End Date * (dd/mm/yyyy)
               </label>
-              <input
-                type="date"
-                id="dateTo"
-                name="dateTo"
-                value={formData.dateTo}
-                onChange={handleInputChange}
-                required
-                disabled={loading}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-              />
+              <div className="relative">
+                <input
+                  type="date"
+                  id="dateTo"
+                  name="dateTo"
+                  value={formData.dateTo}
+                  onChange={handleInputChange}
+                  required
+                  disabled={loading}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                  style={{
+                    colorScheme: 'light',
+                    position: 'relative',
+                    padding: '8px 12px',
+                    fontSize: '14px'
+                  }}
+                  onFocus={(e) => e.target.showPicker && e.target.showPicker()}
+                />
+              </div>
             </div>
           </div>
 
@@ -259,11 +308,11 @@ const ReportGenerationModal = ({
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
               >
                 <option value="">All Brands</option>
-                {brands.map((brand) => (
+                {Array.isArray(brands) ? brands.map((brand) => (
                   <option key={brand.id} value={brand.id}>
                     {brand.name}
                   </option>
-                ))}
+                )) : []}
               </select>
             </div>
 
@@ -280,13 +329,13 @@ const ReportGenerationModal = ({
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
               >
                 <option value="">All Campaigns</option>
-                {campaigns
+                {Array.isArray(campaigns) ? campaigns
                   .filter(campaign => !formData.brandId || campaign.brand_id == formData.brandId)
                   .map((campaign) => (
                   <option key={campaign.id} value={campaign.id}>
                     {campaign.name}
                   </option>
-                ))}
+                )) : []}
               </select>
             </div>
           </div>
