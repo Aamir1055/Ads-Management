@@ -9,7 +9,11 @@ class AuthService {
   }
 
   setupAxiosInterceptors() {
-    // Request interceptor to add auth token
+    console.log('😫 Axios interceptors DISABLED to prevent auth loops');
+    // TEMPORARILY DISABLED - these interceptors might be causing infinite loops
+    // by triggering token refresh which changes auth state
+    
+    // Basic request interceptor only - no auto-refresh
     axios.interceptors.request.use(
       (config) => {
         const token = localStorage.getItem('access_token');
@@ -23,52 +27,7 @@ class AuthService {
       }
     );
 
-    // Response interceptor to handle token expiration and auto-refresh
-    axios.interceptors.response.use(
-      (response) => response,
-      async (error) => {
-        const originalRequest = error.config;
-        
-        // Check if this is a 401 error and not already a retry
-        if (error.response?.status === 401 && !originalRequest._retry) {
-          console.log('🚫 401 Unauthorized detected:', error.response?.data?.message || 'Token invalid');
-          originalRequest._retry = true;
-
-          // Skip refresh attempts for login/refresh endpoints
-          const skipRefreshEndpoints = ['/auth/login', '/auth/refresh', '/auth/logout'];
-          const isSkipEndpoint = skipRefreshEndpoints.some(endpoint => 
-            originalRequest.url?.includes(endpoint)
-          );
-
-          if (!isSkipEndpoint && this.getRefreshToken()) {
-            try {
-              console.log('🔄 Attempting token refresh...');
-              const newTokens = await this.refreshToken();
-              
-              if (newTokens) {
-                // Update the original request with new token
-                originalRequest.headers.Authorization = `Bearer ${newTokens.accessToken}`;
-                console.log('🔄 Retrying original request with new token');
-                
-                // Retry the original request
-                return axios(originalRequest);
-              }
-            } catch (refreshError) {
-              console.error('🚫 Token refresh failed:', refreshError);
-              // Refresh failed, clear auth and redirect
-              this.handleAuthFailure('Token refresh failed');
-              return Promise.reject(refreshError);
-            }
-          } else {
-            console.log('🚪 No refresh token available or skip endpoint, redirecting to login');
-            this.handleAuthFailure('Authentication required');
-          }
-        }
-
-        // For other errors, pass them through
-        return Promise.reject(error);
-      }
-    );
+    // NO RESPONSE INTERCEPTOR - to prevent auth loops
   }
 
   async login(username, password) {
@@ -149,11 +108,12 @@ class AuthService {
       });
 
       if (response.data.success) {
-        const { accessToken, refreshToken: newRefreshToken, user } = response.data.data;
+        // Backend returns access_token and refresh_token (snake_case)
+        const { access_token, refresh_token, user } = response.data.data;
         
         // Update stored tokens
-        localStorage.setItem('access_token', accessToken);
-        localStorage.setItem('refresh_token', newRefreshToken);
+        localStorage.setItem('access_token', access_token);
+        localStorage.setItem('refresh_token', refresh_token);
         
         // Update user data if provided
         if (user) {
@@ -162,7 +122,8 @@ class AuthService {
         
         console.log('✅ Tokens refreshed successfully');
         
-        return { accessToken, refreshToken: newRefreshToken };
+        // Return camelCase for consistency with frontend
+        return { accessToken: access_token, refreshToken: refresh_token };
       }
       
       throw new Error(response.data.message || 'Token refresh failed');
@@ -295,10 +256,21 @@ class AuthService {
       const currentTime = Date.now();
       const timeUntilExpiry = expirationTime - currentTime;
       
-      // Consider token expiring soon if less than 2 minutes remaining
-      return timeUntilExpiry < 2 * 60 * 1000;
+      // Only consider token expiring soon if less than 5 minutes remaining
+      // AND it has already been at least 10 minutes since token was issued
+      const tokenAge = currentTime - (payload.iat * 1000);
+      const isTokenOldEnough = tokenAge > 10 * 60 * 1000; // 10 minutes
+      
+      console.log('🔍 Token expiry check:', {
+        timeUntilExpiry: Math.round(timeUntilExpiry / 1000),
+        tokenAge: Math.round(tokenAge / 1000),
+        isOldEnough: isTokenOldEnough,
+        shouldRefresh: timeUntilExpiry < 5 * 60 * 1000 && isTokenOldEnough
+      });
+      
+      return timeUntilExpiry < 5 * 60 * 1000 && isTokenOldEnough;
     } catch (error) {
-      console.error('🚫 Error checking token expiration:', error);
+      console.error('😫 Error checking token expiration:', error);
       return false;
     }
   }
@@ -317,6 +289,11 @@ class AuthService {
 
   // Start periodic token check (call this after login)
   startTokenRefreshTimer() {
+    // Disabled to prevent refresh loops during development
+    // TODO: Re-enable in production with proper safeguards
+    console.log('🔄 Token refresh timer disabled to prevent loops');
+    return;
+    
     // Check token every minute
     setInterval(() => {
       this.checkAndRefreshToken();

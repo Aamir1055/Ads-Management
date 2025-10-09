@@ -1,12 +1,16 @@
 import React, { useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
-import { AuthProvider } from './contexts/AuthContext'
+import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { PermissionProvider } from './contexts/PermissionContext'
 import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
+import SimpleProtectedRoute from './components/SimpleProtectedRoute'
 import Login from './pages/Login'
 import UserManagement from './modules/UserManagement'
 import Dashboard from './modules/Dashboard'
+import SimpleDashboard from './components/SimpleDashboard'
+import AuthTest from './components/AuthTest'
+import AuthDebug from './components/AuthDebug'
 import RolePermissionDashboard from './modules/RolePermissionDashboard'
 import CampaignTypes from './pages/CampaignTypes'
 import Campaigns from './pages/Campaigns'
@@ -23,14 +27,49 @@ import './styles/hide-totp-fields.css'
 
 // Create a component to handle authentication redirect logic
 const AuthenticatedRedirect = () => {
-  const hasToken = localStorage.getItem('access_token') || localStorage.getItem('authToken');
-  return hasToken ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />;
+  console.log('🚀 AuthenticatedRedirect: Component is rendering!');
+  const { loading } = useAuth();
+  
+  // Direct localStorage check - most reliable
+  const hasAccessToken = localStorage.getItem('access_token');
+  const hasUser = localStorage.getItem('user');
+  
+  console.log('🔄 AuthenticatedRedirect:', {
+    loading,
+    hasAccessToken: !!hasAccessToken,
+    hasUser: !!hasUser,
+    pathname: window.location.pathname
+  });
+  
+  // Show loading while auth is initializing
+  if (loading) {
+    console.log('⏳ AuthenticatedRedirect: Still loading...');
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // Direct check: if we have access token and user data, go to dashboard
+  if (hasAccessToken && hasUser) {
+    console.log('✅ AuthenticatedRedirect: Has tokens, redirecting to dashboard');
+    return <Navigate to="/dashboard" replace />;
+  } else {
+    console.log('🚪 AuthenticatedRedirect: No tokens, redirecting to login');
+    return <Navigate to="/login" replace />;
+  }
 };
 
 function App() {
   // Initialize TOTP field hiding when the app loads
   useEffect(() => {
     console.log('🔒 App: Initializing TOTP field hiding...');
+    console.log('🌐 App: Current URL:', window.location.href);
+    console.log('🌐 App: Current pathname:', window.location.pathname);
     initTotpFieldHiding();
   }, []);
 
@@ -39,20 +78,28 @@ function App() {
       <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
           {/* Login route - no layout, no permission provider */}
-          <Route path="/login" element={<Login />} />
+          <Route path="/login" element={
+            <>
+              {console.log('🚨 Rendering Login route')}
+              <Login />
+            </>
+          } />
           
           {/* Root redirect */}
-          <Route path="/" element={<AuthenticatedRedirect />} />
+          <Route path="/" element={
+            <>
+              {console.log('🏠 Rendering Root route')}
+              <AuthenticatedRedirect />
+            </>
+          } />
           
           {/* All protected routes with layout wrapper */}
           <Route path="/dashboard" element={
-            <ProtectedRoute>
-              <PermissionProvider>
-                <Layout>
-                  <Dashboard />
-                </Layout>
-              </PermissionProvider>
-            </ProtectedRoute>
+            <SimpleProtectedRoute>
+              <Layout>
+                <Dashboard />
+              </Layout>
+            </SimpleProtectedRoute>
           } />
           <Route path="/user-management" element={
             <ProtectedRoute>

@@ -7,7 +7,7 @@ import { useAuth } from '../contexts/AuthContext'
 import config from '../config/config'
 
 const Login = () => {
-  const { login: contextLogin } = useAuth()
+  const { login: contextLogin, isAuthenticated } = useAuth()
   const [formData, setFormData] = useState({
     username: '',
     password: '',
@@ -23,6 +23,21 @@ const Login = () => {
   const [userId, setUserId] = useState(null) // Store user_id for 2FA step
   const [cleanupMessage, setCleanupMessage] = useState('')
   const navigate = useNavigate()
+
+  // Check if user is already authenticated and redirect
+  useEffect(() => {
+    console.log('Login component: Checking authentication status...');
+    // Simple check using localStorage to avoid complex auth logic
+    const hasToken = localStorage.getItem('access_token');
+    const hasUser = localStorage.getItem('user');
+    
+    if (hasToken && hasUser) {
+      console.log('Login component: User already authenticated, redirecting to dashboard');
+      navigate('/dashboard', { replace: true });
+    } else {
+      console.log('Login component: Not authenticated, staying on login page');
+    }
+  }, [navigate]);
 
   // Check for cleanup message on component mount
   useEffect(() => {

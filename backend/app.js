@@ -107,7 +107,7 @@ app.use(express.urlencoded({ extended: true, limit: process.env.URLENCODED_LIMIT
 // Global rate limiting
 const globalRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: dev ? 1000 : 500,
+  max: dev ? 1000 : 500, // Back to normal levels
   message: {
     success: false,
     message: 'Too many requests from this IP, please try again later.',
@@ -116,7 +116,7 @@ const globalRateLimit = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   // If you see proxy-local IPs, verify trust proxy. If still needed, normalize:
-  // keyGenerator: (req) => (req.ip || req.socket.remoteAddress || 'unknown').replace(/:\d+[^:]*$/, '')
+  // keyGenerator: (req) => (req.ip || req.socket.remoteAddress || 'unknown').replace(/:d+[^:]*$/, '')
 });
 app.use(globalRateLimit);
 

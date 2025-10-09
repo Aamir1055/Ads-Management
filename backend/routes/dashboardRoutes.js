@@ -1,401 +1,418 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/authMiddleware');
+const dashboardService = require('../services/dashboardService');
 
-// GET /api/dashboard - Get dashboard overview data
-router.get('/', authenticateToken, async (req, res) => {
+/**
+ * GET /api/dashboard/overview
+ * Get comprehensive dashboard overview statistics
+ */
+router.get('/overview', authenticateToken, async (req, res) => {
   try {
-    const { pool } = require('../config/database');
     const userId = req.user.userId || req.user.id;
     const userRole = req.user.role_name || req.user.role?.name || 'user';
 
-    // Get basic stats - campaigns table has is_enabled column, not is_active
-    const [campaignStats] = await pool.execute(`
-      SELECT 
-        COUNT(*) as total_campaigns,
-        COUNT(CASE WHEN status = 'active' OR status IS NULL THEN 1 END) as active_campaigns,
-        COUNT(CASE WHEN status = 'inactive' THEN 1 END) as paused_campaigns
-      FROM campaigns 
-      WHERE (is_enabled = 1 OR is_enabled IS NULL)
-      ${userRole !== 'super_admin' ? 'AND (created_by = ? OR created_by IS NULL)' : ''}
-    `, userRole !== 'super_admin' ? [userId] : []);
-
-    // Get report stats - reports table has no is_active column
-    const [reportStats] = await pool.execute(`
-      SELECT 
-        COUNT(*) as total_reports,
-        COUNT(CASE WHEN DATE(created_at) = CURDATE() THEN 1 END) as reports_today
-      FROM reports 
-      WHERE 1=1
-      ${userRole !== 'super_admin' ? 'AND (created_by = ? OR created_by IS NULL)' : ''}
-    `, userRole !== 'super_admin' ? [userId] : []);
-
-    // Get campaign types summary
-    const [campaignTypes] = await pool.execute(`
-      SELECT 
-        ct.type_name,
-        COUNT(c.id) as campaign_count
-      FROM campaign_types ct
-      LEFT JOIN campaigns c ON ct.id = c.campaign_type_id AND (c.is_enabled = 1 OR c.is_enabled IS NULL)
-      WHERE (ct.is_active = 1 OR ct.is_active IS NULL)
-      ${userRole !== 'super_admin' ? 'AND (c.created_by = ? OR c.created_by IS NULL)' : ''}
-      GROUP BY ct.id, ct.type_name
-      ORDER BY campaign_count DESC
-    `, userRole !== 'super_admin' ? [userId] : []);
-
-    // Get recent activities (simplified)
-    const [recentActivities] = await pool.execute(`
-      SELECT 
-        'Campaign Created' as activity_type,
-        COALESCE(name, 'Unknown Campaign') as activity_description,
-        created_at as activity_date,
-        'campaign' as entity_type
-      FROM campaigns 
-      WHERE (is_enabled = 1 OR is_enabled IS NULL) 
-      ${userRole !== 'super_admin' ? 'AND (created_by = ? OR created_by IS NULL)' : ''}
-      ORDER BY created_at DESC 
-      LIMIT 10
-    `, userRole !== 'super_admin' ? [userId] : []);
-
-    // Build dashboard data
-    const dashboardData = {
-      success: true,
-      message: 'Dashboard data retrieved successfully',
-      timestamp: new Date().toISOString(),
-      data: {
-        overview: {
-          campaigns: {
-            total: campaignStats[0].total_campaigns || 0,
-            active: campaignStats[0].active_campaigns || 0,
-            paused: campaignStats[0].paused_campaigns || 0
-          },
-          reports: {
-            total: reportStats[0].total_reports || 0,
-            today: reportStats[0].reports_today || 0
-          }
-        },
-        campaignTypeBreakdown: campaignTypes.map(ct => ({
-          type: ct.type_name,
-          count: ct.campaign_count || 0
-        })),
-        recentActivity: recentActivities.map(activity => ({
-          id: `${activity.entity_type}_${Date.now()}_${Math.random()}`,
-          type: activity.activity_type.toLowerCase().replace(/\s+/g, '_'),
-          title: activity.activity_type,
-          description: activity.activity_description,
-          timestamp: activity.activity_date,
-          user: 'System'
-        })),
-        user: {
-          id: userId,
-          role: userRole,
-          permissions: req.user.permissions || []
-        }
-      }
-    };
-
-    res.json(dashboardData);
-
-  } catch (error) {
-    console.error('Dashboard error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch dashboard data',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
-      timestamp: new Date().toISOString()
-    });
-  }
-});
-
-// GET /api/dashboard/stats - Get detailed statistics
-router.get('/stats', authenticateToken, async (req, res) => {
-  try {
-    const { pool } = require('../config/database');
-    const userId = req.user.userId;
-    const userRole = req.user.role_name || 'user';
-
-    // Get performance metrics
-    const [performanceMetrics] = await pool.execute(`
-      SELECT 
-        AVG(CASE WHEN impressions > 0 THEN clicks / impressions * 100 ELSE 0 END) as avg_ctr,
-        AVG(CASE WHEN clicks > 0 THEN cost / clicks ELSE 0 END) as avg_cpc,
-        SUM(impressions) as total_impressions,
-        SUM(clicks) as total_clicks,
-        SUM(cost) as total_cost
-      FROM campaigns 
-      WHERE is_active = 1
-      ${userRole !== 'super_admin' ? 'AND created_by = ?' : ''}
-    `, userRole !== 'super_admin' ? [userId] : []);
+    const overviewData = await dashboardService.getOverviewStats(userId, userRole);
 
     res.json({
       success: true,
-      message: 'Dashboard statistics retrieved successfully',
+      message: 'Dashboard overview retrieved successfully',
       timestamp: new Date().toISOString(),
-      data: {
-        performance: {
-          averageCTR: parseFloat((performanceMetrics[0].avg_ctr || 0).toFixed(2)),
-          averageCPC: parseFloat((performanceMetrics[0].avg_cpc || 0).toFixed(2)),
-          totalImpressions: performanceMetrics[0].total_impressions || 0,
-          totalClicks: performanceMetrics[0].total_clicks || 0,
-          totalCost: parseFloat((performanceMetrics[0].total_cost || 0).toFixed(2))
-        }
+      data: overviewData,
+      user: {
+        id: userId,
+        role: userRole,
+        permissions: req.user.permissions || []
       }
     });
 
   } catch (error) {
-    console.error('Dashboard stats error:', error);
+    console.error('Dashboard overview error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch dashboard statistics',
+      message: 'Failed to fetch dashboard overview',
       error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
       timestamp: new Date().toISOString()
     });
   }
 });
 
-// GET /api/dashboard/trends - Get performance trends data for charts
+/**
+ * GET /api/dashboard/trends
+ * Get performance trends data for charts
+ * Query params: days (default: 30)
+ */
 router.get('/trends', authenticateToken, async (req, res) => {
   try {
-    const { pool } = require('../config/database');
     const userId = req.user.userId || req.user.id;
     const userRole = req.user.role_name || req.user.role?.name || 'user';
-    
-    // Get days parameter (default 30 days)
     const days = parseInt(req.query.days) || 30;
-    const chartType = req.query.chart_type || 'line'; // line, bar, area, doughnut
-    
-    // Get performance trends over the specified period
-    const [trendsData] = await pool.execute(`
-      SELECT 
-        DATE(r.report_date) as date,
-        SUM(r.leads) as total_leads,
-        SUM(r.spent) as total_spent,
-        COUNT(DISTINCT r.campaign_id) as active_campaigns,
-        AVG(r.cost_per_lead) as avg_cost_per_lead,
-        SUM(r.facebook_result) as facebook_leads,
-        SUM(r.zoho_result) as zoho_leads
-      FROM reports r
-      WHERE r.report_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
-        ${userRole !== 'super_admin' ? 'AND (r.created_by = ? OR r.created_by IS NULL)' : ''}
-      GROUP BY DATE(r.report_date)
-      ORDER BY r.report_date ASC
-    `, userRole !== 'super_admin' ? [days, userId] : [days]);
 
-    // Get campaign performance breakdown
-    const [campaignBreakdown] = await pool.execute(`
-      SELECT 
-        r.campaign_name,
-        SUM(r.leads) as total_leads,
-        SUM(r.spent) as total_spent,
-        AVG(r.cost_per_lead) as avg_cost_per_lead
-      FROM reports r
-      WHERE r.report_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
-        ${userRole !== 'super_admin' ? 'AND (r.created_by = ? OR r.created_by IS NULL)' : ''}
-      GROUP BY r.campaign_name, r.campaign_id
-      ORDER BY total_spent DESC
-      LIMIT 10
-    `, userRole !== 'super_admin' ? [days, userId] : [days]);
+    // Validate days parameter
+    if (days < 1 || days > 365) {
+      return res.status(400).json({
+        success: false,
+        message: 'Days parameter must be between 1 and 365',
+        timestamp: new Date().toISOString()
+      });
+    }
 
-    // Get daily performance metrics
-    const [dailyMetrics] = await pool.execute(`
-      SELECT 
-        DATE(r.report_date) as date,
-        SUM(r.spent) as spent,
-        SUM(r.leads) as leads,
-        CASE 
-          WHEN SUM(r.leads) > 0 THEN SUM(r.spent) / SUM(r.leads)
-          ELSE 0
-        END as cost_per_lead
-      FROM reports r
-      WHERE r.report_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
-        ${userRole !== 'super_admin' ? 'AND (r.created_by = ? OR r.created_by IS NULL)' : ''}
-      GROUP BY DATE(r.report_date)
-      ORDER BY r.report_date ASC
-    `, userRole !== 'super_admin' ? [days, userId] : [days]);
-
-    // Format data for different chart types
-    const formatDataForChartType = (data, type) => {
-      switch (type) {
-        case 'line':
-        case 'area':
-          return {
-            labels: data.map(item => {
-              const date = new Date(item.date);
-              return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            }),
-            datasets: [
-              {
-                label: 'Leads',
-                data: data.map(item => parseInt(item.total_leads) || 0),
-                borderColor: '#3b82f6',
-                backgroundColor: type === 'area' ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
-                tension: 0.4,
-                fill: type === 'area'
-              },
-              {
-                label: 'Spent (₹)',
-                data: data.map(item => parseFloat(item.total_spent) || 0),
-                borderColor: '#10b981',
-                backgroundColor: type === 'area' ? 'rgba(16, 185, 129, 0.1)' : 'transparent',
-                tension: 0.4,
-                fill: type === 'area',
-                yAxisID: 'y1'
-              }
-            ]
-          };
-        
-        case 'bar':
-          return {
-            labels: data.map(item => {
-              const date = new Date(item.date);
-              return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            }),
-            datasets: [
-              {
-                label: 'Leads',
-                data: data.map(item => parseInt(item.total_leads) || 0),
-                backgroundColor: 'rgba(59, 130, 246, 0.8)',
-                borderColor: '#3b82f6',
-                borderWidth: 1
-              },
-              {
-                label: 'Spent (₹)',
-                data: data.map(item => parseFloat(item.total_spent) || 0),
-                backgroundColor: 'rgba(16, 185, 129, 0.8)',
-                borderColor: '#10b981',
-                borderWidth: 1
-              }
-            ]
-          };
-        
-        case 'doughnut':
-        case 'pie':
-          const campaignData = campaignBreakdown.slice(0, 6); // Top 6 campaigns
-          return {
-            labels: campaignData.map(item => item.campaign_name || 'Unknown'),
-            datasets: [{
-              data: campaignData.map(item => parseFloat(item.total_spent) || 0),
-              backgroundColor: [
-                '#3b82f6',
-                '#10b981', 
-                '#f59e0b',
-                '#ef4444',
-                '#8b5cf6',
-                '#06b6d4'
-              ],
-              borderWidth: 2,
-              borderColor: '#ffffff'
-            }]
-          };
-        
-        default:
-          return formatDataForChartType(data, 'line');
-      }
-    };
-
-    // Calculate summary statistics
-    const totalLeads = trendsData.reduce((sum, item) => sum + (parseInt(item.total_leads) || 0), 0);
-    const totalSpent = trendsData.reduce((sum, item) => sum + (parseFloat(item.total_spent) || 0), 0);
-    const avgCostPerLead = totalLeads > 0 ? totalSpent / totalLeads : 0;
-    
-    // Growth calculations (compare with previous period)
-    const midPoint = Math.floor(trendsData.length / 2);
-    const firstHalf = trendsData.slice(0, midPoint);
-    const secondHalf = trendsData.slice(midPoint);
-    
-    const firstHalfLeads = firstHalf.reduce((sum, item) => sum + (parseInt(item.total_leads) || 0), 0);
-    const secondHalfLeads = secondHalf.reduce((sum, item) => sum + (parseInt(item.total_leads) || 0), 0);
-    const leadsGrowth = firstHalfLeads > 0 ? ((secondHalfLeads - firstHalfLeads) / firstHalfLeads) * 100 : 0;
-    
-    const firstHalfSpent = firstHalf.reduce((sum, item) => sum + (parseFloat(item.total_spent) || 0), 0);
-    const secondHalfSpent = secondHalf.reduce((sum, item) => sum + (parseFloat(item.total_spent) || 0), 0);
-    const spentGrowth = firstHalfSpent > 0 ? ((secondHalfSpent - firstHalfSpent) / firstHalfSpent) * 100 : 0;
-
-    const responseData = {
-      chart: formatDataForChartType(trendsData, chartType),
-      summary: {
-        totalLeads,
-        totalSpent: parseFloat(totalSpent.toFixed(2)),
-        avgCostPerLead: parseFloat(avgCostPerLead.toFixed(2)),
-        activeCampaigns: Math.max(...trendsData.map(item => item.active_campaigns || 0), 0),
-        dateRange: {
-          from: trendsData[0]?.date || null,
-          to: trendsData[trendsData.length - 1]?.date || null,
-          days
-        },
-        growth: {
-          leads: parseFloat(leadsGrowth.toFixed(1)),
-          spent: parseFloat(spentGrowth.toFixed(1))
-        }
-      },
-      campaignBreakdown: campaignBreakdown.map(campaign => ({
-        name: campaign.campaign_name || 'Unknown',
-        leads: parseInt(campaign.total_leads) || 0,
-        spent: parseFloat(campaign.total_spent) || 0,
-        costPerLead: parseFloat(campaign.avg_cost_per_lead) || 0
-      })),
-      chartOptions: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            position: 'top',
-          },
-          title: {
-            display: true,
-            text: `${days}-Day Performance Trends`
-          }
-        },
-        scales: chartType === 'line' || chartType === 'area' ? {
-          y: {
-            type: 'linear',
-            display: true,
-            position: 'left',
-            title: {
-              display: true,
-              text: 'Leads'
-            }
-          },
-          y1: {
-            type: 'linear',
-            display: true,
-            position: 'right',
-            title: {
-              display: true,
-              text: 'Spent (₹)'
-            },
-            grid: {
-              drawOnChartArea: false,
-            },
-          }
-        } : chartType === 'bar' ? {
-          y: {
-            beginAtZero: true,
-            title: {
-              display: true,
-              text: 'Value'
-            }
-          }
-        } : {}
-      }
-    };
+    const trendsData = await dashboardService.getPerformanceTrends(userId, userRole, days);
 
     res.json({
       success: true,
       message: `Retrieved ${days}-day performance trends`,
       timestamp: new Date().toISOString(),
-      data: responseData
+      data: trendsData,
+      params: {
+        days: days,
+        user_role: userRole
+      }
     });
 
   } catch (error) {
     console.error('Dashboard trends error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch dashboard trends',
+      message: 'Failed to fetch performance trends',
       error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
       timestamp: new Date().toISOString()
     });
   }
 });
+
+/**
+ * GET /api/dashboard/campaigns
+ * Get top performing campaigns
+ * Query params: limit (default: 10)
+ */
+router.get('/campaigns', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id;
+    const userRole = req.user.role_name || req.user.role?.name || 'user';
+    const limit = parseInt(req.query.limit) || 10;
+
+    // Validate limit parameter
+    if (limit < 1 || limit > 50) {
+      return res.status(400).json({
+        success: false,
+        message: 'Limit parameter must be between 1 and 50',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    const campaignsData = await dashboardService.getTopCampaigns(userId, userRole, limit);
+
+    res.json({
+      success: true,
+      message: `Retrieved top ${limit} performing campaigns`,
+      timestamp: new Date().toISOString(),
+      data: {
+        campaigns: campaignsData,
+        total_returned: campaignsData.length
+      },
+      params: {
+        limit: limit,
+        user_role: userRole
+      }
+    });
+
+  } catch (error) {
+    console.error('Dashboard campaigns error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch campaign performance data',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+/**
+ * GET /api/dashboard/brands
+ * Get brand performance analysis
+ * Query params: limit (default: 8)
+ */
+router.get('/brands', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id;
+    const userRole = req.user.role_name || req.user.role?.name || 'user';
+    const limit = parseInt(req.query.limit) || 8;
+
+    // Validate limit parameter
+    if (limit < 1 || limit > 20) {
+      return res.status(400).json({
+        success: false,
+        message: 'Limit parameter must be between 1 and 20',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    const brandsData = await dashboardService.getBrandPerformance(userId, userRole, limit);
+
+    res.json({
+      success: true,
+      message: `Retrieved top ${limit} brand performance data`,
+      timestamp: new Date().toISOString(),
+      data: {
+        brands: brandsData,
+        total_returned: brandsData.length
+      },
+      params: {
+        limit: limit,
+        user_role: userRole
+      }
+    });
+
+  } catch (error) {
+    console.error('Dashboard brands error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch brand performance data',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+/**
+ * GET /api/dashboard/activities
+ * Get recent system activities
+ * Query params: limit (default: 20)
+ */
+router.get('/activities', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id;
+    const userRole = req.user.role_name || req.user.role?.name || 'user';
+    const limit = parseInt(req.query.limit) || 20;
+
+    // Validate limit parameter
+    if (limit < 1 || limit > 100) {
+      return res.status(400).json({
+        success: false,
+        message: 'Limit parameter must be between 1 and 100',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    const activitiesData = await dashboardService.getRecentActivities(userId, userRole, limit);
+
+    res.json({
+      success: true,
+      message: `Retrieved ${limit} recent activities`,
+      timestamp: new Date().toISOString(),
+      data: {
+        activities: activitiesData,
+        total_returned: activitiesData.length
+      },
+      params: {
+        limit: limit,
+        user_role: userRole
+      }
+    });
+
+  } catch (error) {
+    console.error('Dashboard activities error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch recent activities',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+/**
+ * GET /api/dashboard/realtime
+ * Get real-time dashboard metrics for auto-refresh
+ */
+router.get('/realtime', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id;
+    const userRole = req.user.role_name || req.user.role?.name || 'user';
+
+    const realTimeData = await dashboardService.getRealTimeMetrics(userId, userRole);
+
+    res.json({
+      success: true,
+      message: 'Real-time dashboard metrics retrieved successfully',
+      timestamp: new Date().toISOString(),
+      data: realTimeData
+    });
+
+  } catch (error) {
+    console.error('Dashboard real-time error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch real-time metrics',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+/**
+ * GET /api/dashboard/summary
+ * Get a quick summary of all dashboard data (lightweight version)
+ */
+router.get('/summary', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id;
+    const userRole = req.user.role_name || req.user.role?.name || 'user';
+
+    // Get basic overview data
+    const overviewData = await dashboardService.getOverviewStats(userId, userRole);
+    const realTimeData = await dashboardService.getRealTimeMetrics(userId, userRole);
+
+    // Simplified summary
+    const summaryData = {
+      quick_stats: {
+        total_campaigns: overviewData.campaigns.total,
+        active_campaigns: overviewData.campaigns.active,
+        total_leads: overviewData.performance.total_leads,
+        total_spent: overviewData.performance.total_spent,
+        avg_cost_per_lead: overviewData.performance.avg_cost_per_lead
+      },
+      today: realTimeData.today,
+      growth: {
+        leads: overviewData.growth.leads,
+        spent: overviewData.growth.spent
+      },
+      system_health: realTimeData.system_health,
+      last_updated: new Date().toISOString()
+    };
+
+    res.json({
+      success: true,
+      message: 'Dashboard summary retrieved successfully',
+      timestamp: new Date().toISOString(),
+      data: summaryData
+    });
+
+  } catch (error) {
+    console.error('Dashboard summary error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch dashboard summary',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+/**
+ * GET /api/dashboard/export
+ * Export dashboard data in various formats
+ * Query params: format (json, csv), type (overview, campaigns, brands)
+ */
+router.get('/export', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id;
+    const userRole = req.user.role_name || req.user.role?.name || 'user';
+    const format = req.query.format || 'json';
+    const type = req.query.type || 'overview';
+
+    if (!['json', 'csv'].includes(format)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Format must be either json or csv',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    if (!['overview', 'campaigns', 'brands', 'activities'].includes(type)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Type must be one of: overview, campaigns, brands, activities',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    let exportData;
+    let filename;
+
+    switch (type) {
+      case 'overview':
+        exportData = await dashboardService.getOverviewStats(userId, userRole);
+        filename = `dashboard-overview-${new Date().toISOString().split('T')[0]}`;
+        break;
+      case 'campaigns':
+        exportData = await dashboardService.getTopCampaigns(userId, userRole, 50);
+        filename = `dashboard-campaigns-${new Date().toISOString().split('T')[0]}`;
+        break;
+      case 'brands':
+        exportData = await dashboardService.getBrandPerformance(userId, userRole, 20);
+        filename = `dashboard-brands-${new Date().toISOString().split('T')[0]}`;
+        break;
+      case 'activities':
+        exportData = await dashboardService.getRecentActivities(userId, userRole, 100);
+        filename = `dashboard-activities-${new Date().toISOString().split('T')[0]}`;
+        break;
+    }
+
+    if (format === 'json') {
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}.json"`);
+      res.json({
+        exported_at: new Date().toISOString(),
+        type: type,
+        user_id: userId,
+        user_role: userRole,
+        data: exportData
+      });
+    } else if (format === 'csv') {
+      // Simple CSV conversion for arrays
+      if (Array.isArray(exportData)) {
+        const csvData = convertToCSV(exportData);
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}.csv"`);
+        res.send(csvData);
+      } else {
+        // For complex objects, return JSON with CSV headers
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}.json"`);
+        res.json({
+          message: 'CSV format not available for complex data structures',
+          exported_at: new Date().toISOString(),
+          type: type,
+          data: exportData
+        });
+      }
+    }
+
+  } catch (error) {
+    console.error('Dashboard export error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to export dashboard data',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+/**
+ * Helper function to convert array of objects to CSV
+ */
+function convertToCSV(data) {
+  if (!data || data.length === 0) return '';
+
+  const headers = Object.keys(data[0]);
+  const csvRows = [headers.join(',')];
+
+  for (const row of data) {
+    const values = headers.map(header => {
+      const value = row[header];
+      // Escape commas and quotes in CSV
+      if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
+        return `"${value.replace(/"/g, '""')}"`;
+      }
+      return value;
+    });
+    csvRows.push(values.join(','));
+  }
+
+  return csvRows.join('\n');
+}
 
 module.exports = router;

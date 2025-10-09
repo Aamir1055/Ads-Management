@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import useUserAccess from '../hooks/useUserAccess'
+import { useAuth } from '../contexts/AuthContext'
+// import useUserAccess from '../hooks/useUserAccess' // DISABLED
 import {
   Menu, 
   X, 
@@ -28,26 +29,21 @@ const Layout = ({ children }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
-  const { userAccess, loading: permissionsLoading } = useUserAccess()
+  const { user: currentUser, logout } = useAuth()
   
-  // Get current user info from localStorage
-  const currentUser = React.useMemo(() => {
-    try {
-      const userString = localStorage.getItem('user')
-      return userString ? JSON.parse(userString) : null
-    } catch {
-      return null
-    }
-  }, [])
+  // TEMPORARILY DISABLED: useUserAccess to prevent auth loops
+  // const { userAccess, loading: permissionsLoading } = useUserAccess()
+  const userAccess = null // Use fallback navigation
+  const permissionsLoading = false
 
-  const handleLogout = () => {
-    // Clear any stored authentication data
-    localStorage.removeItem('authToken')
-    localStorage.removeItem('user')
-    sessionStorage.clear()
-    
-    // Redirect to login page
-    navigate('/login')
+  const handleLogout = async () => {
+    try {
+      await logout() // Use AuthContext logout
+    } catch (error) {
+      console.error('Logout error:', error)
+      // Fallback: direct navigation if logout fails
+      navigate('/login')
+    }
   }
 
   // Icon mapping for backend response

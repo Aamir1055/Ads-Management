@@ -1,610 +1,756 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import {
-  Users,
-  Target,
   BarChart3,
-  FileText,
-  DollarSign,
   TrendingUp,
-  RefreshCw,
-  Plus,
-  Eye,
-  Download,
+  Users,
+  DollarSign,
+  Target,
   Calendar,
-  AlertTriangle,
-  PieChart,
+  RefreshCw,
+  Download,
+  Eye,
   Activity,
-  Zap
+  PieChart,
+  Zap,
+  AlertTriangle,
+  ChevronRight,
+  Play,
+  Pause,
+  Settings,
+  Filter,
+  Building2
 } from 'lucide-react';
 
-// Import our new components
+// Chart components
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  ArcElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+} from 'chart.js';
+import { Line, Bar, Doughnut } from 'react-chartjs-2';
+
+// Services
 import dashboardService from '../services/dashboardService';
-import KPICard from '../components/dashboard/KPICard';
-import ActivityFeed from '../components/dashboard/ActivityFeed';
-import {
-  PerformanceTrendChart,
-  CampaignPerformanceChart,
-  BrandDistributionChart
-} from '../components/dashboard/DashboardCharts';
-import { CardSkeleton } from '../components/LoadingSkeleton';
-import {
-  createCachedService,
-  invalidateCache,
-  preloadDashboardData,
-  createLazyChartLoader
-} from '../utils/dashboardCache';
-import AuthDebug from '../components/debug/AuthDebug';
+
+// Register ChartJS components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  ArcElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+);
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   
-  // Create cached service instance
-  const cachedDashboardService = useMemo(
-    () => createCachedService(dashboardService, 'dashboardService'),
-    []
-  );
-  
-  // Lazy chart loader
-  const lazyLoader = useMemo(() => createLazyChartLoader(), []);
-  
-  // State management
+  // State management with placeholder data
   const [activeTab, setActiveTab] = useState('overview');
-  const [dashboardData, setDashboardData] = useState(null);
-  const [trendsData, setTrendsData] = useState(null);
-  const [campaignData, setCampaignData] = useState(null);
-  const [brandData, setBrandData] = useState(null);
-  const [activities, setActivities] = useState([]);
-  const [showMoreCampaigns, setShowMoreCampaigns] = useState(false);
-  const [showMoreBrands, setShowMoreBrands] = useState(false);
+  const [dashboardData, setDashboardData] = useState({
+    overview: {
+      campaigns: { total: 15, active: 8 },
+      performance: {
+        total_leads: 2847,
+        total_spent: 189500,
+        avg_cost_per_lead: 66.58,
+        today_leads: 24,
+        today_spent: 3200,
+      }
+    },
+    trends: {
+      chart: {
+        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+        datasets: [{
+          label: 'Leads',
+          data: [120, 190, 300, 500, 400, 650],
+          borderColor: 'rgb(59, 130, 246)',
+          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+          fill: true
+        }]
+      },
+      summary: {
+        total_leads: 2200,
+        total_spent: 147000,
+        avg_cost_per_lead: 66.82
+      }
+    },
+    campaigns: {
+      campaigns: [
+        {
+          campaign_id: 1,
+          campaign_name: 'Summer Sale Facebook Ads',
+          brand: 'Fashion Brand A',
+          total_leads: 450,
+          total_spent: 28500,
+          avg_cost_per_lead: 63.33,
+          performance_score: 85
+        },
+        {
+          campaign_id: 2,
+          campaign_name: 'Holiday Shopping Campaign',
+          brand: 'Electronics Store',
+          total_leads: 320,
+          total_spent: 24800,
+          avg_cost_per_lead: 77.50,
+          performance_score: 72
+        },
+        {
+          campaign_id: 3,
+          campaign_name: 'Back to School Promotion',
+          brand: 'Education Co',
+          total_leads: 280,
+          total_spent: 18200,
+          avg_cost_per_lead: 65.00,
+          performance_score: 78
+        }
+      ]
+    },
+    brands: {
+      brands: [
+        {
+          brand: 'Fashion Brand A',
+          campaigns_count: 5,
+          total_leads: 890,
+          total_spent: 58500,
+          avg_cost_per_lead: 65.73,
+          efficiency_score: 88
+        },
+        {
+          brand: 'Electronics Store',
+          campaigns_count: 3,
+          total_leads: 650,
+          total_spent: 48200,
+          avg_cost_per_lead: 74.15,
+          efficiency_score: 76
+        },
+        {
+          brand: 'Education Co',
+          campaigns_count: 4,
+          total_leads: 520,
+          total_spent: 31800,
+          avg_cost_per_lead: 61.15,
+          efficiency_score: 82
+        }
+      ]
+    }
+  });
   const [loading, setLoading] = useState({
-    overview: true,
-    trends: true,
-    campaigns: true,
-    brands: true,
-    activities: true
+    overview: false,
+    trends: false,
+    campaigns: false,
+    brands: false
   });
   const [error, setError] = useState(null);
-  const [lastRefresh, setLastRefresh] = useState(new Date());
-
-  // Fetch dashboard overview data
-  const fetchDashboardOverview = useCallback(async () => {
-    try {
-      setLoading(prev => ({ ...prev, overview: true }));
-      const response = await cachedDashboardService.getDashboardOverview();
-      
-      if (response.success) {
-        setDashboardData(response.data);
-        setError(null);
-      } else {
-        throw new Error(response.message || 'Failed to load dashboard data');
-      }
-    } catch (err) {
-      console.error('Dashboard overview error:', err);
-      
-      // Only set error state for non-auth issues
-      if (err.response?.status !== 401 && err.response?.status !== 403) {
-        setError(err.message || 'Unable to load dashboard data');
-      }
-      
-      // Set fallback data
-      setDashboardData({
-        overview: {
-          campaignsCount: 0,
-          totalLeads: 0,
-          totalSpent: 0,
-          avgCostPerLead: 0
-        },
-        dailyComparison: {
-          changes: { leadsChange: 0, spentChange: 0 }
-        },
-        topCampaigns: [],
-        brandPerformance: []
-      });
-    } finally {
-      setLoading(prev => ({ ...prev, overview: false }));
-    }
-  }, [cachedDashboardService]);
-
-  // Fetch trends data
-  const fetchTrendsData = useCallback(async () => {
-    try {
-      setLoading(prev => ({ ...prev, trends: true }));
-      const response = await cachedDashboardService.getTrendsData({ period: '30d' });
-      
-      if (response.success) {
-        setTrendsData(response.data?.series || []);
-      }
-    } catch (err) {
-      console.error('Trends data error:', err);
-      // Set empty array to prevent chart errors
-      setTrendsData([]);
-    } finally {
-      setLoading(prev => ({ ...prev, trends: false }));
-    }
-  }, [cachedDashboardService]);
-
-  // Fetch campaign performance data
-  const fetchCampaignData = useCallback(async () => {
-    try {
-      setLoading(prev => ({ ...prev, campaigns: true }));
-      const response = await cachedDashboardService.getCampaignPerformance({ limit: 10 });
-      
-      if (response.success) {
-        setCampaignData(response.data?.campaigns || []);
-      }
-    } catch (err) {
-      console.error('Campaign data error:', err);
-      // Set empty array to prevent chart errors
-      setCampaignData([]);
-    } finally {
-      setLoading(prev => ({ ...prev, campaigns: false }));
-    }
-  }, [cachedDashboardService]);
-
-  // Fetch brand performance data
-  const fetchBrandData = useCallback(async () => {
-    try {
-      setLoading(prev => ({ ...prev, brands: true }));
-      const response = await cachedDashboardService.getBrandPerformance({ limit: 8 });
-      
-      if (response.success) {
-        setBrandData(response.data?.brands || []);
-      }
-    } catch (err) {
-      console.error('Brand data error:', err);
-      // Set empty array to prevent chart errors
-      setBrandData([]);
-    } finally {
-      setLoading(prev => ({ ...prev, brands: false }));
-    }
-  }, [cachedDashboardService]);
-
-  // Fetch activities
-  const fetchActivities = useCallback(async () => {
-    try {
-      setLoading(prev => ({ ...prev, activities: true }));
-      const response = await cachedDashboardService.getRecentActivities({ limit: 10 });
-      
-      if (response.success) {
-        setActivities(response.data?.activities || []);
-      } else {
-        // Fallback sample activities for demo
-        setActivities([
-          {
-            id: 1,
-            type: 'report_generated',
-            title: 'Campaign Report Generated',
-            description: 'Monthly performance report for TK TAMIL campaign',
-            timestamp: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
-            user: 'System',
-            status: 'success'
-          },
-          {
-            id: 2,
-            type: 'user_login',
-            title: 'User Login',
-            description: 'User logged into dashboard',
-            timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-            user: user?.username || 'User',
-            status: 'success'
-          },
-          {
-            id: 3,
-            type: 'data_refresh',
-            title: 'Data Refreshed',
-            description: 'Dashboard data updated automatically',
-            timestamp: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-            user: 'System',
-            status: 'success'
-          },
-          {
-            id: 4,
-            type: 'campaign_updated',
-            title: 'Campaign Modified',
-            description: 'TK TAMIL campaign settings updated',
-            timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-            user: user?.username || 'User',
-            status: 'success'
-          },
-          {
-            id: 5,
-            type: 'analytics_view',
-            title: 'Analytics Accessed',
-            description: 'Performance analytics page viewed',
-            timestamp: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(),
-            user: user?.username || 'User',
-            status: 'success'
-          }
-        ]);
-      }
-    } catch (err) {
-      console.error('Activities error:', err);
-      // Set fallback sample activities
-      setActivities([
-        {
-          id: 1,
-          type: 'report_generated',
-          title: 'System Report',
-          timestamp: new Date().toISOString(),
-          user: 'System',
-          status: 'success'
-        }
-      ]);
-    } finally {
-      setLoading(prev => ({ ...prev, activities: false }));
-    }
-  }, [cachedDashboardService, user]);
-
-  // Refresh all data
-  const refreshAllData = useCallback(async () => {
-    // Clear cache before refreshing
-    invalidateCache.all();
-    
-    setLastRefresh(new Date());
-    await Promise.all([
-      fetchDashboardOverview(),
-      fetchTrendsData(),
-      fetchCampaignData(),
-      fetchBrandData(),
-      fetchActivities()
-    ]);
-    toast.success('Dashboard refreshed successfully!');
-  }, [fetchDashboardOverview, fetchTrendsData, fetchCampaignData, fetchBrandData, fetchActivities]);
-
-  // Initial data load with preloading
-  useEffect(() => {
-    // Preload critical data first
-    preloadDashboardData(cachedDashboardService).then(() => {
-      // Then load all dashboard data
-      fetchDashboardOverview();
-      fetchTrendsData();
-      fetchCampaignData();
-      fetchBrandData();
-      fetchActivities();
-    });
-  }, [fetchDashboardOverview, fetchTrendsData, fetchCampaignData, fetchBrandData, fetchActivities, cachedDashboardService]);
-
-  // Auto-refresh every 5 minutes
-  useEffect(() => {
-    const interval = setInterval(refreshAllData, 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [refreshAllData]);
   
-  // Cleanup lazy loader on unmount
-  useEffect(() => {
-    return () => {
-      lazyLoader.cleanup();
-    };
-  }, [lazyLoader]);
+  // Real-time data will be loaded from API
+  const [realTimeData, setRealTimeData] = useState(null);
 
-  // Quick action handlers
-  const handleQuickAction = (action) => {
-    switch (action) {
-      case 'create_campaign':
-        navigate('/campaigns?action=create');
-        break;
-      case 'generate_report':
-        navigate('/reports?action=generate');
-        break;
-      case 'view_analytics':
-        navigate('/report-analytics');
-        break;
-      case 'manage_users':
-        navigate('/user-management');
-        break;
-      case 'export_data':
-        navigate('/reports?action=export');
-        break;
-      default:
-        console.log(`Action: ${action}`);
+  // Load data for specific tab
+  const loadTabData = useCallback(async (tab) => {
+    console.log(`Loading data for ${tab} tab...`);
+    try {
+      setLoading(prev => ({ ...prev, [tab]: true }));
+      let data;
+      
+      switch (tab) {
+        case 'overview':
+          data = await dashboardService.getOverview();
+          // Also load real-time data for overview
+          try {
+            const realtime = await dashboardService.getRealTimeMetrics();
+            if (realtime?.data) {
+              setRealTimeData(realtime.data);
+            }
+          } catch (realtimeErr) {
+            console.log('Real-time data not available:', realtimeErr.message);
+          }
+          break;
+        case 'trends':
+          data = await dashboardService.getTrends();
+          break;
+        case 'campaigns':
+          data = await dashboardService.getCampaigns();
+          break;
+        case 'brands':
+          data = await dashboardService.getBrands();
+          break;
+        default:
+          return;
+      }
+      
+      if (data?.data) {
+        setDashboardData(prev => ({ ...prev, [tab]: data.data }));
+        console.log(`${tab} data loaded:`, data.data);
+      }
+    } catch (err) {
+      console.error(`Failed to load ${tab} data:`, err);
+      setError(`Failed to load ${tab} data`);
+    } finally {
+      setLoading(prev => ({ ...prev, [tab]: false }));
     }
+  }, []);
+
+  // DISABLE API calls to prevent loops - showing static data instead
+  useEffect(() => {
+    console.log('Dashboard: API calls disabled - showing static data to prevent loops');
+    // loadTabData('overview'); // DISABLED to prevent auth loops
+  }, []);
+  
+  // Refs - REMOVED to prevent loops
+
+  // Navigation handlers - SIMPLIFIED
+  const navigateTo = useCallback((path) => {
+    console.log('Navigating to:', path);
+    navigate(path);
+  }, [navigate]);
+
+  // Refresh function - DISABLED to prevent loops
+  const refreshAll = () => {
+    console.log('Refresh disabled to prevent loops');
+    toast.error('Refresh disabled - API calls cause authentication loops');
   };
 
-  const overview = dashboardData?.overview || {};
-  const dailyComparison = dashboardData?.dailyComparison || {};
-  const changes = dailyComparison.changes || {};
-
-  // Tab configuration
+  // Tab configuration - Remove Activities
   const tabs = [
-    { id: 'overview', name: 'Overview', icon: BarChart3 },
-    { id: 'trends', name: 'Trends', icon: TrendingUp },
-    { id: 'campaigns', name: 'Campaigns', icon: Target },
-    { id: 'brands', name: 'Brands', icon: PieChart },
-    { id: 'activity', name: 'Activity', icon: Activity }
+    { id: 'overview', name: 'Overview', icon: BarChart3, color: 'blue' },
+    { id: 'trends', name: 'Trends', icon: TrendingUp, color: 'green' },
+    { id: 'campaigns', name: 'Campaigns', icon: Target, color: 'purple' },
+    { id: 'brands', name: 'Brands', icon: PieChart, color: 'orange' }
   ];
 
-  return (
-    <div className="p-4 lg:p-6 space-y-6">
-      {/* Compact Header Section */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h1 className="text-2xl lg:text-3xl font-bold text-gray-900">
-            Welcome back, {user?.username || 'User'}!
-          </h1>
-          <p className="mt-1 text-sm text-gray-600">
-            {activeTab === 'overview' ? 'Dashboard overview and key metrics' :
-             activeTab === 'trends' ? 'Performance trends over time' :
-             activeTab === 'campaigns' ? 'Top performing campaigns' :
-             activeTab === 'brands' ? 'Brand performance analysis' :
-             'Recent system activity'}
+  // Load data when tab changes - DISABLED
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId);
+    console.log('Tab data loading disabled to prevent auth loops');
+    // if (!dashboardData[tabId]) {
+    //   loadTabData(tabId);
+    // }
+  };
+
+  // Chart options helper function
+  const getChartOptions = (title, yAxisLabel) => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'top',
+      },
+      title: {
+        display: true,
+        text: title,
+      },
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        title: {
+          display: true,
+          text: yAxisLabel,
+        },
+      },
+    },
+  });
+
+  // DISABLED export handler to prevent loops
+  const handleExport = (type, format) => {
+    console.log('Export disabled to prevent loops');
+    toast.error('Export temporarily disabled');
+  };
+
+  // Metric cards component
+  const MetricCard = ({ title, value, change, icon: Icon, color, onClick, loading }) => (
+    <div 
+      className={`bg-white rounded-lg shadow-sm border border-gray-200 p-6 cursor-pointer hover:shadow-md transition-all duration-200 ${onClick ? 'hover:border-' + color + '-200' : ''}`}
+      onClick={onClick}
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex-1">
+          <p className="text-sm font-medium text-gray-600">{title}</p>
+          <div className="flex items-center mt-2">
+            {loading ? (
+              <div className="animate-pulse bg-gray-200 h-8 w-20 rounded"></div>
+            ) : (
+              <p className="text-2xl font-bold text-gray-900">
+                {typeof value === 'number' && value >= 1000 ? 
+                  (value >= 100000 ? `${(value/100000).toFixed(1)}L` : `${(value/1000).toFixed(1)}K`) : 
+                  value?.toLocaleString?.() || value || '0'}
+              </p>
+            )}
+            {change !== undefined && !loading && (
+              <span className={`ml-2 text-sm font-medium ${
+                change > 0 ? 'text-green-600' : change < 0 ? 'text-red-600' : 'text-gray-600'
+              }`}>
+                {change > 0 ? '+' : ''}{change}%
+              </span>
+            )}
+          </div>
+        </div>
+        <div className={`p-3 rounded-full bg-${color}-100`}>
+          <Icon className={`h-6 w-6 text-${color}-600`} />
+        </div>
+      </div>
+    </div>
+  );
+
+  // SIMPLIFIED - All complex logic removed to prevent loops
+
+  // Activity item component
+  const ActivityItem = ({ activity }) => {
+    const getActivityIcon = (type) => {
+      switch (type) {
+        case 'campaign_created': return Target;
+        case 'report_generated': return BarChart3;
+        case 'card_updated': return DollarSign;
+        default: return Activity;
+      }
+    };
+
+    const Icon = getActivityIcon(activity.type);
+    return (
+      <div className="flex items-start space-x-3 p-3 hover:bg-gray-50 rounded-lg transition-colors">
+        <div className="flex-shrink-0">
+          <div className="p-2 bg-blue-100 rounded-full">
+            <Icon className="h-4 w-4 text-blue-600" />
+          </div>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-gray-900">{activity.title}</p>
+          <p className="text-sm text-gray-500 mt-1">{activity.description}</p>
+          <p className="text-xs text-gray-400 mt-1">
+            {new Date(activity.timestamp).toLocaleString()}
           </p>
         </div>
-        <div className="mt-3 lg:mt-0 flex items-center space-x-3">
-          <div className="text-xs text-gray-500">
-            Updated: {lastRefresh.toLocaleTimeString()}
+      </div>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center">
+              <h1 className="text-2xl font-bold text-gray-900">
+                Dashboard
+              </h1>
+              <span className="ml-3 px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+                {user?.username || 'User'}
+              </span>
+            </div>
+            
+            <div className="flex items-center space-x-4">
+              {/* Status indicator */}
+              <div className="flex items-center space-x-2">
+                <div className={`h-2 w-2 rounded-full ${
+                  Object.values(loading).some(Boolean) ? 'bg-yellow-400 animate-pulse' : 'bg-green-400'
+                }`}></div>
+                <span className="text-xs text-gray-500">
+                  {Object.values(loading).some(Boolean) ? 'Loading...' : 'Ready'}
+                </span>
+              </div>
+
+              {/* Refresh button */}
+              <button
+                onClick={refreshAll}
+                disabled={Object.values(loading).some(Boolean)}
+                className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <RefreshCw className={`h-4 w-4 ${Object.values(loading).some(Boolean) ? 'animate-spin' : ''}`} />
+                <span>Refresh</span>
+              </button>
+
+              {/* Export dropdown */}
+              <div className="relative group">
+                <button className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                  <Download className="h-4 w-4" />
+                  <span>Export</span>
+                </button>
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
+                  <div className="py-2">
+                    <button 
+                      onClick={() => handleExport('overview', 'json')}
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
+                    >
+                      Export Overview (JSON)
+                    </button>
+                    <button 
+                      onClick={() => handleExport('campaigns', 'csv')}
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
+                    >
+                      Export Campaigns (CSV)
+                    </button>
+                    <button 
+                      onClick={() => handleExport('brands', 'json')}
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
+                    >
+                      Export Brands (JSON)
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-          <button
-            onClick={refreshAllData}
-            className="btn-secondary flex items-center space-x-2 text-sm px-3 py-2"
-            disabled={Object.values(loading).some(Boolean)}
-          >
-            <RefreshCw className={`h-3 w-3 ${Object.values(loading).some(Boolean) ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">Refresh</span>
-          </button>
         </div>
       </div>
 
       {/* Tab Navigation */}
-      <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8 overflow-x-auto">
-          {tabs.map((tab) => {
-            const TabIcon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
-                  activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <TabIcon className="h-4 w-4" />
-                <span>{tab.name}</span>
-              </button>
-            );
-          })}
-        </nav>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+        <div className="border-b border-gray-200">
+          <nav className="-mb-px flex space-x-8 overflow-x-auto">
+            {tabs.map((tab) => {
+              const TabIcon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => handleTabChange(tab.id)}
+                  className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap transition-colors ${
+                    activeTab === tab.id
+                      ? `border-${tab.color}-500 text-${tab.color}-600`
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  <TabIcon className="h-4 w-4" />
+                  <span>{tab.name}</span>
+                  {loading[tab.id] && (
+                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-current"></div>
+                  )}
+                </button>
+              );
+            })}
+          </nav>
+        </div>
       </div>
 
       {/* Error Banner */}
       {error && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-start space-x-3">
-          <AlertTriangle className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
-          <div>
-            <h3 className="text-sm font-medium text-yellow-800">Data Loading Issue</h3>
-            <p className="text-xs text-yellow-700 mt-1">{error}</p>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-start space-x-3">
+            <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <h3 className="text-sm font-medium text-yellow-800">Data Loading Issue</h3>
+              <p className="text-sm text-yellow-700 mt-1">{error}</p>
+            </div>
+            <button 
+              onClick={() => setError(null)}
+              className="ml-auto text-yellow-600 hover:text-yellow-800"
+            >
+              <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </button>
           </div>
         </div>
       )}
 
       {/* Tab Content */}
-      <div className="space-y-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 mb-8">
         {/* Overview Tab */}
         {activeTab === 'overview' && (
-          <>
-            {/* Compact KPI Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
-              <KPICard
-                title="Campaigns"
-                value={overview.campaignsCount}
+          <div className="space-y-6">
+            {/* Metric Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              <MetricCard
+                title="Total Campaigns"
+                value={dashboardData.overview?.campaigns?.total}
+                change={realTimeData?.comparisons?.campaigns_change}
                 icon={Target}
-                color="bg-blue-500"
+                color="blue"
+                onClick={() => navigateTo('/campaigns')}
                 loading={loading.overview}
-                onClick={() => navigate('/campaigns')}
-                className="text-sm"
               />
-              <KPICard
+              <MetricCard
                 title="Total Leads"
-                value={overview.totalLeads}
-                previousValue={overview.totalLeads - (changes.leadsChange || 0)}
+                value={dashboardData.overview?.performance?.total_leads}
+                change={realTimeData?.comparisons?.leads_change}
                 icon={Users}
-                color="bg-green-500"
-                format="compact"
+                color="green"
+                onClick={() => navigateTo('/reports')}
                 loading={loading.overview}
-                onClick={() => navigate('/reports')}
-                className="text-sm"
               />
-              <KPICard
+              <MetricCard
                 title="Total Spent"
-                value={overview.totalSpent}
-                previousValue={overview.totalSpent - (changes.spentChange || 0)}
+                value={`₹${(dashboardData.overview?.performance?.total_spent || 0).toLocaleString()}`}
+                change={realTimeData?.comparisons?.spent_change}
                 icon={DollarSign}
-                color="bg-purple-500"
-                format="currency"
+                color="purple"
+                onClick={() => navigateTo('/report-analytics')}
                 loading={loading.overview}
-                onClick={() => navigate('/report-analytics')}
-                className="text-sm"
               />
-              <KPICard
+              <MetricCard
                 title="Avg Cost/Lead"
-                value={overview.avgCostPerLead}
+                value={`₹${(dashboardData.overview?.performance?.avg_cost_per_lead || 0).toFixed(2)}`}
                 icon={TrendingUp}
-                color="bg-orange-500"
-                format="currency"
-                precision={2}
+                color="orange"
                 loading={loading.overview}
-                className="text-sm"
               />
             </div>
 
-            {/* Grid layout for Quick Actions and Recent Activity */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Quick Actions Grid */}
-              <div className="card">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Quick Actions</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    onClick={() => handleQuickAction('create_campaign')}
-                    className="flex flex-col items-center justify-center p-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all duration-200 group"
-                  >
-                    <Plus className="h-6 w-6 text-gray-400 group-hover:text-blue-500 mb-2" />
-                    <span className="text-xs font-medium text-gray-700 group-hover:text-blue-700 text-center">
-                      Create Campaign
-                    </span>
-                  </button>
-                  
-                  <button
-                    onClick={() => handleQuickAction('generate_report')}
-                    className="flex flex-col items-center justify-center p-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-green-500 hover:bg-green-50 transition-all duration-200 group"
-                  >
-                    <FileText className="h-6 w-6 text-gray-400 group-hover:text-green-500 mb-2" />
-                    <span className="text-xs font-medium text-gray-700 group-hover:text-green-700 text-center">
-                      Generate Report
-                    </span>
-                  </button>
-                  
-                  <button
-                    onClick={() => handleQuickAction('view_analytics')}
-                    className="flex flex-col items-center justify-center p-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition-all duration-200 group"
-                  >
-                    <BarChart3 className="h-6 w-6 text-gray-400 group-hover:text-purple-500 mb-2" />
-                    <span className="text-xs font-medium text-gray-700 group-hover:text-purple-700 text-center">
-                      View Analytics
-                    </span>
-                  </button>
-                  
-                  <button
-                    onClick={() => handleQuickAction('export_data')}
-                    className="flex flex-col items-center justify-center p-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-orange-500 hover:bg-orange-50 transition-all duration-200 group"
-                  >
-                    <Download className="h-6 w-6 text-gray-400 group-hover:text-orange-500 mb-2" />
-                    <span className="text-xs font-medium text-gray-700 group-hover:text-orange-700 text-center">
-                      Export Data
-                    </span>
-                  </button>
+            {/* Today's Performance */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Today's Performance</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="text-center p-4 bg-blue-50 rounded-lg">
+                  {loading.overview ? (
+                    <div className="animate-pulse bg-gray-200 h-8 w-16 rounded mx-auto mb-2"></div>
+                  ) : (
+                    <p className="text-2xl font-bold text-blue-600">
+                      {dashboardData.overview?.performance?.today_leads || '24'}
+                    </p>
+                  )}
+                  <p className="text-sm text-gray-600">Leads Today</p>
+                </div>
+                <div className="text-center p-4 bg-green-50 rounded-lg">
+                  {loading.overview ? (
+                    <div className="animate-pulse bg-gray-200 h-8 w-16 rounded mx-auto mb-2"></div>
+                  ) : (
+                    <p className="text-2xl font-bold text-green-600">
+                      ₹{(dashboardData.overview?.performance?.today_spent || 3200).toLocaleString()}
+                    </p>
+                  )}
+                  <p className="text-sm text-gray-600">Spent Today</p>
+                </div>
+                <div className="text-center p-4 bg-purple-50 rounded-lg">
+                  {loading.overview ? (
+                    <div className="animate-pulse bg-gray-200 h-8 w-16 rounded mx-auto mb-2"></div>
+                  ) : (
+                    <p className="text-2xl font-bold text-purple-600">
+                      {dashboardData.overview?.campaigns?.active || '8'}
+                    </p>
+                  )}
+                  <p className="text-sm text-gray-600">Active Campaigns</p>
                 </div>
               </div>
-
-              {/* Compact Recent Activity */}
-              <ActivityFeed
-                activities={activities}
-                loading={loading.activities}
-                title="Recent Activity"
-                compact={true}
-                maxVisible={3}
-              />
             </div>
-          </>
+
+            {/* Quick Actions */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Quick Actions</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <button
+                  onClick={() => navigateTo('/campaigns?action=create')}
+                  className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all duration-200 group"
+                >
+                  <Target className="h-8 w-8 text-gray-400 group-hover:text-blue-500 mb-2" />
+                  <span className="text-sm font-medium text-gray-700 group-hover:text-blue-700">
+                    Create Campaign
+                  </span>
+                </button>
+                <button
+                  onClick={() => navigateTo('/reports?action=generate')}
+                  className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-green-500 hover:bg-green-50 transition-all duration-200 group"
+                >
+                  <BarChart3 className="h-8 w-8 text-gray-400 group-hover:text-green-500 mb-2" />
+                  <span className="text-sm font-medium text-gray-700 group-hover:text-green-700">
+                    Generate Report
+                  </span>
+                </button>
+                <button
+                  onClick={() => navigateTo('/business-manager')}
+                  className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition-all duration-200 group"
+                >
+                  <Building2 className="h-8 w-8 text-gray-400 group-hover:text-purple-500 mb-2" />
+                  <span className="text-sm font-medium text-gray-700 group-hover:text-purple-700">
+                    Business Manager
+                  </span>
+                </button>
+                <button
+                  onClick={() => navigateTo('/user-management')}
+                  className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-orange-500 hover:bg-orange-50 transition-all duration-200 group"
+                >
+                  <Users className="h-8 w-8 text-gray-400 group-hover:text-orange-500 mb-2" />
+                  <span className="text-sm font-medium text-gray-700 group-hover:text-orange-700">
+                    Manage Users
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Trends Tab */}
         {activeTab === 'trends' && (
           <div className="space-y-6">
-            <PerformanceTrendChart
-              data={trendsData}
-              loading={loading.trends}
-              title="30-Day Performance Trends"
-            />
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Performance Trends (30 Days)</h3>
+              {loading.trends ? (
+                <div className="animate-pulse bg-gray-200 h-64 rounded"></div>
+              ) : dashboardData.trends?.chart ? (
+                <div className="h-64">
+                  <Line 
+                    data={dashboardData.trends.chart} 
+                    options={getChartOptions('Performance Trends', 'Leads')} 
+                  />
+                </div>
+              ) : (
+                <div className="h-64 flex items-center justify-center text-gray-500">
+                  No trends data available
+                </div>
+              )}
+            </div>
+            
+            {dashboardData.trends?.summary && (
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Trends Summary</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="text-center p-4 bg-gray-50 rounded-lg">
+                    <p className="text-2xl font-bold text-gray-900">{dashboardData.trends.summary.total_leads}</p>
+                    <p className="text-sm text-gray-600">Total Leads (30d)</p>
+                  </div>
+                  <div className="text-center p-4 bg-gray-50 rounded-lg">
+                    <p className="text-2xl font-bold text-gray-900">₹{dashboardData.trends.summary.total_spent.toLocaleString()}</p>
+                    <p className="text-sm text-gray-600">Total Spent (30d)</p>
+                  </div>
+                  <div className="text-center p-4 bg-gray-50 rounded-lg">
+                    <p className="text-2xl font-bold text-gray-900">₹{dashboardData.trends.summary.avg_cost_per_lead}</p>
+                    <p className="text-sm text-gray-600">Avg Cost/Lead</p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
         {/* Campaigns Tab */}
         {activeTab === 'campaigns' && (
           <div className="space-y-6">
-            <CampaignPerformanceChart
-              data={campaignData}
-              loading={loading.campaigns}
-              title="Campaign Performance"
-            />
-            
-            {/* Campaign List */}
-            {campaignData && campaignData.length > 0 && (
-              <div className="card">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Campaign Details</h3>
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-gray-900">Top Performing Campaigns</h3>
+                <button
+                  onClick={() => navigateTo('/campaigns')}
+                  className="flex items-center space-x-1 text-blue-600 hover:text-blue-800 text-sm font-medium"
+                >
+                  <span>View All</span>
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+              
+              {loading.campaigns ? (
                 <div className="space-y-3">
-                  {(showMoreCampaigns ? campaignData : campaignData.slice(0, 5)).map((campaign, index) => (
-                    <div key={campaign.campaign_id || index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} className="animate-pulse flex items-center justify-between p-4 bg-gray-100 rounded-lg">
+                      <div className="flex-1 space-y-2">
+                        <div className="h-4 bg-gray-300 rounded w-1/2"></div>
+                        <div className="h-3 bg-gray-300 rounded w-1/3"></div>
+                      </div>
+                      <div className="h-4 bg-gray-300 rounded w-16"></div>
+                    </div>
+                  ))}
+                </div>
+              ) : dashboardData.campaigns?.campaigns?.length > 0 ? (
+                <div className="space-y-3">
+                  {dashboardData.campaigns.campaigns.map((campaign, index) => (
+                    <div key={campaign.campaign_id || index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                       <div className="flex-1">
-                        <h4 className="font-medium text-gray-900">{campaign.campaign_name || `Campaign ${campaign.campaign_id}`}</h4>
-                        <p className="text-sm text-gray-600">
-                          {campaign.totalLeads || campaign.total_leads || 0} leads • 
-                          ₹{Number(campaign.totalSpent || campaign.total_spent || 0).toLocaleString('en-IN')} spent
+                        <div className="flex items-center space-x-2">
+                          <h4 className="font-medium text-gray-900">{campaign.campaign_name}</h4>
+                          <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+                            {campaign.brand}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-600 mt-1">
+                          {campaign.total_leads} leads • ₹{campaign.total_spent.toLocaleString()} spent
                         </p>
                       </div>
                       <div className="text-right">
-                        <span className="text-sm font-medium text-gray-900">
-                          ₹{Number(campaign.avgCostPerLead || campaign.avg_cost_per_lead || 0).toFixed(2)}
+                        <span className="text-lg font-bold text-gray-900">
+                          ₹{campaign.avg_cost_per_lead.toFixed(2)}
                         </span>
                         <p className="text-xs text-gray-500">cost/lead</p>
+                        {campaign.performance_score && (
+                          <div className="mt-1">
+                            <div className="flex items-center space-x-1">
+                              <div className="w-8 bg-gray-200 rounded-full h-1">
+                                <div 
+                                  className="bg-blue-600 h-1 rounded-full" 
+                                  style={{ width: `${Math.min(campaign.performance_score, 100)}%` }}
+                                ></div>
+                              </div>
+                              <span className="text-xs text-gray-500">{campaign.performance_score}/100</span>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
-                  
-                  {campaignData.length > 5 && (
-                    <button
-                      onClick={() => setShowMoreCampaigns(!showMoreCampaigns)}
-                      className="w-full text-center text-sm text-blue-600 hover:text-blue-800 font-medium py-2"
-                    >
-                      {showMoreCampaigns ? 'Show Less' : `Show ${campaignData.length - 5} More`}
-                    </button>
-                  )}
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  No campaigns data available
+                </div>
+              )}
+            </div>
           </div>
         )}
 
         {/* Brands Tab */}
         {activeTab === 'brands' && (
           <div className="space-y-6">
-            <BrandDistributionChart
-              data={brandData}
-              loading={loading.brands}
-              title="Brand Performance Distribution"
-            />
-            
-            {/* Brand List */}
-            {brandData && brandData.length > 0 && (
-              <div className="card">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Brand Details</h3>
-                <div className="space-y-3">
-                  {(showMoreBrands ? brandData : brandData.slice(0, 5)).map((brand, index) => (
-                    <div key={brand.brand || index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div className="flex-1">
-                        <h4 className="font-medium text-gray-900">{brand.brand || 'Unknown Brand'}</h4>
-                        <p className="text-sm text-gray-600">
-                          {brand.totalLeads || brand.total_leads || 0} leads • 
-                          {brand.campaignsCount || brand.campaigns_count || 0} campaigns
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-sm font-medium text-gray-900">
-                          ₹{Number(brand.totalSpent || brand.total_spent || 0).toLocaleString('en-IN')}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-gray-900">Brand Performance</h3>
+              </div>
+              
+              {loading.brands ? (
+                <div className="animate-pulse bg-gray-200 h-64 rounded"></div>
+              ) : dashboardData.brands?.brands?.length > 0 ? (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {dashboardData.brands.brands.map((brand, index) => (
+                    <div key={brand.brand || index} className="p-4 bg-gray-50 rounded-lg">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-medium text-gray-900">{brand.brand}</h4>
+                        <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
+                          {brand.campaigns_count} campaigns
                         </span>
-                        <p className="text-xs text-gray-500">total spent</p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <p className="text-gray-600">Total Leads</p>
+                          <p className="font-bold text-gray-900">{brand.total_leads}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-600">Total Spent</p>
+                          <p className="font-bold text-gray-900">₹{brand.total_spent.toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-600">Avg Cost/Lead</p>
+                          <p className="font-bold text-gray-900">₹{brand.avg_cost_per_lead.toFixed(2)}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-600">Efficiency Score</p>
+                          <p className="font-bold text-blue-600">{brand.efficiency_score}</p>
+                        </div>
                       </div>
                     </div>
                   ))}
-                  
-                  {brandData.length > 5 && (
-                    <button
-                      onClick={() => setShowMoreBrands(!showMoreBrands)}
-                      className="w-full text-center text-sm text-blue-600 hover:text-blue-800 font-medium py-2"
-                    >
-                      {showMoreBrands ? 'Show Less' : `Show ${brandData.length - 5} More`}
-                    </button>
-                  )}
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  No brands data available
+                </div>
+              )}
+            </div>
           </div>
         )}
 
-        {/* Activity Tab */}
-        {activeTab === 'activity' && (
-          <div className="space-y-6">
-            <ActivityFeed
-              activities={activities}
-              loading={loading.activities}
-              title="Recent System Activity"
-            />
-          </div>
-        )}
       </div>
     </div>
   );

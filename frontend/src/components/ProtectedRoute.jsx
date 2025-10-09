@@ -3,10 +3,18 @@ import { Navigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
 const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated, loading } = useAuth()
+  const { isAuthenticated, loading, user, token } = useAuth()
+  
+  console.log('🚪 ProtectedRoute: Checking authentication...', {
+    loading,
+    hasUser: !!user,
+    hasToken: !!token,
+    currentPath: window.location.pathname
+  })
   
   // Show loading while checking authentication
   if (loading) {
+    console.log('🔄 ProtectedRoute: Still loading, showing spinner')
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -17,13 +25,18 @@ const ProtectedRoute = ({ children }) => {
     )
   }
   
+  // Check authentication
+  const authResult = isAuthenticated()
+  console.log('🔍 ProtectedRoute: Authentication result:', authResult)
+  
   // If not authenticated, redirect to login
-  if (!isAuthenticated()) {
-    console.log('🚪 Not authenticated, redirecting to login')
+  if (!authResult) {
+    console.log('🚨 ProtectedRoute: Not authenticated, redirecting to login')
     return <Navigate to="/login" replace />
   }
   
   // If authenticated, render the protected content
+  console.log('✅ ProtectedRoute: User authenticated, rendering protected content')
   return children
 }
 

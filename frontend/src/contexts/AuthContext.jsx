@@ -15,38 +15,59 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
   const [token, setToken] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [initialized, setInitialized] = useState(false)
 
   // Check for existing authentication on app load
   useEffect(() => {
+    console.log('🔍 AuthContext: useEffect triggered, initialized:', initialized);
+    console.log('🔍 AuthContext: Current URL:', window.location.href);
+    if (initialized) {
+      console.log('🔍 AuthContext: Already initialized, skipping...')
+      return
+    }
+    
     const initAuth = () => {
       try {
+        console.log('🔍 AuthContext: Initializing authentication...')
+        setInitialized(true)
+        
+        const isAuth = authService.isAuthenticated()
+        const storedUser = authService.getStoredUser()
+        const storedToken = authService.getAccessToken()
+        
+        console.log('🔍 AuthContext Init Check:')
+        console.log('  - isAuth:', isAuth)
+        console.log('  - hasStoredUser:', !!storedUser)
+        console.log('  - hasStoredToken:', !!storedToken)
+        console.log('  - storedUserData:', storedUser)
+        console.log('  - tokenLength:', storedToken?.length || 0)
+        console.log('  - storedToken preview:', storedToken?.substring(0, 50) + '...')
+        
         // Use authService to check authentication
-        if (authService.isAuthenticated()) {
-          const storedUser = authService.getStoredUser()
-          const storedToken = authService.getAccessToken()
+        if (isAuth && storedToken && storedUser) {
+          console.log('✅ AuthContext: Setting user and token state...')
+          setToken(storedToken)
+          setUser(storedUser)
           
-          if (storedToken && storedUser) {
-            setToken(storedToken)
-            setUser(storedUser)
-            
-            // Check if token needs refresh
-            authService.checkAndRefreshToken()
-            
-            console.log('✅ User authenticated from stored tokens')
-          } else {
-            console.log('⚠️ Invalid stored auth data, clearing...')
-            authService.clearAuthData()
-          }
+          // Verify state was set
+          console.log('✅ AuthContext: State set - User:', storedUser.username, 'Token length:', storedToken.length)
+          
+          console.log('✅ AuthContext: User authenticated from stored tokens')
         } else {
-          console.log('❤️ No valid authentication found')
-          // Don't aggressively clear data - let the user try to login
-          // authService.clearAuthData()
+          console.log('⚠️ AuthContext: Auth failed - clearing states')
+          console.log('  - isAuth:', isAuth, 'hasToken:', !!storedToken, 'hasUser:', !!storedUser)
+          authService.clearAuthData()
+          setUser(null)
+          setToken(null)
         }
       } catch (error) {
-        console.error('Error loading auth from localStorage:', error)
+        console.error('🚫 AuthContext: Error loading auth from localStorage:', error)
         // Clear invalid data
         authService.clearAuthData()
+        setUser(null)
+        setToken(null)
       } finally {
+        console.log('🔍 AuthContext: Init complete, setting loading to false')
         setLoading(false)
       }
     }
@@ -58,8 +79,16 @@ export const AuthProvider = ({ children }) => {
     console.log('🔐 AuthContext login called:', { 
       hasUser: !!userData, 
       hasToken: !!authToken, 
-      hasRefresh: !!refreshToken 
+      hasRefresh: !!refreshToken,
+      userData: userData,
+      tokenLength: authToken?.length || 0
     })
+    
+    // Validate input
+    if (!userData || !authToken) {
+      console.error('🚫 AuthContext: Invalid login data provided')
+      return
+    }
     
     // Set local state immediately
     setUser(userData)
@@ -74,13 +103,14 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('user', JSON.stringify(userData))
     }
     
-    // Check token expiration
-    authService.checkAndRefreshToken()
-    
     // Remove old token formats if they exist
     localStorage.removeItem('authToken')
     
-    console.log('✅ AuthContext login completed')
+    console.log('✅ AuthContext login completed - User set:', !!user, 'Token set:', !!token)
+    
+    // Verify the data was stored correctly
+    const verifyAuth = authService.isAuthenticated()
+    console.log('🔍 AuthContext: Post-login auth check:', verifyAuth)
   }
 
   const logout = async () => {
@@ -103,6 +133,21 @@ export const AuthProvider = ({ children }) => {
     
     // Secondary check: local state (for immediate UI updates)
     const stateAuth = !!(user && token)
+    
+    // Debug logging
+    const accessToken = localStorage.getItem('access_token')
+    const storedUser = localStorage.getItem('user')
+    
+    console.log('🔍 Authentication Check:', {
+      serviceAuth,
+      stateAuth,
+      hasUser: !!user,
+      hasToken: !!token,
+      hasAccessToken: !!accessToken,
+      hasStoredUser: !!storedUser,
+      accessTokenLength: accessToken?.length || 0,
+      storedUserLength: storedUser?.length || 0
+    })
     
     // Return true if either check passes (allows for immediate UI updates after login)
     const result = serviceAuth || stateAuth
