@@ -1,0 +1,101 @@
+{
+  "timestamp": "2025-10-08T13:06:22.434Z",
+  "summary": {
+    "passed": 10,
+    "failed": 3,
+    "total": 13
+  },
+  "tests": [
+    {
+      "name": "File: Reports Service",
+      "passed": true,
+      "message": "File exists and contains expected content",
+      "details": "Size: 11810 bytes",
+      "timestamp": "2025-10-08T13:06:22.436Z"
+    },
+    {
+      "name": "File: ReportsList Component",
+      "passed": true,
+      "message": "File exists and contains expected content",
+      "details": "Size: 21754 bytes",
+      "timestamp": "2025-10-08T13:06:22.436Z"
+    },
+    {
+      "name": "File: Reports Page",
+      "passed": true,
+      "message": "File exists and contains expected content",
+      "details": "Size: 167 bytes",
+      "timestamp": "2025-10-08T13:06:22.437Z"
+    },
+    {
+      "name": "File: ReportsTable Module",
+      "passed": true,
+      "message": "File exists and contains expected content",
+      "details": "Size: 23267 bytes",
+      "timestamp": "2025-10-08T13:06:22.437Z"
+    },
+    {
+      "name": "File: Reports Module",
+      "passed": true,
+      "message": "File exists and contains expected content",
+      "details": "Size: 19733 bytes",
+      "timestamp": "2025-10-08T13:06:22.438Z"
+    },
+    {
+      "name": "File: ReportsTable Page",
+      "passed": true,
+      "message": "File exists and contains expected content",
+      "details": "Size: 189 bytes",
+      "timestamp": "2025-10-08T13:06:22.438Z"
+    },
+    {
+      "name": "Service Config: Base URL Configuration",
+      "passed": true,
+      "message": "API configuration properly set up with correct base URL",
+      "details": "Config file: true, API util: true, Service uses API: true",
+      "timestamp": "2025-10-08T13:06:22.440Z"
+    },
+    {
+      "name": "Service Config: API Methods",
+      "passed": true,
+      "message": "All required API methods present",
+      "details": null,
+      "timestamp": "2025-10-08T13:06:22.440Z"
+    },
+    {
+      "name": "Integration: Reports Page",
+      "passed": true,
+      "message": "Reports page properly imports and uses ReportsList",
+      "details": "Uses ReportsList: true, Imports ReportsList: true",
+      "timestamp": "2025-10-08T13:06:22.441Z"
+    },
+    {
+      "name": "Integration: ReportsList Component",
+      "passed": true,
+      "message": "ReportsList component properly structured",
+      "details": "State: true, Effect: true, Service: true",
+      "timestamp": "2025-10-08T13:06:22.441Z"
+    },
+    {
+      "name": "API: Reports List API",
+      "passed": false,
+      "message": "Endpoint failed (No response)",
+      "details": "Error",
+      "timestamp": "2025-10-08T13:06:22.467Z"
+    },
+    {
+      "name": "API: Dashboard Stats API",
+      "passed": false,
+      "message": "Endpoint failed (No response)",
+      "details": "Error",
+      "timestamp": "2025-10-08T13:06:22.472Z"
+    },
+    {
+      "name": "API: Filters API",
+      "passed": false,
+      "message": "Endpoint failed (No response)",
+      "details": "Error",
+      "timestamp": "2025-10-08T13:06:22.476Z"
+    }
+  ]
+}

@@ -234,10 +234,12 @@ const createCampaignData = async (req, res) => {
       SELECT 
         cd.*,
         c.name as campaign_name,
+        COALESCE(b.name, 'Unknown') as brand_name,
         cards.card_name as card_display_name,
         users.username as created_by_user
       FROM campaign_data cd
       LEFT JOIN campaigns c ON cd.campaign_id = c.id
+      LEFT JOIN brands b ON c.brand = b.id
       LEFT JOIN cards ON cd.card_id = cards.id
       LEFT JOIN users ON cd.created_by = users.id
       WHERE cd.id = ?
@@ -303,6 +305,7 @@ const getAllCampaignData = async (req, res) => {
       SELECT COUNT(*) AS total
       FROM campaign_data cd
       LEFT JOIN campaigns c ON cd.campaign_id = c.id
+      LEFT JOIN brands b ON c.brand = b.id
       ${whereClause}
     `;
     const [countRows] = await pool.execute(countQuery, queryParams);
@@ -312,10 +315,12 @@ const getAllCampaignData = async (req, res) => {
       SELECT 
         cd.*,
         c.name as campaign_name,
+        COALESCE(b.name, 'Unknown') as brand_name,
         cards.card_name as card_display_name,
         users.username as created_by_user
       FROM campaign_data cd
       LEFT JOIN campaigns c ON cd.campaign_id = c.id
+      LEFT JOIN brands b ON c.brand = b.id
       LEFT JOIN cards ON cd.card_id = cards.id
       LEFT JOIN users ON cd.created_by = users.id
       ${whereClause}
@@ -374,10 +379,12 @@ const getCampaignDataById = async (req, res) => {
       SELECT 
         cd.*,
         c.name as campaign_name,
+        COALESCE(b.name, 'Unknown') as brand_name,
         cards.card_name as card_display_name,
         users.username as created_by_user
       FROM campaign_data cd
       LEFT JOIN campaigns c ON cd.campaign_id = c.id
+      LEFT JOIN brands b ON c.brand = b.id
       LEFT JOIN cards ON cd.card_id = cards.id
       LEFT JOIN users ON cd.created_by = users.id
       WHERE cd.id = ?
@@ -520,10 +527,12 @@ const updateCampaignData = async (req, res) => {
       SELECT 
         cd.*,
         c.name as campaign_name,
+        COALESCE(b.name, 'Unknown') as brand_name,
         cards.card_name as card_display_name,
         users.username as created_by_user
       FROM campaign_data cd
       LEFT JOIN campaigns c ON cd.campaign_id = c.id
+      LEFT JOIN brands b ON c.brand = b.id
       LEFT JOIN cards ON cd.card_id = cards.id
       LEFT JOIN users ON cd.created_by = users.id
       WHERE cd.id = ?

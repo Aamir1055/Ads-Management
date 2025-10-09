@@ -19,7 +19,8 @@ import {
   LogOut,
   Key,
   UserCog,
-  Facebook
+  Facebook,
+  Building2
 } from 'lucide-react'
 
 const Layout = ({ children }) => {
@@ -62,7 +63,8 @@ const Layout = ({ children }) => {
     BarChart3,
     FileText,
     Settings,
-    Facebook
+    Facebook,
+    Building2
   }
 
   // Sort navigation items in the specified sidebar order
@@ -72,6 +74,7 @@ const Layout = ({ children }) => {
       'User Management', 
       'Role Management',
       'Brand Management',
+      'Business Manager',
       'Campaign Type',
       'Campaign',
       'Cards',
@@ -138,18 +141,22 @@ const Layout = ({ children }) => {
     { name: 'User Management', href: '/user-management', icon: Users },
     { name: 'Role Management', href: '/role-management', icon: Key },
     { name: 'Brand Management', href: '/brands', icon: Tags },
+    { name: 'Business Manager', href: '/business-manager', icon: Building2 },
     { name: 'Campaign Type', href: '/campaign-types', icon: Tags },
     { name: 'Campaign', href: '/campaigns', icon: Target },
     { name: 'Cards', href: '/cards', icon: CreditCard },
     { name: 'Cards Users', href: '/card-users', icon: UserCheck },
     { name: 'Facebook Accounts', href: '/facebook-accounts', icon: Facebook },
     { name: 'Facebook Pages', href: '/facebook-pages', icon: FileText },
-    { name: 'Report', href: '/reports-table', icon: FileText },
+    { name: 'Reports', href: '/reports', icon: BarChart3 },
   ];
 
-  // Always ensure Facebook Accounts and Facebook Pages are included
+  // Always ensure Facebook Accounts, Facebook Pages, and Business Manager are included
   const baseNavigation = backendNavigation.length > 0 ? [
     ...backendNavigation,
+    // Force add Business Manager if not already present
+    ...(backendNavigation.find(item => item.name === 'Business Manager') ? [] : 
+        [{ name: 'Business Manager', href: '/business-manager', icon: Building2 }]),
     // Force add Facebook Accounts if not already present
     ...(backendNavigation.find(item => item.name === 'Facebook Accounts') ? [] : 
         [{ name: 'Facebook Accounts', href: '/facebook-accounts', icon: Facebook }]),

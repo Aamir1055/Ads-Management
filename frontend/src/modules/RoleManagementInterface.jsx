@@ -33,13 +33,18 @@ const RoleManagementInterface = () => {
     const manageableModulesOrder = [
       'User Management',
       'Role Management', 
-      'Campaign Type',
-      'Campaign',
+      'Brand',
+      'Campaign Types',
+      'Campaigns',
       'Campaign Data',
       'Cards',
-      'Cards Users',
+      'Card Users',
       'Report Analytics',
-      'Report'
+      'Reports',
+      'Facebook Accounts',
+      'Facebook Pages', 
+      'Business Manager',
+      'Ads Manager'
     ];
     
     // Map different possible module names to standard names
@@ -47,19 +52,37 @@ const RoleManagementInterface = () => {
       const nameMap = {
         'users': 'User Management',
         'user management': 'User Management',
-        'campaigns': 'Campaign',
+        'campaigns': 'Campaigns',
+        'campaign': 'Campaigns',
         'campaign_data': 'Campaign Data',
         'campaign-data': 'Campaign Data',
-        'campaign_types': 'Campaign Type',
-        'campaign-types': 'Campaign Type',
+        'campaign_types': 'Campaign Types',
+        'campaign-types': 'Campaign Types',
+        'campaign types': 'Campaign Types',
+        'brand': 'Brand',
+        'brands': 'Brand',
         'cards': 'Cards',
-        'card_users': 'Cards Users',
-        'card-users': 'Cards Users',
-        'reports': 'Report',
-        'report': 'Report',
+        'card_users': 'Card Users',
+        'card-users': 'Card Users',
+        'card users': 'Card Users',
+        'cards users': 'Card Users',
+        'reports': 'Reports',
+        'report': 'Reports',
+        'report analytics': 'Report Analytics',
+        'analytics': 'Report Analytics',
         'permissions': 'Role Management',
         'role management': 'Role Management',
-        'system': 'Role Management'
+        'system': 'Role Management',
+        'facebook accounts': 'Facebook Accounts',
+        'facebook_accounts': 'Facebook Accounts',
+        'facebook pages': 'Facebook Pages', 
+        'facebook_pages': 'Facebook Pages',
+        'business manager': 'Business Manager',
+        'business_manager': 'Business Manager',
+        'ads manager': 'Ads Manager',
+        'ads_manager': 'Ads Manager',
+        'ads managers': 'Ads Manager',
+        'ads_managers': 'Ads Manager'
       };
       
       return nameMap[name.toLowerCase()] || name;
@@ -92,16 +115,19 @@ const RoleManagementInterface = () => {
     [modules, sortModulesBySidebarOrder]
   );
 
-  // Load initial data
-  const loadData = useCallback(async () => {
+  // Load initial data with cache busting
+  const loadData = useCallback(async (forceRefresh = false) => {
     try {
       setLoading(true);
       setError(null);
       setErrorMessage('');
       
+      // Add cache busting parameter
+      const cacheBuster = forceRefresh ? `?_t=${Date.now()}` : '';
+      
       const [rolesData, modulesData] = await Promise.all([
-        roleService.getAllRolesWithPermissions(),
-        roleService.getModulesWithPermissions()
+        roleService.getAllRolesWithPermissions(cacheBuster),
+        roleService.getModulesWithPermissions(cacheBuster)
       ]);
       
       const finalRoles = rolesData.data || rolesData;
@@ -117,6 +143,12 @@ const RoleManagementInterface = () => {
       
       setRoles(cleanRoles);
       setModules(modulesData.data || modulesData);
+      
+      if (forceRefresh) {
+        setSuccessMessage('Data refreshed successfully!');
+        console.log('🔄 Data force refreshed at', new Date().toLocaleTimeString());
+        console.log('📦 Loaded modules:', modulesData.data?.length || 0);
+      }
     } catch (err) {
       console.error('Error loading data:', err);
       const errorMsg = err.response?.data?.message || err.message || 'Failed to load data';
@@ -646,14 +678,33 @@ const RoleManagementInterface = () => {
       )}
 
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Role Management</h2>
-        <button 
-          className="btn-primary" 
-          onClick={() => setShowCreateModal(true)}
-          aria-label="Create new role"
-        >
-          Create Role
-        </button>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Role Management</h2>
+          <p className="text-sm text-gray-600 mt-1">
+            Manage user roles and permissions for all system modules
+          </p>
+        </div>
+        <div className="flex space-x-3">
+          <button 
+            className="btn-secondary flex items-center space-x-2" 
+            onClick={() => loadData(true)}
+            disabled={loading}
+            aria-label="Refresh data"
+            title="Refresh modules and permissions data"
+          >
+            <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <span>Refresh</span>
+          </button>
+          <button 
+            className="btn-primary" 
+            onClick={() => setShowCreateModal(true)}
+            aria-label="Create new role"
+          >
+            Create Role
+          </button>
+        </div>
       </div>
 
       {/* Roles Table */}

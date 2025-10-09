@@ -103,7 +103,19 @@ api.interceptors.response.use(
 
     // For other 401 errors or if refresh failed
     if (error.response?.status === 401) {
-      console.log('🚪 Authentication failed, redirecting to login');
+      console.log('🚩 Authentication failed, redirecting to login');
+      
+      // Check if this might be related to new modules
+      const isNewModuleRequest = originalRequest.url?.includes('/facebook-') || 
+                                originalRequest.url?.includes('/bm') ||
+                                originalRequest.url?.includes('/ads-manager')
+      
+      if (isNewModuleRequest) {
+        sessionStorage.setItem('loginMessage', 
+          'Please log in again to access the new Facebook and Advertising modules with updated permissions.'
+        )
+      }
+      
       localStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token');
       localStorage.removeItem('authToken');
@@ -120,6 +132,11 @@ api.interceptors.response.use(
       const message = error.response?.data?.message || 'Access denied. You don\'t have permission to perform this action.'
       console.error('Permission denied:', message)
       
+      // Check if this is related to new modules (Facebook, Business Manager, Ads Manager)
+      const isNewModuleRequest = originalRequest.url?.includes('/facebook-') || 
+                                originalRequest.url?.includes('/bm') ||
+                                originalRequest.url?.includes('/ads-manager')
+      
       // If it's a token type error, clear old tokens and redirect to login
       if (message.includes('Wrong token type') || message.includes('access token')) {
         console.log('Token type error detected, clearing old tokens')
@@ -133,6 +150,15 @@ api.interceptors.response.use(
           sessionStorage.setItem('loginMessage', 'Please log in again to get a fresh access token.')
           window.location.href = '/login'
         }
+      } else if (isNewModuleRequest) {
+        // Specific handling for new module permissions
+        console.log('🔒 Access denied to new module - may need fresh session')
+        const newModuleMessage = 'You may need to log out and log in again to access the new Facebook and Advertising modules.'
+        sessionStorage.setItem('permissionMessage', newModuleMessage)
+        
+        // Enhanced error for components to use
+        error.isNewModulePermissionError = true
+        error.newModuleMessage = newModuleMessage
       }
       // You could show a toast notification here
     } else if (error.response?.status === 404) {

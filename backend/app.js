@@ -24,8 +24,6 @@ const twoFactorAuthRoutes = require('./routes/twoFactorAuthRoutes');
 const campaignTypeRoutes = require('./routes/campaignTypeRoutes');
 const campaignDataRoutes = require('./routes/campaignDataRoutes_privacy');
 const adsRoutes = require('./routes/adsRoutes');
-const reportRoutes = require('./routes/reportRoutes_privacy');
-const reportAnalyticsRoutes = require('./routes/reportAnalyticsRoutes');
 const cardsRoutes = require('./routes/cardsRoutes_privacy');
 const cardUsersRoutes = require('./routes/cardUsers_privacy');
 const campaignRoutes = require('./routes/campaignRoutes_privacy');
@@ -38,6 +36,10 @@ const roleRoutes = require('./routes/roleRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const facebookAccountRoutes = require('./routes/facebookAccountRoutes');
 const facebookPageRoutes = require('./routes/facebookPageRoutes');
+const bmRoutes = require('./routes/bmRoutes');
+const adsManagerRoutes = require('./routes/adsManagerRoutes');
+const reportRoutes = require('./routes/reportRoutes');
+const analyticsRoutes = require('./routes/analyticsRoutes');
 
 const app = express();
 
@@ -137,12 +139,23 @@ app.use((req, res, next) => {
   next();
 });
 
-// Static files
-app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+// Static files with CORS headers
+app.use('/uploads', (req, res, next) => {
+  // Add CORS headers for static files
+  res.setHeader('Access-Control-Allow-Origin', dev ? '*' : (process.env.CORS_ALLOWLIST || '').split(',')[0] || '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  next();
+}, express.static(path.join(__dirname, 'uploads'), {
   maxAge: process.env.NODE_ENV === 'production' ? '1d' : '0',
   setHeaders: (res, filePath) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Content-Disposition', 'inline');
+    // Ensure CORS headers are always set
+    res.setHeader('Access-Control-Allow-Origin', dev ? '*' : (process.env.CORS_ALLOWLIST || '').split(',')[0] || '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
   }
 }));
 
@@ -201,6 +214,7 @@ app.get('/api/health', async (req, res) => {
 const testRoutes = require('./routes/testRoutes');
 app.use('/api/test', testRoutes);
 
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userManagementRoutes);
@@ -208,8 +222,6 @@ app.use('/api/2fa', twoFactorAuthRoutes);
 app.use('/api/campaign-types', campaignTypeRoutes);
 app.use('/api/campaign-data', campaignDataRoutes);
 app.use('/api/ads', adsRoutes);
-app.use('/api/reports', reportRoutes);
-app.use('/api/analytics', reportAnalyticsRoutes);
 app.use('/api/cards', cardsRoutes);
 app.use('/api/card-users', cardUsersRoutes);
 app.use('/api/campaigns', campaignRoutes);
@@ -222,6 +234,10 @@ app.use('/api/roles', roleRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/facebook-accounts', facebookAccountRoutes);
 app.use('/api/facebook-pages', facebookPageRoutes);
+app.use('/api/bm', bmRoutes);
+app.use('/api/ads-managers', adsManagerRoutes);
+app.use('/api/reports', reportRoutes);
+app.use('/api/analytics', analyticsRoutes);
 // Root
 app.get('/', (req, res) => {
   res.json({
@@ -239,13 +255,14 @@ app.get('/', (req, res) => {
       campaignTypes: '/api/campaign-types',
       campaignData: '/api/campaign-data',
       ads: '/api/ads',
-      reports: '/api/reports',
-      analytics: '/api/analytics',
       cards: '/api/cards',
       cardUsers: '/api/card-users',
       brands: '/api/brands',
       facebookAccounts: '/api/facebook-accounts',
-      facebookPages: '/api/facebook-pages'
+      facebookPages: '/api/facebook-pages',
+      bm: '/api/bm',
+      adsManagers: '/api/ads-managers',
+      reports: '/api/reports'
     },
     support: {
       documentation: '/api/docs',

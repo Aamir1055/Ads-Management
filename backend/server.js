@@ -1,6 +1,6 @@
 const app = require('./app');
 const { pool, testConnection } = require('./config/database');
-const ReportAnalyticsWebSocket = require('./websocket/reportAnalyticsSocket');
+// const ReportAnalyticsWebSocket = require('./websocket/reportAnalyticsSocket');
 require('dotenv').config();
 
 const PORT = process.env.PORT;
@@ -32,7 +32,8 @@ const startServer = async () => {
       console.log(`⚡ Ready to accept connections`);
     });
 
-    // Initialize WebSocket server for real-time analytics
+    // Initialize WebSocket server for real-time analytics (disabled temporarily)
+    /*
     try {
       analyticsWS = new ReportAnalyticsWebSocket(server);
       console.log('🔗 WebSocket analytics server initialized');
@@ -40,6 +41,7 @@ const startServer = async () => {
     } catch (error) {
       console.warn('⚠️  Failed to initialize WebSocket server:', error.message);
     }
+    */
 
     // Track sockets (helps closing idle keep-alive sockets on shutdown)
     server.on('connection', (socket) => {
@@ -130,12 +132,14 @@ const gracefulShutdown = async (signal) => {
     // Stop accepting new connections and wait for in-flight to finish
     await closeServer();
 
-    // Close WebSocket server
+    // Close WebSocket server (disabled temporarily)
+    /*
     if (analyticsWS) {
       console.log('🔄 Closing WebSocket server...');
       analyticsWS.shutdown();
       console.log('✅ WebSocket server closed');
     }
+    */
 
     // Close idle keep-alive sockets so process can exit
     closeIdleSockets(); // helps if clients keep sockets open [5][1]

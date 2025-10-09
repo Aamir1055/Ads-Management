@@ -14,11 +14,10 @@ import Brands from './pages/Brands'
 import CampaignDetail from './pages/CampaignDetail'
 import Cards from './components/Cards'
 import CardUsers from './pages/CardUsers'
-import Reports from './pages/Reports'
-import ReportsTable from './pages/ReportsTable'
-import ReportAnalyticsPage from './pages/ReportAnalyticsPage'
 import FacebookAccounts from './pages/FacebookAccounts'
 import FacebookPages from './pages/FacebookPages'
+import BusinessManager from './pages/BusinessManager'
+import Reports from './pages/Reports'
 import { initTotpFieldHiding } from './utils/hideTotpFields'
 import './styles/hide-totp-fields.css'
 
@@ -127,33 +126,6 @@ function App() {
               </PermissionProvider>
             </ProtectedRoute>
           } />
-          <Route path="/reports-table" element={
-            <ProtectedRoute>
-              <PermissionProvider>
-                <Layout>
-                  <ReportsTable />
-                </Layout>
-              </PermissionProvider>
-            </ProtectedRoute>
-          } />
-          <Route path="/reports" element={
-            <ProtectedRoute>
-              <PermissionProvider>
-                <Layout>
-                  <Reports />
-                </Layout>
-              </PermissionProvider>
-            </ProtectedRoute>
-          } />
-          <Route path="/report-analytics" element={
-            <ProtectedRoute>
-              <PermissionProvider>
-                <Layout>
-                  <ReportAnalyticsPage />
-                </Layout>
-              </PermissionProvider>
-            </ProtectedRoute>
-          } />
           <Route path="/facebook-accounts" element={
             <ProtectedRoute>
               <PermissionProvider>
@@ -168,6 +140,24 @@ function App() {
               <PermissionProvider>
                 <Layout>
                   <FacebookPages />
+                </Layout>
+              </PermissionProvider>
+            </ProtectedRoute>
+          } />
+          <Route path="/business-manager" element={
+            <ProtectedRoute>
+              <PermissionProvider>
+                <Layout>
+                  <BusinessManager />
+                </Layout>
+              </PermissionProvider>
+            </ProtectedRoute>
+          } />
+          <Route path="/reports" element={
+            <ProtectedRoute>
+              <PermissionProvider>
+                <Layout>
+                  <Reports />
                 </Layout>
               </PermissionProvider>
             </ProtectedRoute>

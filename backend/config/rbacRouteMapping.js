@@ -11,7 +11,6 @@
  * - card_users_create, card_users_read
  * - cards_create, cards_read
  * - permissions_read
- * - reports_create, reports_export, reports_read
  * - users_create, users_read
  */
 
@@ -58,15 +57,6 @@ const ROUTE_PERMISSIONS = {
     DELETE: 'campaign_data_delete'     // DELETE /api/campaign-data/:id
   },
 
-  // Reports Module
-  reports: {
-    GET: 'reports_read',               // GET /api/reports
-    POST: 'reports_create',            // POST /api/reports
-    PUT: 'reports_update',             // PUT /api/reports/:id  
-    PATCH: 'reports_update',           // PATCH /api/reports/:id
-    DELETE: 'reports_delete',          // DELETE /api/reports/:id
-    EXPORT: 'reports_export'           // Special export endpoints
-  },
 
   // User Management Module
   users: {
@@ -102,6 +92,16 @@ const ROUTE_PERMISSIONS = {
     PUT: 'permissions_update',         // PUT /api/permissions/:id
     PATCH: 'permissions_update',       // PATCH /api/permissions/:id
     DELETE: 'permissions_delete'       // DELETE /api/permissions/:id
+  },
+
+  // Reports Module
+  reports: {
+    GET: 'reports_read',               // GET /api/reports
+    POST: 'reports_create',            // POST /api/reports
+    PUT: 'reports_update',             // PUT /api/reports/:id
+    PATCH: 'reports_update',           // PATCH /api/reports/:id
+    DELETE: 'reports_delete',          // DELETE /api/reports/:id
+    EXPORT: 'reports_export'           // Export functionality
   }
 };
 
@@ -174,14 +174,6 @@ const createPermissionMiddleware = {
     delete: () => getPermissionMiddleware('campaign_data', 'DELETE')
   },
 
-  // Reports
-  reports: {
-    read: () => getPermissionMiddleware('reports', 'GET'),
-    create: () => getPermissionMiddleware('reports', 'POST'),
-    update: () => getPermissionMiddleware('reports', 'PUT'),
-    delete: () => getPermissionMiddleware('reports', 'DELETE'),
-    export: () => getPermissionMiddleware('reports', 'GET', 'export')
-  },
 
   // Users
   users: {
@@ -197,6 +189,15 @@ const createPermissionMiddleware = {
     create: () => getPermissionMiddleware('brands', 'POST'),
     update: () => getPermissionMiddleware('brands', 'PUT'),
     delete: () => getPermissionMiddleware('brands', 'DELETE')
+  },
+
+  // Reports
+  reports: {
+    read: () => getPermissionMiddleware('reports', 'GET'),
+    create: () => getPermissionMiddleware('reports', 'POST'),
+    update: () => getPermissionMiddleware('reports', 'PUT'),
+    delete: () => getPermissionMiddleware('reports', 'DELETE'),
+    export: () => getPermissionMiddleware('reports', 'GET', 'export')
   }
 };
 

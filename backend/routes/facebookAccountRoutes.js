@@ -102,7 +102,7 @@ const paginationValidation = [
  */
 router.get('/', 
     paginationValidation,
-    requirePermission('facebook_accounts_read'),
+    requirePermission('facebook_accounts_view'),
     FacebookAccountController.getAllAccounts
 );
 
@@ -112,7 +112,7 @@ router.get('/',
  * @access  Private (requires Facebook Accounts Read permission)
  */
 router.get('/stats',
-    requirePermission('facebook_accounts_read'),
+    requirePermission('facebook_accounts_view'),
     FacebookAccountController.getAccountStats
 );
 
@@ -122,7 +122,7 @@ router.get('/stats',
  * @access  Private (requires Facebook Accounts Read permission)
  */
 router.get('/status/:status',
-    requirePermission('facebook_accounts_read'),
+    requirePermission('facebook_accounts_view'),
     FacebookAccountController.getAccountsByStatus
 );
 
@@ -132,7 +132,7 @@ router.get('/status/:status',
  * @access  Private (requires Facebook Accounts Read permission)
  */
 router.get('/:id',
-    requirePermission('facebook_accounts_read'),
+    requirePermission('facebook_accounts_view'),
     FacebookAccountController.getAccountById
 );
 

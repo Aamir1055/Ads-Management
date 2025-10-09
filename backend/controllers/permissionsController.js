@@ -617,6 +617,26 @@ const permissionsController = {
           name: 'Reports',
           categories: ['reports'],
           description: 'Report management permissions'
+        },
+        {
+          name: 'Facebook Accounts',
+          categories: ['facebook_accounts'],
+          description: 'Facebook advertising accounts management'
+        },
+        {
+          name: 'Facebook Pages',
+          categories: ['facebook_pages'],
+          description: 'Facebook business pages management'
+        },
+        {
+          name: 'Business Manager',
+          categories: ['business_manager'],
+          description: 'Business managers and organizational structure'
+        },
+        {
+          name: 'Ads Manager',
+          categories: ['ads_manager'],
+          description: 'Advertising managers and campaign personnel'
         }
       ];
 

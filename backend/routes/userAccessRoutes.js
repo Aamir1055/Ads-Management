@@ -36,11 +36,11 @@ router.get('/modules', async (req, res) => {
       'campaign_data': '/campaign-data',
       'cards': '/cards',
       'card_users': '/card-users',
-      'reports': '/reports-table',
-      'analytics': '/report-analytics',
       'roles': '/role-management', // Fixed: was 'permissions', should be 'roles'
       'permissions': '/role-management', // Keep both for compatibility
       'facebook_accounts': '/facebook-accounts', // Add Facebook Accounts module
+      'facebook_pages': '/facebook-pages',
+      'reports': '/reports', // Add Reports module
       'settings': '/settings'
     };
 
@@ -82,8 +82,8 @@ router.get('/modules', async (req, res) => {
           { name: 'Cards', href: '/cards', icon: 'CreditCard', allowed: allowedModules.includes('cards') },
           { name: 'Card Users', href: '/card-users', icon: 'UserCheck', allowed: allowedModules.includes('card_users') },
           { name: 'Facebook Accounts', href: '/facebook-accounts', icon: 'Facebook', allowed: allowedModules.includes('facebook_accounts') },
-          { name: 'Reports', href: '/reports-table', icon: 'FileText', allowed: allowedModules.includes('reports') },
-          { name: 'Report Analytics', href: '/report-analytics', icon: 'BarChart3', allowed: allowedModules.includes('analytics') || allowedModules.includes('reports') }
+          { name: 'Facebook Pages', href: '/facebook-pages', icon: 'FileText', allowed: allowedModules.includes('facebook_pages') },
+          { name: 'Reports', href: '/reports', icon: 'BarChart3', allowed: allowedModules.includes('reports') },
         ].filter(item => item.allowed) // Only return allowed navigation items
       }
     });

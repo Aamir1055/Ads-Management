@@ -1,170 +1,37 @@
-import { api } from '../utils/api';
+import api from './api';
+
+const BASE_URL = '/reports';
 
 const reportsService = {
   // ============================================================================
-  // REPORT GENERATION & BUILDING
+  // REPORT GENERATION AND SYNC
   // ============================================================================
 
   /**
-   * Build daily reports for a specific date
-   * @param {string} date - Date in YYYY-MM-DD format
+   * Generate reports from campaign data without storing them
+   * @param {Object} params - { dateFrom, dateTo, campaignId?, brandId? }
    */
-  buildDaily: async (date) => {
+  generateReports: async (params) => {
     try {
-      const response = await api.post(`/reports/build?date=${date}`);
+      const response = await api.post(`${BASE_URL}/generate`, params);
       return response.data;
     } catch (error) {
-      console.error('Error building daily reports:', error);
-      throw error;
+      console.error('Reports Service - Generate reports error:', error);
+      throw error.response?.data || error;
     }
   },
 
   /**
-   * Build reports for a date range
-   * @param {string} fromDate - Start date in YYYY-MM-DD format
-   * @param {string} toDate - End date in YYYY-MM-DD format
+   * Sync generated reports to the reports table
+   * @param {Object} params - { dateFrom, dateTo, campaignId?, brandId?, updateExisting? }
    */
-  buildRange: async (fromDate, toDate) => {
+  syncReports: async (params) => {
     try {
-      const response = await api.post(`/reports/build-range?from=${fromDate}&to=${toDate}`);
+      const response = await api.post(`${BASE_URL}/sync`, params);
       return response.data;
     } catch (error) {
-      console.error('Error building range reports:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Rebuild reports for a specific campaign over a date range
-   * @param {number} campaignId - Campaign ID
-   * @param {string} fromDate - Start date in YYYY-MM-DD format
-   * @param {string} toDate - End date in YYYY-MM-DD format
-   */
-  rebuildCampaignRange: async (campaignId, fromDate, toDate) => {
-    try {
-      const response = await api.post(
-        `/reports/rebuild-campaign?campaign_id=${campaignId}&from=${fromDate}&to=${toDate}`
-      );
-      return response.data;
-    } catch (error) {
-      console.error('Error rebuilding campaign reports:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Generate comprehensive report with filters (from campaign_data)
-   * @param {Object} filters - Filter options
-   * @param {string} filters.date_from - Start date filter (YYYY-MM-DD)
-   * @param {string} filters.date_to - End date filter (YYYY-MM-DD)
-   * @param {string} [filters.brand] - Brand filter
-   * @param {number} [filters.campaign_id] - Campaign ID filter
-   */
-  generateReport: async (filters = {}) => {
-    try {
-      const queryParams = new URLSearchParams();
-      
-      // Map frontend filter names to backend expected names
-      const filterMap = {
-        dateFrom: 'date_from',
-        dateTo: 'date_to',
-        campaignId: 'campaign_id',
-        brand: 'brand'
-      };
-      
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value !== null && value !== undefined && value !== '') {
-          const backendKey = filterMap[key] || key;
-          queryParams.append(backendKey, value);
-        }
-      });
-
-      // Use the standard reports endpoint that reads from reports table
-      const response = await api.get(`/reports?${queryParams.toString()}`);
-      
-      // Transform the response to match the expected format for the Reports page
-      if (response.data.success && response.data.data) {
-        // API returns data directly as array, not wrapped in reports object
-        const reports = Array.isArray(response.data.data) ? response.data.data : [];
-        const meta = response.data.meta || {};
-        
-        // Brand ID to Name mapping (as backup when API doesn't return brand_name)
-        const brandIdToName = {
-          53: 'Tradekaro',
-          54: 'BazaarFX'
-        };
-        
-        // Transform reports data to match Reports page format
-        const transformedReports = reports.map(report => {
-          const spent = parseFloat(report.spent) || 0;
-          const leads = parseInt(report.leads) || 0;
-          
-          // Since backend doesn't return facebook_result/zoho_result, we'll calculate them
-          // based on the original data proportions (100 Facebook, 90 Zoho = 190 total)
-          // This gives us Facebook: 52.6%, Zoho: 47.4%
-          const facebookResult = Math.round(leads * 0.526); // 100/190 = 0.526
-          const zohoResult = leads - facebookResult; // Remainder goes to Zoho
-          
-          // Determine brand name: prefer API brand_name, fallback to mapping, then Unknown
-          let brandName = 'Unknown Brand';
-          if (report.brand_name) {
-            brandName = report.brand_name;
-          } else if (report.brand && brandIdToName[report.brand]) {
-            brandName = brandIdToName[report.brand];
-          }
-          
-          return {
-            id: report.id,
-            campaign_id: report.campaign_id,
-            campaign_name: report.campaign_name,
-            brand: brandName, // Always show meaningful brand name
-            report_date: report.report_date,
-            facebook_result: facebookResult,
-            zoho_result: zohoResult,
-            leads: leads,
-            spent: spent,
-            cost_per_lead: parseFloat(report.cost_per_lead) || 0,
-            facebook_cost_per_lead: facebookResult > 0 ? (spent / facebookResult) : 0,
-            zoho_cost_per_lead: zohoResult > 0 ? (spent / zohoResult) : 0
-          };
-        });
-        
-        // Calculate summary
-        const summary = {
-          totalCampaigns: reports.length > 0 ? [...new Set(reports.map(r => r.campaign_id))].length : 0,
-          totalRecords: reports.length,
-          totalFacebookResults: reports.reduce((sum, r) => sum + (r.facebook_result || 0), 0),
-          totalZohoResults: reports.reduce((sum, r) => sum + (r.zoho_result || 0), 0),
-          totalResults: reports.reduce((sum, r) => sum + (r.leads || 0), 0),
-          totalSpent: reports.reduce((sum, r) => sum + (r.spent || 0), 0),
-          avgCostPerResult: 0, // Will be calculated below
-          dateRange: {
-            from: filters.dateFrom || '',
-            to: filters.dateTo || ''
-          }
-        };
-        
-        // Calculate average cost per result
-        if (summary.totalResults > 0) {
-          summary.avgCostPerResult = summary.totalSpent / summary.totalResults;
-        }
-        
-        return {
-          success: true,
-          message: `Found ${transformedReports.length} reports from reports table`,
-          data: {
-            reports: transformedReports,
-            summary: summary,
-            filters: filters
-          },
-          meta: meta
-        };
-      }
-      
-      return response.data;
-    } catch (error) {
-      console.error('Error generating report:', error);
-      throw error;
+      console.error('Reports Service - Sync reports error:', error);
+      throw error.response?.data || error;
     }
   },
 
@@ -173,72 +40,44 @@ const reportsService = {
   // ============================================================================
 
   /**
-   * Get all reports with filters and pagination
-   * @param {Object} options - Query options
-   * @param {number} [options.page=1] - Page number
-   * @param {number} [options.limit=10] - Items per page
-   * @param {number} [options.campaignId] - Filter by campaign ID
-   * @param {string} [options.dateFrom] - Filter from date
-   * @param {string} [options.dateTo] - Filter to date
-   * @param {string} [options.month] - Filter by month (YYYY-MM)
-   * @param {string} [options.search] - Search term
+   * Get all reports with pagination and filters
+   * @param {Object} params - Query parameters for filtering and pagination
    */
-  getAll: async (options = {}) => {
+  getAllReports: async (params = {}) => {
     try {
-      const queryParams = new URLSearchParams();
-      
-      // Set defaults
-      const { page = 1, limit = 10, ...filters } = options;
-      
-      queryParams.append('page', page);
-      queryParams.append('limit', limit);
-      
-      // Add filters
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value !== null && value !== undefined && value !== '') {
-          queryParams.append(key, value);
-        }
-      });
-
-      const response = await api.get(`/reports?${queryParams.toString()}`);
+      const response = await api.get(BASE_URL, { params });
       return response.data;
     } catch (error) {
-      console.error('Error fetching reports:', error);
-      throw error;
+      console.error('Reports Service - Get all reports error:', error);
+      throw error.response?.data || error;
     }
   },
 
   /**
-   * Get a single report by ID
+   * Get a specific report by ID
    * @param {number} id - Report ID
    */
-  getById: async (id) => {
+  getReportById: async (id) => {
     try {
-      const response = await api.get(`/reports/${id}`);
+      const response = await api.get(`${BASE_URL}/${id}`);
       return response.data;
     } catch (error) {
-      console.error('Error fetching report by ID:', error);
-      throw error;
+      console.error('Reports Service - Get report by ID error:', error);
+      throw error.response?.data || error;
     }
   },
 
   /**
-   * Create a new report (manual entry)
-   * @param {Object} reportData - Report data
-   * @param {number} reportData.campaign_id - Campaign ID
-   * @param {string} reportData.date - Date in YYYY-MM-DD format
-   * @param {number} [reportData.spent] - Amount spent
-   * @param {number} [reportData.facebook_result] - Facebook results
-   * @param {number} [reportData.zoho_result] - Zoho results
-   * @param {string} [reportData.notes] - Additional notes
+   * Create a new report manually
+   * @param {Object} reportData - Report data to create
    */
-  create: async (reportData) => {
+  createReport: async (reportData) => {
     try {
-      const response = await api.post('/reports', reportData);
+      const response = await api.post(BASE_URL, reportData);
       return response.data;
     } catch (error) {
-      console.error('Error creating report:', error);
-      throw error;
+      console.error('Reports Service - Create report error:', error);
+      throw error.response?.data || error;
     }
   },
 
@@ -247,32 +86,46 @@ const reportsService = {
    * @param {number} id - Report ID
    * @param {Object} reportData - Updated report data
    */
-  update: async (id, reportData) => {
+  updateReport: async (id, reportData) => {
     try {
-      const response = await api.put(`/reports/${id}`, reportData);
+      const response = await api.put(`${BASE_URL}/${id}`, reportData);
       return response.data;
     } catch (error) {
-      console.error('Error updating report:', error);
-      throw error;
+      console.error('Reports Service - Update report error:', error);
+      throw error.response?.data || error;
     }
   },
 
   /**
-   * Delete a report
+   * Delete a specific report
    * @param {number} id - Report ID
    */
-  delete: async (id) => {
+  deleteReport: async (id) => {
     try {
-      const response = await api.delete(`/reports/${id}`);
+      const response = await api.delete(`${BASE_URL}/${id}`);
       return response.data;
     } catch (error) {
-      console.error('Error deleting report:', error);
-      throw error;
+      console.error('Reports Service - Delete report error:', error);
+      throw error.response?.data || error;
+    }
+  },
+
+  /**
+   * Delete reports in a date range
+   * @param {Object} params - { dateFrom, dateTo, campaignId?, brandId? }
+   */
+  deleteReportsInRange: async (params) => {
+    try {
+      const response = await api.delete(`${BASE_URL}/range`, { data: params });
+      return response.data;
+    } catch (error) {
+      console.error('Reports Service - Delete reports in range error:', error);
+      throw error.response?.data || error;
     }
   },
 
   // ============================================================================
-  // UTILITY & ANALYTICS
+  // ANALYTICS AND UTILITIES
   // ============================================================================
 
   /**
@@ -280,124 +133,115 @@ const reportsService = {
    */
   getFilterOptions: async () => {
     try {
-      const response = await api.get('/reports/filters');
+      const response = await api.get(`${BASE_URL}/filters`);
       return response.data;
     } catch (error) {
-      console.error('Error fetching filter options:', error);
-      throw error;
+      console.error('Reports Service - Get filter options error:', error);
+      throw error.response?.data || error;
+    }
+  },
+
+  /**
+   * Get report statistics
+   * @param {Object} filters - Filter parameters
+   */
+  getReportStats: async (filters = {}) => {
+    try {
+      const response = await api.get(`${BASE_URL}/stats`, { params: filters });
+      return response.data;
+    } catch (error) {
+      console.error('Reports Service - Get report stats error:', error);
+      throw error.response?.data || error;
     }
   },
 
   /**
    * Get dashboard statistics
+   * @param {Object} filters - Filter parameters
    */
-  getDashboardStats: async () => {
+  getDashboardStats: async (filters = {}) => {
     try {
-      const response = await api.get('/reports/dashboard');
+      const response = await api.get(`${BASE_URL}/dashboard`, { params: filters });
       return response.data;
     } catch (error) {
-      console.error('Error fetching dashboard stats:', error);
-      throw error;
+      console.error('Reports Service - Get dashboard stats error:', error);
+      throw error.response?.data || error;
     }
   },
 
   // ============================================================================
-  // HELPER METHODS
+  // UTILITY METHODS
   // ============================================================================
 
   /**
-   * Format currency value
-   * @param {number} value - Numeric value
-   * @returns {string} Formatted currency string
+   * Format date for API requests (YYYY-MM-DD)
+   * @param {Date|string} date 
    */
-  formatCurrency: (value) => {
-    if (value === null || value === undefined) return '₹0.00';
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 2
-    }).format(value);
+  formatDate: (date) => {
+    if (!date) return '';
+    const d = new Date(date);
+    return d.toISOString().split('T')[0];
   },
 
   /**
-   * Format number with commas
-   * @param {number} value - Numeric value
-   * @returns {string} Formatted number string
+   * Get date range for common periods
+   * @param {string} period - 'today', 'yesterday', 'last7days', 'last30days', 'thisMonth', 'lastMonth'
    */
-  formatNumber: (value) => {
-    if (value === null || value === undefined) return '0';
-    return new Intl.NumberFormat('en-IN').format(value);
-  },
-
-  /**
-   * Calculate ROI (Return on Investment)
-   * @param {number} results - Total results (facebook + zoho)
-   * @param {number} spent - Amount spent
-   * @returns {number} ROI percentage
-   */
-  calculateROI: (results, spent) => {
-    if (!spent || spent === 0) return 0;
-    return ((results - spent) / spent) * 100;
-  },
-
-  /**
-   * Calculate cost per result
-   * @param {number} spent - Amount spent
-   * @param {number} results - Total results
-   * @returns {number} Cost per result
-   */
-  calculateCostPerResult: (spent, results) => {
-    if (!results || results === 0) return 0;
-    return spent / results;
-  },
-
-  /**
-   * Get date range presets
-   * @returns {Object} Preset date ranges
-   */
-  getDateRangePresets: () => {
+  getDateRange: (period) => {
     const today = new Date();
     const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    
-    const lastWeek = new Date(today);
-    lastWeek.setDate(lastWeek.getDate() - 7);
-    
-    const lastMonth = new Date(today);
-    lastMonth.setMonth(lastMonth.getMonth() - 1);
-    
-    const lastThreeMonths = new Date(today);
-    lastThreeMonths.setMonth(lastThreeMonths.getMonth() - 3);
-    
-    const format = (date) => date.toISOString().split('T')[0];
-    
-    return {
-      today: {
-        label: 'Today',
-        from: format(today),
-        to: format(today)
-      },
-      yesterday: {
-        label: 'Yesterday',
-        from: format(yesterday),
-        to: format(yesterday)
-      },
-      lastWeek: {
-        label: 'Last 7 Days',
-        from: format(lastWeek),
-        to: format(today)
-      },
-      lastMonth: {
-        label: 'Last 30 Days',
-        from: format(lastMonth),
-        to: format(today)
-      },
-      lastThreeMonths: {
-        label: 'Last 3 Months',
-        from: format(lastThreeMonths),
-        to: format(today)
-      }
-    };
+    yesterday.setDate(today.getDate() - 1);
+
+    switch (period) {
+      case 'today':
+        return {
+          dateFrom: reportsService.formatDate(today),
+          dateTo: reportsService.formatDate(today)
+        };
+
+      case 'yesterday':
+        return {
+          dateFrom: reportsService.formatDate(yesterday),
+          dateTo: reportsService.formatDate(yesterday)
+        };
+
+      case 'last7days':
+        const last7Days = new Date(today);
+        last7Days.setDate(today.getDate() - 7);
+        return {
+          dateFrom: reportsService.formatDate(last7Days),
+          dateTo: reportsService.formatDate(yesterday)
+        };
+
+      case 'last30days':
+        const last30Days = new Date(today);
+        last30Days.setDate(today.getDate() - 30);
+        return {
+          dateFrom: reportsService.formatDate(last30Days),
+          dateTo: reportsService.formatDate(yesterday)
+        };
+
+      case 'thisMonth':
+        const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        return {
+          dateFrom: reportsService.formatDate(startOfMonth),
+          dateTo: reportsService.formatDate(yesterday)
+        };
+
+      case 'lastMonth':
+        const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
+        return {
+          dateFrom: reportsService.formatDate(lastMonthStart),
+          dateTo: reportsService.formatDate(lastMonthEnd)
+        };
+
+      default:
+        return {
+          dateFrom: reportsService.formatDate(yesterday),
+          dateTo: reportsService.formatDate(yesterday)
+        };
+    }
   }
 };
 
