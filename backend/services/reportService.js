@@ -11,10 +11,20 @@ class ReportService {
       console.log(`📊 Generating reports from ${dateFrom} to ${dateTo}`);
       
       // Query to fetch and aggregate data from multiple tables
+      // Use created_at/updated_at for date, and calculate cost per lead
       const query = `
         SELECT 
-          cd.data_date as report_date,
-          DATE_FORMAT(cd.data_date, '%Y-%m') as report_month,
+          -- Use created_at as primary date, updated_at if record was updated
+          CASE 
+            WHEN cd.updated_at > cd.created_at THEN DATE(cd.updated_at)
+            ELSE DATE(cd.created_at)
+          END as report_date,
+          DATE_FORMAT(
+            CASE 
+              WHEN cd.updated_at > cd.created_at THEN cd.updated_at
+              ELSE cd.created_at
+            END, '%Y-%m'
+          ) as report_month,
           cd.campaign_id,
           c.name as campaign_name,
           ct.type_name as campaign_type,
@@ -22,23 +32,44 @@ class ReportService {
           b.name as brand_name,
           
           -- Aggregate campaign data by date and campaign
-          SUM(cd.facebook_result) as facebook_result,
-          SUM(cd.xoho_result) as zoho_result,
-          SUM(cd.facebook_result + cd.xoho_result) as leads,
-          SUM(cd.spent) as spent
+          SUM(cd.facebook_result) as facebook_leads,
+          SUM(cd.xoho_result) as zoho_leads,
+          SUM(cd.facebook_result + cd.xoho_result) as total_leads,
+          SUM(cd.spent) as amount_spend,
+          
+          -- Calculate cost per lead (avoid division by zero)
+          CASE 
+            WHEN SUM(cd.facebook_result) > 0 
+            THEN ROUND(SUM(cd.spent) / SUM(cd.facebook_result), 2)
+            ELSE NULL
+          END as facebook_cost_per_lead,
+          
+          CASE 
+            WHEN SUM(cd.xoho_result) > 0 
+            THEN ROUND(SUM(cd.spent) / SUM(cd.xoho_result), 2)
+            ELSE NULL
+          END as zoho_cost_per_lead
           
         FROM campaign_data cd
         LEFT JOIN campaigns c ON cd.campaign_id = c.id
         LEFT JOIN campaign_types ct ON c.campaign_type_id = ct.id  
         LEFT JOIN brands b ON c.brand = b.id
-        WHERE cd.data_date >= ? AND cd.data_date <= ?
+        WHERE (
+          DATE(cd.created_at) >= ? AND DATE(cd.created_at) <= ?
+          OR DATE(cd.updated_at) >= ? AND DATE(cd.updated_at) <= ?
+        )
         ${options.campaignId ? 'AND cd.campaign_id = ?' : ''}
         ${options.brandId ? 'AND c.brand = ?' : ''}
-        GROUP BY cd.data_date, cd.campaign_id
-        ORDER BY cd.data_date DESC, cd.campaign_id
+        GROUP BY DATE(
+          CASE 
+            WHEN cd.updated_at > cd.created_at THEN cd.updated_at
+            ELSE cd.created_at
+          END
+        ), cd.campaign_id
+        ORDER BY report_date DESC, cd.campaign_id
       `;
 
-      const params = [dateFrom, dateTo];
+      const params = [dateFrom, dateTo, dateFrom, dateTo];
       if (options.campaignId) params.push(options.campaignId);
       if (options.brandId) params.push(options.brandId);
 
@@ -57,10 +88,20 @@ class ReportService {
         campaign_type: row.campaign_type,
         brand: row.brand,
         brand_name: row.brand_name,
-        leads: parseInt(row.leads) || 0,
-        facebook_result: parseInt(row.facebook_result) || 0,
-        zoho_result: parseInt(row.zoho_result) || 0,
-        spent: parseFloat(row.spent) || 0.00
+        
+        // Updated field names and structure
+        total_leads: parseInt(row.total_leads) || 0,
+        facebook_leads: parseInt(row.facebook_leads) || 0,
+        zoho_leads: parseInt(row.zoho_leads) || 0,
+        amount_spend: parseFloat(row.amount_spend) || 0.00,
+        facebook_cost_per_lead: row.facebook_cost_per_lead ? parseFloat(row.facebook_cost_per_lead) : null,
+        zoho_cost_per_lead: row.zoho_cost_per_lead ? parseFloat(row.zoho_cost_per_lead) : null,
+        
+        // Keep backward compatibility with old field names for now
+        leads: parseInt(row.total_leads) || 0,
+        facebook_result: parseInt(row.facebook_leads) || 0,
+        zoho_result: parseInt(row.zoho_leads) || 0,
+        spent: parseFloat(row.amount_spend) || 0.00
       }));
 
       return {
@@ -69,11 +110,25 @@ class ReportService {
           reports: processedReports,
           summary: {
             totalRecords: processedReports.length,
+            totalAmountSpend: processedReports.reduce((sum, r) => sum + r.amount_spend, 0),
+            totalLeads: processedReports.reduce((sum, r) => sum + r.total_leads, 0),
+            totalFacebookLeads: processedReports.reduce((sum, r) => sum + r.facebook_leads, 0),
+            totalZohoLeads: processedReports.reduce((sum, r) => sum + r.zoho_leads, 0),
+            
+            // Calculate average cost per leads
+            avgFacebookCostPerLead: processedReports.length > 0 ? 
+              processedReports.filter(r => r.facebook_cost_per_lead !== null)
+                .reduce((sum, r, _, arr) => sum + r.facebook_cost_per_lead / arr.length, 0) : null,
+            avgZohoCostPerLead: processedReports.length > 0 ? 
+              processedReports.filter(r => r.zoho_cost_per_lead !== null)
+                .reduce((sum, r, _, arr) => sum + r.zoho_cost_per_lead / arr.length, 0) : null,
+                
+            dateRange: { from: dateFrom, to: dateTo },
+            
+            // Backward compatibility
             totalSpent: processedReports.reduce((sum, r) => sum + r.spent, 0),
-            totalLeads: processedReports.reduce((sum, r) => sum + r.leads, 0),
             totalFacebookResults: processedReports.reduce((sum, r) => sum + r.facebook_result, 0),
-            totalZohoResults: processedReports.reduce((sum, r) => sum + r.zoho_result, 0),
-            dateRange: { from: dateFrom, to: dateTo }
+            totalZohoResults: processedReports.reduce((sum, r) => sum + r.zoho_result, 0)
           }
         }
       };
@@ -193,11 +248,21 @@ class ReportService {
         ORDER BY c.name
       `);
 
-      // Get date range from campaign_data
+      // Get date range from campaign_data using created_at/updated_at
       const [dateRange] = await pool.execute(`
         SELECT 
-          MIN(data_date) as earliest_date,
-          MAX(data_date) as latest_date
+          MIN(
+            CASE 
+              WHEN updated_at > created_at THEN DATE(updated_at)
+              ELSE DATE(created_at)
+            END
+          ) as earliest_date,
+          MAX(
+            CASE 
+              WHEN updated_at > created_at THEN DATE(updated_at)
+              ELSE DATE(created_at)
+            END
+          ) as latest_date
         FROM campaign_data
       `);
 
@@ -221,27 +286,40 @@ class ReportService {
       // Get stats from reports table
       const reportStats = await Report.getStats(filters);
 
-      // Get campaign data stats for comparison
+      // Get campaign data stats for comparison - use created_at/updated_at filtering
       let whereClause = 'WHERE 1=1';
       const params = [];
 
       if (filters.dateFrom) {
-        whereClause += ' AND cd.data_date >= ?';
-        params.push(filters.dateFrom);
+        whereClause += ' AND (DATE(cd.created_at) >= ? OR DATE(cd.updated_at) >= ?)';
+        params.push(filters.dateFrom, filters.dateFrom);
       }
 
       if (filters.dateTo) {
-        whereClause += ' AND cd.data_date <= ?';
-        params.push(filters.dateTo);
+        whereClause += ' AND (DATE(cd.created_at) <= ? OR DATE(cd.updated_at) <= ?)';
+        params.push(filters.dateTo, filters.dateTo);
       }
 
       const [campaignDataStats] = await pool.execute(`
         SELECT 
           COUNT(*) as total_campaign_data_records,
           COUNT(DISTINCT cd.campaign_id) as unique_campaigns_in_data,
-          SUM(cd.facebook_result) as total_facebook_from_data,
-          SUM(cd.xoho_result) as total_zoho_from_data,
-          SUM(cd.spent) as total_spent_from_data
+          SUM(cd.facebook_result) as total_facebook_leads,
+          SUM(cd.xoho_result) as total_zoho_leads,
+          SUM(cd.spent) as total_amount_spend,
+          
+          -- Calculate overall cost per lead
+          CASE 
+            WHEN SUM(cd.facebook_result) > 0 
+            THEN ROUND(SUM(cd.spent) / SUM(cd.facebook_result), 2)
+            ELSE NULL
+          END as overall_facebook_cost_per_lead,
+          
+          CASE 
+            WHEN SUM(cd.xoho_result) > 0 
+            THEN ROUND(SUM(cd.spent) / SUM(cd.xoho_result), 2)
+            ELSE NULL
+          END as overall_zoho_cost_per_lead
         FROM campaign_data cd
         ${whereClause}
       `, params);

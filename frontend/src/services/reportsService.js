@@ -45,8 +45,58 @@ const reportsService = {
    */
   getAllReports: async (params = {}) => {
     try {
-      const response = await api.get(BASE_URL, { params });
-      return response.data;
+      // Generate reports from campaign data instead of fetching from reports table
+      // This ensures we always get the latest data with new structure
+      const { date_from, date_to, campaign_id, brand_id, ...otherParams } = params;
+      
+      // Set default date range if not provided (last 30 days)
+      const defaultDateTo = reportsService.formatDate(new Date());
+      const defaultDateFrom = (() => {
+        const date = new Date();
+        date.setDate(date.getDate() - 30);
+        return reportsService.formatDate(date);
+      })();
+      
+      const generateParams = {
+        dateFrom: date_from || defaultDateFrom,
+        dateTo: date_to || defaultDateTo
+      };
+      
+      if (campaign_id) generateParams.campaignId = campaign_id;
+      if (brand_id) generateParams.brandId = brand_id;
+      
+      const response = await api.post(`${BASE_URL}/generate`, generateParams);
+      
+      if (response.data.success) {
+        // Transform the generated reports to match the expected pagination structure
+        const reports = response.data.data.reports || [];
+        
+        // Apply client-side pagination if needed
+        const page = parseInt(otherParams.page) || 1;
+        const limit = parseInt(otherParams.limit) || 20;
+        const startIndex = (page - 1) * limit;
+        const endIndex = startIndex + limit;
+        const paginatedReports = reports.slice(startIndex, endIndex);
+        
+        return {
+          success: true,
+          message: response.data.message,
+          data: paginatedReports,
+          meta: {
+            pagination: {
+              currentPage: page,
+              totalPages: Math.ceil(reports.length / limit),
+              totalCount: reports.length,
+              limit: limit,
+              hasNext: endIndex < reports.length,
+              hasPrev: page > 1
+            },
+            summary: response.data.data.summary
+          }
+        };
+      } else {
+        return response.data;
+      }
     } catch (error) {
       console.error('Reports Service - Get all reports error:', error);
       throw error.response?.data || error;
