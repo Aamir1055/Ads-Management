@@ -299,9 +299,10 @@ const BusinessManager = () => {
   };
 
   return (
-    <div className="flex h-full bg-gray-50">
-      {/* Left Panel - Business Managers */}
-      <div className="w-1/3 bg-white border-r border-gray-200 flex flex-col">
+    <>
+      <div className="flex h-screen bg-gray-50">
+        {/* Left Panel - Business Managers */}
+        <div className="w-1/3 bg-white border-r border-gray-200 flex flex-col">
         {/* Header */}
         <div className="p-6 border-b border-gray-200">
           <div className="flex items-center justify-between mb-4">
@@ -595,6 +596,7 @@ const BusinessManager = () => {
             </div>
           </div>
         )}
+        </div>
       </div>
 
       {/* BM Form Modal */}
@@ -621,7 +623,7 @@ const BusinessManager = () => {
           onSave={handleAdsManagerSaved}
         />
       )}
-    </div>
+    </>
   );
 };
 
