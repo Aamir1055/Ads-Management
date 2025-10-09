@@ -12,7 +12,6 @@ const Reports = () => {
   // UI states
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [selectedReports, setSelectedReports] = useState([]);
   
   // Filter and pagination states
   const [filters, setFilters] = useState({
@@ -32,7 +31,7 @@ const Reports = () => {
     hasPrev: false
   });
 
-  // Load filtered data only when filters change (not on initial mount)
+  // Load filtered data when filters change
   useEffect(() => {
     if (filters.date_from || filters.date_to || filters.campaign_name || filters.brand_name || pagination.page > 1) {
       loadReports();
@@ -76,17 +75,15 @@ const Reports = () => {
         setAvailableCampaigns(uniqueCampaigns);
         setAvailableBrands(uniqueBrands);
         
-        // If no filters are set, show all data
-        if (!filters.date_from && !filters.date_to && !filters.campaign_name && !filters.brand_name) {
-          setReports(reportsData.slice(0, pagination.limit));
-          setPagination(prev => ({
-            ...prev,
-            totalCount: reportsData.length,
-            totalPages: Math.ceil(reportsData.length / pagination.limit),
-            hasNext: reportsData.length > pagination.limit,
-            hasPrev: false
-          }));
-        }
+        // Always show initial data, filtering will be handled by the filtered loadReports call
+        setReports(reportsData.slice(0, pagination.limit));
+        setPagination(prev => ({
+          ...prev,
+          totalCount: reportsData.length,
+          totalPages: Math.ceil(reportsData.length / pagination.limit),
+          hasNext: reportsData.length > pagination.limit,
+          hasPrev: false
+        }));
         
         setError('');
       } else {
@@ -123,7 +120,21 @@ const Reports = () => {
       console.log('Reports response:', response);
       
       if (response.success) {
-        const reportsData = response.data || [];
+        let reportsData = response.data || [];
+        
+        // Client-side filtering as backup
+        if (filters.campaign_name) {
+          reportsData = reportsData.filter(report => 
+            report.campaign_name === filters.campaign_name
+          );
+        }
+        
+        if (filters.brand_name) {
+          reportsData = reportsData.filter(report => 
+            report.brand_name === filters.brand_name
+          );
+        }
+        
         setReports(reportsData);
         
         if (response.meta?.pagination) {
@@ -217,59 +228,11 @@ const Reports = () => {
     setPagination(prev => ({ ...prev, page: newPage }));
   };
 
-  const handleSelectReport = (reportId) => {
-    setSelectedReports(prev => 
-      prev.includes(reportId)
-        ? prev.filter(id => id !== reportId)
-        : [...prev, reportId]
-    );
-  };
-
-  const handleSelectAllReports = () => {
-    if (selectedReports.length === reports.length) {
-      setSelectedReports([]);
-    } else {
-      setSelectedReports(reports.map((report, index) => report.id || `${report.campaign_id}-${report.report_date}-${index}`));
-    }
-  };
-
-  const handleDeleteReport = async (reportId) => {
-    if (!confirm('Are you sure you want to delete this report?')) return;
-
-    try {
-      const response = await reportsService.deleteReport(reportId);
-      if (response.success) {
-        loadReports(); // Reload the list
-        setSelectedReports(prev => prev.filter(id => id !== reportId));
-      } else {
-        alert('Failed to delete report: ' + response.message);
-      }
-    } catch (error) {
-      console.error('Error deleting report:', error);
-      alert('Failed to delete report');
-    }
-  };
-
-  const handleBulkDelete = async () => {
-    if (selectedReports.length === 0) return;
-    
-    if (!confirm(`Are you sure you want to delete ${selectedReports.length} selected report(s)?`)) return;
-
-    try {
-      const promises = selectedReports.map(id => reportsService.deleteReport(id));
-      await Promise.all(promises);
-      loadReports();
-      setSelectedReports([]);
-    } catch (error) {
-      console.error('Error deleting reports:', error);
-      alert('Failed to delete some reports');
-    }
-  };
 
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('en-IN', {
       style: 'currency',
-      currency: 'USD'
+      currency: 'INR'
     }).format(amount || 0);
   };
 
@@ -352,18 +315,6 @@ const Reports = () => {
           </svg>
           Refresh
         </button>
-
-        {selectedReports.length > 0 && (
-          <button
-            onClick={handleBulkDelete}
-            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md font-medium transition-colors flex items-center"
-          >
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-            Delete Selected ({selectedReports.length})
-          </button>
-        )}
       </div>
 
       {/* Filters */}
@@ -556,12 +507,6 @@ const Reports = () => {
         {/* Table Header */}
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
           <div className="flex items-center">
-            <input
-              type="checkbox"
-              checked={selectedReports.length === reports.length && reports.length > 0}
-              onChange={handleSelectAllReports}
-              className="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-            />
             <h3 className="text-lg font-medium text-gray-900">
               Reports ({pagination.totalCount})
             </h3>
@@ -585,9 +530,6 @@ const Reports = () => {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Select
-                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Date
                   </th>
@@ -618,22 +560,11 @@ const Reports = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Total Cost Per Lead
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {reports.map((report, index) => (
                   <tr key={report.id || `${report.campaign_id}-${report.report_date}-${index}`} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <input
-                        type="checkbox"
-                        checked={selectedReports.includes(report.id || `${report.campaign_id}-${report.report_date}-${index}`)}
-                        onChange={() => handleSelectReport(report.id || `${report.campaign_id}-${report.report_date}-${index}`)}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      />
-                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {formatDate(report.report_date || report.data_date || report.created_at)}
                     </td>
@@ -663,17 +594,6 @@ const Reports = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
                       {formatCurrency(report.total_cost_per_lead || 0)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <button
-                        onClick={() => handleDeleteReport(report.id || `${report.campaign_id}-${report.report_date}-${index}`)}
-                        className="text-red-600 hover:text-red-900 ml-2"
-                        title="Delete report"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
                     </td>
                   </tr>
                 ))}
