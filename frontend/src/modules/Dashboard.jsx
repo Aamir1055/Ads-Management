@@ -41,7 +41,7 @@ import {
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
 
 // Services
-import dashboardService from '../services/dashboardService';
+import safeDashboardService from '../services/safeDashboardService';
 
 // Register ChartJS components
 ChartJS.register(
@@ -61,96 +61,9 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   
-  // State management with placeholder data
+  // State management - will load real data
   const [activeTab, setActiveTab] = useState('overview');
-  const [dashboardData, setDashboardData] = useState({
-    overview: {
-      campaigns: { total: 15, active: 8 },
-      performance: {
-        total_leads: 2847,
-        total_spent: 189500,
-        avg_cost_per_lead: 66.58,
-        today_leads: 24,
-        today_spent: 3200,
-      }
-    },
-    trends: {
-      chart: {
-        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-        datasets: [{
-          label: 'Leads',
-          data: [120, 190, 300, 500, 400, 650],
-          borderColor: 'rgb(59, 130, 246)',
-          backgroundColor: 'rgba(59, 130, 246, 0.1)',
-          fill: true
-        }]
-      },
-      summary: {
-        total_leads: 2200,
-        total_spent: 147000,
-        avg_cost_per_lead: 66.82
-      }
-    },
-    campaigns: {
-      campaigns: [
-        {
-          campaign_id: 1,
-          campaign_name: 'Summer Sale Facebook Ads',
-          brand: 'Fashion Brand A',
-          total_leads: 450,
-          total_spent: 28500,
-          avg_cost_per_lead: 63.33,
-          performance_score: 85
-        },
-        {
-          campaign_id: 2,
-          campaign_name: 'Holiday Shopping Campaign',
-          brand: 'Electronics Store',
-          total_leads: 320,
-          total_spent: 24800,
-          avg_cost_per_lead: 77.50,
-          performance_score: 72
-        },
-        {
-          campaign_id: 3,
-          campaign_name: 'Back to School Promotion',
-          brand: 'Education Co',
-          total_leads: 280,
-          total_spent: 18200,
-          avg_cost_per_lead: 65.00,
-          performance_score: 78
-        }
-      ]
-    },
-    brands: {
-      brands: [
-        {
-          brand: 'Fashion Brand A',
-          campaigns_count: 5,
-          total_leads: 890,
-          total_spent: 58500,
-          avg_cost_per_lead: 65.73,
-          efficiency_score: 88
-        },
-        {
-          brand: 'Electronics Store',
-          campaigns_count: 3,
-          total_leads: 650,
-          total_spent: 48200,
-          avg_cost_per_lead: 74.15,
-          efficiency_score: 76
-        },
-        {
-          brand: 'Education Co',
-          campaigns_count: 4,
-          total_leads: 520,
-          total_spent: 31800,
-          avg_cost_per_lead: 61.15,
-          efficiency_score: 82
-        }
-      ]
-    }
-  });
+  const [dashboardData, setDashboardData] = useState({});
   const [loading, setLoading] = useState({
     overview: false,
     trends: false,
@@ -162,34 +75,37 @@ const Dashboard = () => {
   // Real-time data will be loaded from API
   const [realTimeData, setRealTimeData] = useState(null);
 
-  // Load data for specific tab
+  // Load data for specific tab - SAFE VERSION
   const loadTabData = useCallback(async (tab) => {
-    console.log(`Loading data for ${tab} tab...`);
+    console.log(`SafeDashboard: Loading data for ${tab} tab...`);
     try {
       setLoading(prev => ({ ...prev, [tab]: true }));
+      setError(null); // Clear any previous errors
       let data;
       
       switch (tab) {
         case 'overview':
-          data = await dashboardService.getOverview();
-          // Also load real-time data for overview
+          data = await safeDashboardService.getOverview();
+          // Also try to load real-time data for overview
           try {
-            const realtime = await dashboardService.getRealTimeMetrics();
+            const realtime = await safeDashboardService.getRealTimeMetrics();
             if (realtime?.data) {
               setRealTimeData(realtime.data);
+              console.log('SafeDashboard: Real-time data loaded');
             }
           } catch (realtimeErr) {
-            console.log('Real-time data not available:', realtimeErr.message);
+            console.log('SafeDashboard: Real-time data not available:', realtimeErr.message);
+            // Not a critical error, continue without real-time data
           }
           break;
         case 'trends':
-          data = await dashboardService.getTrends();
+          data = await safeDashboardService.getTrends();
           break;
         case 'campaigns':
-          data = await dashboardService.getCampaigns();
+          data = await safeDashboardService.getCampaigns();
           break;
         case 'brands':
-          data = await dashboardService.getBrands();
+          data = await safeDashboardService.getBrands();
           break;
         default:
           return;
@@ -197,21 +113,51 @@ const Dashboard = () => {
       
       if (data?.data) {
         setDashboardData(prev => ({ ...prev, [tab]: data.data }));
-        console.log(`${tab} data loaded:`, data.data);
+        console.log(`SafeDashboard: ${tab} data loaded successfully:`, data.data);
+        toast.success(`${tab} data loaded successfully`);
+      } else {
+        console.warn(`SafeDashboard: No data received for ${tab}`);
+        setError(`No data available for ${tab}`);
       }
     } catch (err) {
-      console.error(`Failed to load ${tab} data:`, err);
-      setError(`Failed to load ${tab} data`);
+      console.error(`SafeDashboard: Failed to load ${tab} data:`, err.message);
+      setError(`Failed to load ${tab} data: ${err.message}`);
+      toast.error(`Failed to load ${tab} data`);
     } finally {
       setLoading(prev => ({ ...prev, [tab]: false }));
     }
   }, []);
 
-  // DISABLE API calls to prevent loops - showing static data instead
+  // Initialize dashboard - Test connection and load overview data
   useEffect(() => {
-    console.log('Dashboard: API calls disabled - showing static data to prevent loops');
-    // loadTabData('overview'); // DISABLED to prevent auth loops
-  }, []);
+    console.log('SafeDashboard: Component mounted, initializing...');
+    
+    const initDashboard = async () => {
+      try {
+        // Test API connection first
+        console.log('SafeDashboard: Testing API connection...');
+        const connectionTest = await safeDashboardService.testConnection();
+        
+        if (connectionTest.success) {
+          console.log('SafeDashboard: API connection successful, loading overview data...');
+          await loadTabData('overview');
+        } else {
+          console.error('SafeDashboard: API connection failed:', connectionTest.message);
+          setError('Unable to connect to the server. Please check if the backend is running.');
+          toast.error('Backend connection failed');
+        }
+      } catch (err) {
+        console.error('SafeDashboard: Initialization failed:', err.message);
+        setError('Failed to initialize dashboard');
+        toast.error('Dashboard initialization failed');
+      }
+    };
+    
+    // Delay initialization to ensure auth is stable
+    const timer = setTimeout(initDashboard, 2000);
+    
+    return () => clearTimeout(timer);
+  }, []); // Empty dependency array - runs only once on mount
   
   // Refs - REMOVED to prevent loops
 
@@ -221,10 +167,11 @@ const Dashboard = () => {
     navigate(path);
   }, [navigate]);
 
-  // Refresh function - DISABLED to prevent loops
+  // Refresh function - ENABLED with safe service
   const refreshAll = () => {
-    console.log('Refresh disabled to prevent loops');
-    toast.error('Refresh disabled - API calls cause authentication loops');
+    console.log('SafeDashboard: Refreshing current tab data...');
+    loadTabData(activeTab);
+    toast.info('Refreshing data...');
   };
 
   // Tab configuration - Remove Activities
@@ -235,37 +182,108 @@ const Dashboard = () => {
     { id: 'brands', name: 'Brands', icon: PieChart, color: 'orange' }
   ];
 
-  // Load data when tab changes - DISABLED
+  // Load data when tab changes - ENABLED with safe service
   const handleTabChange = (tabId) => {
+    console.log(`SafeDashboard: Changing to ${tabId} tab`);
     setActiveTab(tabId);
-    console.log('Tab data loading disabled to prevent auth loops');
-    // if (!dashboardData[tabId]) {
-    //   loadTabData(tabId);
-    // }
+    
+    // Load data if not already loaded
+    if (!dashboardData[tabId] && !loading[tabId]) {
+      console.log(`SafeDashboard: Loading data for new tab: ${tabId}`);
+      loadTabData(tabId);
+    }
   };
 
-  // Chart options helper function
+  // Enhanced chart options for better readability
   const getChartOptions = (title, yAxisLabel) => ({
     responsive: true,
     maintainAspectRatio: false,
+    interaction: {
+      intersect: false,
+      mode: 'index'
+    },
     plugins: {
       legend: {
         position: 'top',
+        labels: {
+          usePointStyle: true,
+          padding: 20,
+          font: {
+            size: 12,
+            weight: 'bold'
+          }
+        }
       },
       title: {
         display: true,
         text: title,
+        font: {
+          size: 16,
+          weight: 'bold'
+        },
+        padding: 20
       },
+      tooltip: {
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        titleColor: '#fff',
+        bodyColor: '#fff',
+        borderColor: '#3B82F6',
+        borderWidth: 2,
+        cornerRadius: 8,
+        padding: 12
+      }
     },
     scales: {
+      x: {
+        display: true,
+        grid: {
+          display: true,
+          color: 'rgba(0, 0, 0, 0.1)'
+        },
+        ticks: {
+          font: {
+            size: 11,
+            weight: '500'
+          },
+          color: '#6B7280'
+        }
+      },
       y: {
         beginAtZero: true,
+        display: true,
+        grid: {
+          display: true,
+          color: 'rgba(0, 0, 0, 0.1)'
+        },
         title: {
           display: true,
           text: yAxisLabel,
+          font: {
+            size: 12,
+            weight: 'bold'
+          },
+          color: '#374151'
         },
-      },
+        ticks: {
+          font: {
+            size: 11
+          },
+          color: '#6B7280'
+        }
+      }
     },
+    elements: {
+      point: {
+        radius: 6,
+        hoverRadius: 8,
+        borderWidth: 3,
+        backgroundColor: '#fff'
+      },
+      line: {
+        tension: 0.4,
+        borderWidth: 3
+      }
+    }
   });
 
   // DISABLED export handler to prevent loops
@@ -274,12 +292,9 @@ const Dashboard = () => {
     toast.error('Export temporarily disabled');
   };
 
-  // Metric cards component
-  const MetricCard = ({ title, value, change, icon: Icon, color, onClick, loading }) => (
-    <div 
-      className={`bg-white rounded-lg shadow-sm border border-gray-200 p-6 cursor-pointer hover:shadow-md transition-all duration-200 ${onClick ? 'hover:border-' + color + '-200' : ''}`}
-      onClick={onClick}
-    >
+  // Metric cards component - No click functionality
+  const MetricCard = ({ title, value, change, icon: Icon, color, loading }) => (
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 transition-all duration-200">
       <div className="flex items-center justify-between">
         <div className="flex-1">
           <p className="text-sm font-medium text-gray-600">{title}</p>
@@ -473,7 +488,6 @@ const Dashboard = () => {
                 change={realTimeData?.comparisons?.campaigns_change}
                 icon={Target}
                 color="blue"
-                onClick={() => navigateTo('/campaigns')}
                 loading={loading.overview}
               />
               <MetricCard
@@ -482,22 +496,20 @@ const Dashboard = () => {
                 change={realTimeData?.comparisons?.leads_change}
                 icon={Users}
                 color="green"
-                onClick={() => navigateTo('/reports')}
                 loading={loading.overview}
               />
               <MetricCard
                 title="Total Spent"
                 value={`₹${(dashboardData.overview?.performance?.total_spent || 0).toLocaleString()}`}
                 change={realTimeData?.comparisons?.spent_change}
-                icon={DollarSign}
+                icon={TrendingUp}
                 color="purple"
-                onClick={() => navigateTo('/report-analytics')}
                 loading={loading.overview}
               />
               <MetricCard
                 title="Avg Cost/Lead"
                 value={`₹${(dashboardData.overview?.performance?.avg_cost_per_lead || 0).toFixed(2)}`}
-                icon={TrendingUp}
+                icon={Target}
                 color="orange"
                 loading={loading.overview}
               />
@@ -512,7 +524,9 @@ const Dashboard = () => {
                     <div className="animate-pulse bg-gray-200 h-8 w-16 rounded mx-auto mb-2"></div>
                   ) : (
                     <p className="text-2xl font-bold text-blue-600">
-                      {dashboardData.overview?.performance?.today_leads || '24'}
+                      {realTimeData?.today?.leads || 
+                       dashboardData.overview?.performance?.today_leads || 
+                       dashboardData.overview?.today_leads || '0'}
                     </p>
                   )}
                   <p className="text-sm text-gray-600">Leads Today</p>
@@ -522,7 +536,9 @@ const Dashboard = () => {
                     <div className="animate-pulse bg-gray-200 h-8 w-16 rounded mx-auto mb-2"></div>
                   ) : (
                     <p className="text-2xl font-bold text-green-600">
-                      ₹{(dashboardData.overview?.performance?.today_spent || 3200).toLocaleString()}
+                      ₹{(realTimeData?.today?.spent || 
+                         dashboardData.overview?.performance?.today_spent || 
+                         dashboardData.overview?.today_spent || 0).toLocaleString()}
                     </p>
                   )}
                   <p className="text-sm text-gray-600">Spent Today</p>
@@ -532,7 +548,9 @@ const Dashboard = () => {
                     <div className="animate-pulse bg-gray-200 h-8 w-16 rounded mx-auto mb-2"></div>
                   ) : (
                     <p className="text-2xl font-bold text-purple-600">
-                      {dashboardData.overview?.campaigns?.active || '8'}
+                      {realTimeData?.today?.active_campaigns || 
+                       dashboardData.overview?.campaigns?.active || 
+                       dashboardData.overview?.active_campaigns || '0'}
                     </p>
                   )}
                   <p className="text-sm text-gray-600">Active Campaigns</p>
@@ -589,19 +607,55 @@ const Dashboard = () => {
         {activeTab === 'trends' && (
           <div className="space-y-6">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Performance Trends (30 Days)</h3>
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-gray-900">Performance Trends</h3>
+                <div className="flex items-center space-x-4 text-sm text-gray-500">
+                  <div className="flex items-center space-x-1">
+                    <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                    <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+                  </div>
+                  <span>Multiple Metrics</span>
+                </div>
+              </div>
               {loading.trends ? (
-                <div className="animate-pulse bg-gray-200 h-64 rounded"></div>
+                <div className="animate-pulse bg-gray-200 h-80 rounded-lg"></div>
               ) : dashboardData.trends?.chart ? (
-                <div className="h-64">
+                <div className="h-80 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-4">
                   <Line 
-                    data={dashboardData.trends.chart} 
-                    options={getChartOptions('Performance Trends', 'Leads')} 
+                    data={{
+                      ...dashboardData.trends.chart,
+                      datasets: dashboardData.trends.chart.datasets?.map((dataset, index) => {
+                        const colors = [
+                          { border: '#3B82F6', bg: 'rgba(59, 130, 246, 0.1)', hover: '#1D4ED8' }, // Blue
+                          { border: '#10B981', bg: 'rgba(16, 185, 129, 0.1)', hover: '#047857' }, // Green  
+                          { border: '#F59E0B', bg: 'rgba(245, 158, 11, 0.1)', hover: '#D97706' }, // Orange
+                          { border: '#EF4444', bg: 'rgba(239, 68, 68, 0.1)', hover: '#DC2626' }, // Red
+                          { border: '#8B5CF6', bg: 'rgba(139, 92, 246, 0.1)', hover: '#7C3AED' }, // Purple
+                          { border: '#06B6D4', bg: 'rgba(6, 182, 212, 0.1)', hover: '#0891B2' }  // Cyan
+                        ];
+                        const colorSet = colors[index % colors.length];
+                        return {
+                          ...dataset,
+                          borderColor: colorSet.border,
+                          backgroundColor: colorSet.bg,
+                          pointBackgroundColor: colorSet.border,
+                          pointBorderColor: '#ffffff',
+                          pointHoverBackgroundColor: colorSet.hover,
+                          pointHoverBorderColor: '#ffffff',
+                          fill: true,
+                          tension: 0.4
+                        };
+                      }) || []
+                    }}
+                    options={getChartOptions('', 'Number of Leads')} 
                   />
                 </div>
               ) : (
-                <div className="h-64 flex items-center justify-center text-gray-500">
-                  No trends data available
+                <div className="h-80 flex flex-col items-center justify-center text-gray-500 bg-gray-50 rounded-lg">
+                  <TrendingUp className="h-16 w-16 text-gray-300 mb-4" />
+                  <p className="text-lg font-medium mb-2">No trends data available</p>
+                  <p className="text-sm">Data will appear here once campaigns generate leads</p>
                 </div>
               )}
             </div>
@@ -712,35 +766,55 @@ const Dashboard = () => {
               {loading.brands ? (
                 <div className="animate-pulse bg-gray-200 h-64 rounded"></div>
               ) : dashboardData.brands?.brands?.length > 0 ? (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {dashboardData.brands.brands.map((brand, index) => (
-                    <div key={brand.brand || index} className="p-4 bg-gray-50 rounded-lg">
-                      <div className="flex items-center justify-between mb-3">
-                        <h4 className="font-medium text-gray-900">{brand.brand}</h4>
-                        <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
-                          {brand.campaigns_count} campaigns
+                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                  {dashboardData.brands.brands.map((brand, index) => {
+                    // Debug log to see what fields are available
+                    console.log('Brand data:', brand);
+                    
+                    // Try to extract brand name from various possible fields
+                    const brandName = brand.name || 
+                                     brand.brand_name || 
+                                     brand.brand || 
+                                     brand.brandName ||
+                                     (typeof brand === 'object' && Object.values(brand).find(val => 
+                                       typeof val === 'string' && val.length > 0 && val.length < 100
+                                     )) ||
+                                     `Brand ${brand.brand_id || brand.id || index + 1}`;
+                    
+                    return (
+                      <div key={brand.brand_id || brand.id || index} className="p-6 bg-gradient-to-br from-white to-gray-50 rounded-xl border border-gray-200 hover:shadow-lg transition-all duration-200">
+                        <div className="flex items-center justify-between mb-4">
+                          <h4 className="font-bold text-lg text-gray-900">
+                            {brandName}
+                          </h4>
+                        <span className="px-3 py-1 text-sm bg-blue-100 text-blue-800 rounded-full font-medium">
+                          {brand.campaigns_count || brand.campaign_count || 0} campaigns
                         </span>
                       </div>
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <p className="text-gray-600">Total Leads</p>
-                          <p className="font-bold text-gray-900">{brand.total_leads}</p>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="text-center p-3 bg-blue-50 rounded-lg">
+                          <p className="text-xs text-gray-600 mb-1">Total Leads</p>
+                          <p className="text-xl font-bold text-blue-700">{brand.total_leads || 0}</p>
                         </div>
-                        <div>
-                          <p className="text-gray-600">Total Spent</p>
-                          <p className="font-bold text-gray-900">₹{brand.total_spent.toLocaleString()}</p>
+                        <div className="text-center p-3 bg-green-50 rounded-lg">
+                          <p className="text-xs text-gray-600 mb-1">Total Spent</p>
+                          <p className="text-xl font-bold text-green-700">₹{(brand.total_spent || 0).toLocaleString()}</p>
                         </div>
-                        <div>
-                          <p className="text-gray-600">Avg Cost/Lead</p>
-                          <p className="font-bold text-gray-900">₹{brand.avg_cost_per_lead.toFixed(2)}</p>
+                        <div className="text-center p-3 bg-orange-50 rounded-lg">
+                          <p className="text-xs text-gray-600 mb-1">Avg Cost/Lead</p>
+                          <p className="text-lg font-bold text-orange-700">₹{(brand.avg_cost_per_lead || 0).toFixed(2)}</p>
                         </div>
-                        <div>
-                          <p className="text-gray-600">Efficiency Score</p>
-                          <p className="font-bold text-blue-600">{brand.efficiency_score}</p>
+                        <div className="text-center p-3 bg-purple-50 rounded-lg">
+                          <p className="text-xs text-gray-600 mb-1">Efficiency Score</p>
+                          <div className="flex items-center justify-center">
+                            <p className="text-lg font-bold text-purple-700">{brand.efficiency_score || 0}</p>
+                            <span className="text-xs text-purple-600 ml-1">/100</span>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="text-center py-8 text-gray-500">
