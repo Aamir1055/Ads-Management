@@ -385,6 +385,174 @@ class DashboardService {
   }
 
   /**
+   * Force refresh - clears all caches and bypasses debouncing
+   */
+  async forceRefresh() {
+    console.log('Dashboard service: FORCE REFRESH initiated');
+    
+    // Clear all cache
+    this.clearCache();
+    
+    // Clear debouncing state
+    this.requestsInProgress.clear();
+    this.lastRequestTime.clear();
+    
+    // Force fresh data fetch for all sections without any caching or debouncing
+    const promises = [
+      this.forceGetOverview(),
+      this.forceGetTrends(30),
+      this.forceGetCampaigns(10),
+      this.forceGetBrands(8),
+      this.forceGetActivities(20)
+    ];
+
+    try {
+      console.log('Dashboard service: Forcing fresh data fetch from all endpoints...');
+      const results = await Promise.all(promises);
+      console.log('Dashboard service: FORCE REFRESH completed successfully');
+      return { success: true, message: 'Dashboard force refreshed successfully', data: results };
+    } catch (error) {
+      console.error('Dashboard force refresh error:', error);
+      return { success: false, message: error.message };
+    }
+  }
+
+  /**
+   * Force get overview - bypasses all caching and debouncing
+   */
+  async forceGetOverview() {
+    const requestKey = `force_overview_${Date.now()}`;
+    
+    try {
+      console.log('Dashboard service: Force fetching overview data...');
+      const axios = this.getAxiosInstance();
+      
+      // Add cache busting parameter
+      const response = await axios.get(`/overview?_t=${Date.now()}`);
+      
+      if (response.data.success) {
+        console.log('Dashboard service: Overview force fetch successful');
+        // Don't cache this data - let normal flow handle caching
+        return response.data;
+      } else {
+        throw new Error(response.data.message || 'Failed to force fetch dashboard overview');
+      }
+    } catch (error) {
+      console.error('Dashboard force overview service error:', error);
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        localStorage.removeItem('token');
+        window.location.href = '/login';
+        return null;
+      }
+      throw new Error(error.response?.data?.message || error.message || 'Network error');
+    }
+  }
+
+  /**
+   * Force get trends - bypasses all caching and debouncing
+   */
+  async forceGetTrends(days = 30) {
+    try {
+      console.log('Dashboard service: Force fetching trends data...');
+      const axios = this.getAxiosInstance();
+      const response = await axios.get(`/trends?days=${days}&_t=${Date.now()}`);
+      
+      if (response.data.success) {
+        console.log('Dashboard service: Trends force fetch successful');
+        return response.data;
+      } else {
+        throw new Error(response.data.message || 'Failed to force fetch trends data');
+      }
+    } catch (error) {
+      console.error('Dashboard force trends service error:', error);
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        localStorage.removeItem('token');
+        window.location.href = '/login';
+        return null;
+      }
+      throw new Error(error.response?.data?.message || error.message || 'Network error');
+    }
+  }
+
+  /**
+   * Force get campaigns - bypasses all caching and debouncing
+   */
+  async forceGetCampaigns(limit = 10) {
+    try {
+      console.log('Dashboard service: Force fetching campaigns data...');
+      const axios = this.getAxiosInstance();
+      const response = await axios.get(`/campaigns?limit=${limit}&_t=${Date.now()}`);
+      
+      if (response.data.success) {
+        console.log('Dashboard service: Campaigns force fetch successful');
+        return response.data;
+      } else {
+        throw new Error(response.data.message || 'Failed to force fetch campaigns data');
+      }
+    } catch (error) {
+      console.error('Dashboard force campaigns service error:', error);
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        localStorage.removeItem('token');
+        window.location.href = '/login';
+        return null;
+      }
+      throw new Error(error.response?.data?.message || error.message || 'Network error');
+    }
+  }
+
+  /**
+   * Force get brands - bypasses all caching and debouncing
+   */
+  async forceGetBrands(limit = 8) {
+    try {
+      console.log('Dashboard service: Force fetching brands data...');
+      const axios = this.getAxiosInstance();
+      const response = await axios.get(`/brands?limit=${limit}&_t=${Date.now()}`);
+      
+      if (response.data.success) {
+        console.log('Dashboard service: Brands force fetch successful');
+        return response.data;
+      } else {
+        throw new Error(response.data.message || 'Failed to force fetch brands data');
+      }
+    } catch (error) {
+      console.error('Dashboard force brands service error:', error);
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        localStorage.removeItem('token');
+        window.location.href = '/login';
+        return null;
+      }
+      throw new Error(error.response?.data?.message || error.message || 'Network error');
+    }
+  }
+
+  /**
+   * Force get activities - bypasses all caching and debouncing
+   */
+  async forceGetActivities(limit = 20) {
+    try {
+      console.log('Dashboard service: Force fetching activities data...');
+      const axios = this.getAxiosInstance();
+      const response = await axios.get(`/activities?limit=${limit}&_t=${Date.now()}`);
+      
+      if (response.data.success) {
+        console.log('Dashboard service: Activities force fetch successful');
+        return response.data;
+      } else {
+        throw new Error(response.data.message || 'Failed to force fetch activities data');
+      }
+    } catch (error) {
+      console.error('Dashboard force activities service error:', error);
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        localStorage.removeItem('token');
+        window.location.href = '/login';
+        return null;
+      }
+      throw new Error(error.response?.data?.message || error.message || 'Network error');
+    }
+  }
+
+  /**
    * Get all dashboard data at once
    * @param {boolean} useCache - Whether to use cached data
    * @returns {Promise<Object>} All dashboard data

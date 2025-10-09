@@ -42,6 +42,7 @@ import { Line, Bar, Doughnut } from 'react-chartjs-2';
 
 // Services
 import safeDashboardService from '../services/safeDashboardService';
+import dashboardService from '../services/dashboardService';
 
 // Register ChartJS components
 ChartJS.register(
@@ -175,11 +176,52 @@ const Dashboard = () => {
     navigate(path);
   }, [navigate]);
 
-  // Refresh function - ENABLED with safe service
-  const refreshAll = () => {
-    console.log('SafeDashboard: Refreshing current tab data...');
-    loadTabData(activeTab);
-    toast.info('Refreshing data...');
+  // Refresh function - ENABLED with force refresh
+  const refreshAll = async () => {
+    console.log('Dashboard: Starting FORCE REFRESH...');
+    toast.info('Force refreshing all data...');
+    
+    try {
+      setLoading({ overview: true, trends: true, campaigns: true });
+      setError(null);
+      
+      // Use the new force refresh method to bypass all caches
+      const result = await dashboardService.forceRefresh();
+      
+      if (result.success && result.data) {
+        console.log('Dashboard: Force refresh successful, updating state...');
+        
+        // Update dashboard data with fresh results
+        const [overview, trends, campaigns, brands, activities] = result.data;
+        
+        setDashboardData({
+          overview: overview?.data,
+          trends: trends?.data,
+          campaigns: campaigns?.data,
+          brands: brands?.data,
+          activities: activities?.data
+        });
+        
+        toast.success('Dashboard refreshed successfully');
+      } else {
+        throw new Error(result.message || 'Force refresh failed');
+      }
+      
+    } catch (error) {
+      console.error('Dashboard: Force refresh failed:', error);
+      setError(`Force refresh failed: ${error.message}`);
+      toast.error('Failed to refresh dashboard');
+      
+      // Fallback to safe service for current tab
+      console.log('Dashboard: Falling back to safe service for current tab...');
+      try {
+        await loadTabData(activeTab);
+      } catch (fallbackError) {
+        console.error('Dashboard: Fallback also failed:', fallbackError);
+      }
+    } finally {
+      setLoading({ overview: false, trends: false, campaigns: false });
+    }
   };
 
   // Tab configuration - Removed Activities and Brands
@@ -389,15 +431,30 @@ const Dashboard = () => {
                 </span>
               </div>
 
-              {/* Refresh button */}
-              <button
-                onClick={refreshAll}
-                disabled={Object.values(loading).some(Boolean)}
-                className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <RefreshCw className={`h-4 w-4 ${Object.values(loading).some(Boolean) ? 'animate-spin' : ''}`} />
-                <span>Refresh</span>
-              </button>
+              {/* Refresh buttons */}
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => {
+                    console.log('Dashboard: Quick refresh current tab...');
+                    loadTabData(activeTab);
+                    toast.info('Refreshing current tab...');
+                  }}
+                  disabled={Object.values(loading).some(Boolean)}
+                  className="flex items-center space-x-2 px-3 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <RefreshCw className={`h-4 w-4 ${Object.values(loading).some(Boolean) ? 'animate-spin' : ''}`} />
+                  <span>Refresh</span>
+                </button>
+                
+                <button
+                  onClick={refreshAll}
+                  disabled={Object.values(loading).some(Boolean)}
+                  className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <RefreshCw className={`h-4 w-4 ${Object.values(loading).some(Boolean) ? 'animate-spin' : ''}`} />
+                  <span>Hard Refresh</span>
+                </button>
+              </div>
 
               {/* Export dropdown */}
               <div className="relative group">
@@ -519,139 +576,6 @@ const Dashboard = () => {
               />
             </div>
 
-            {/* Today's Performance - Real Data */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Today's Performance</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="text-center p-4 bg-blue-50 rounded-lg">
-                  {loading.overview ? (
-                    <div className="animate-pulse bg-gray-200 h-8 w-16 rounded mx-auto mb-2"></div>
-                  ) : (
-                    <p className="text-2xl font-bold text-blue-600">
-                      {(() => {
-                        // Get today's date in the same format as the data (dd/mm/yyyy)
-                        const today = new Date();
-                        const todayString = String(today.getDate()).padStart(2, '0') + '/' + 
-                                          String(today.getMonth() + 1).padStart(2, '0') + '/' + 
-                                          today.getFullYear();
-                        
-                        console.log('Looking for today\'s data for date:', todayString);
-                        
-                        // Check if we have today's data from realtime API
-                        if (realTimeData?.today?.leads) {
-                          return realTimeData.today.leads;
-                        }
-                        
-                        // Check if we have today's data in overview
-                        const todayLeads = dashboardData.overview?.today_leads || 
-                                          dashboardData.overview?.performance?.today_leads;
-                        
-                        if (todayLeads) {
-                          return todayLeads;
-                        }
-                        
-                        // If we have campaigns data, look for today's campaigns
-                        if (dashboardData.campaigns?.campaigns) {
-                          const todayCampaigns = dashboardData.campaigns.campaigns.filter(campaign => {
-                            // Assuming campaign has a date field that matches today
-                            return campaign.date === todayString || campaign.created_date === todayString;
-                          });
-                          
-                          const todayLeadsFromCampaigns = todayCampaigns.reduce((sum, campaign) => {
-                            return sum + (campaign.total_leads || campaign.facebook_leads || 0);
-                          }, 0);
-                          
-                          if (todayLeadsFromCampaigns > 0) {
-                            return todayLeadsFromCampaigns;
-                          }
-                        }
-                        
-                        // For demo based on your data: if today is 09/10/2025, show 350
-                        if (todayString === '09/10/2025') {
-                          return 350;
-                        }
-                        
-                        return 0;
-                      })()}
-                    </p>
-                  )}
-                  <p className="text-sm text-gray-600">Leads Today</p>
-                </div>
-                <div className="text-center p-4 bg-green-50 rounded-lg">
-                  {loading.overview ? (
-                    <div className="animate-pulse bg-gray-200 h-8 w-16 rounded mx-auto mb-2"></div>
-                  ) : (
-                    <p className="text-2xl font-bold text-green-600">
-                      ₹{(() => {
-                        // Get today's date
-                        const today = new Date();
-                        const todayString = String(today.getDate()).padStart(2, '0') + '/' + 
-                                          String(today.getMonth() + 1).padStart(2, '0') + '/' + 
-                                          today.getFullYear();
-                        
-                        // Check if we have today's spend data from realtime API
-                        if (realTimeData?.today?.spent) {
-                          return realTimeData.today.spent.toLocaleString();
-                        }
-                        
-                        // Check if we have today's data in overview
-                        const todaySpent = dashboardData.overview?.today_spent || 
-                                          dashboardData.overview?.performance?.today_spent;
-                        
-                        if (todaySpent) {
-                          return todaySpent.toLocaleString();
-                        }
-                        
-                        // For demo based on your data: if today is 09/10/2025
-                        // Facebook: 120 leads × ₹7.49 = ₹899
-                        // Zoho: 230 leads × ₹3.91 = ₹899
-                        // Total: ₹1,798 (approximate from your cost per lead)
-                        if (todayString === '09/10/2025') {
-                          const facebookCost = 120 * 7.49;
-                          const zohoCost = 230 * 3.91;
-                          const totalCost = Math.round(facebookCost + zohoCost);
-                          return totalCost.toLocaleString();
-                        }
-                        
-                        return '0';
-                      })()}
-                    </p>
-                  )}
-                  <p className="text-sm text-gray-600">Spent Today</p>
-                </div>
-                <div className="text-center p-4 bg-purple-50 rounded-lg">
-                  {loading.overview ? (
-                    <div className="animate-pulse bg-gray-200 h-8 w-16 rounded mx-auto mb-2"></div>
-                  ) : (
-                    <p className="text-2xl font-bold text-purple-600">
-                      {(() => {
-                        // Get today's date
-                        const today = new Date();
-                        const todayString = String(today.getDate()).padStart(2, '0') + '/' + 
-                                          String(today.getMonth() + 1).padStart(2, '0') + '/' + 
-                                          today.getFullYear();
-                        
-                        // Check realtime data first
-                        if (realTimeData?.today?.active_campaigns) {
-                          return realTimeData.today.active_campaigns;
-                        }
-                        
-                        // For demo: if today is 09/10/2025, we have 1 active campaign (John Smith)
-                        if (todayString === '09/10/2025') {
-                          return 1;
-                        }
-                        
-                        // Fallback to total active campaigns
-                        return dashboardData.overview?.campaigns?.active || 
-                               dashboardData.overview?.campaigns?.total || 
-                               dashboardData.overview?.active_campaigns || '0';
-                      })()}
-                    </p>
-                  )}
-                  <p className="text-sm text-gray-600">Active Campaigns</p>
-                </div>
-              </div>
-            </div>
 
             {/* Quick Actions */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">

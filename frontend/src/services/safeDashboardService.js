@@ -112,6 +112,25 @@ class SafeDashboardService {
       return { success: false, message: error.message };
     }
   }
+
+  /**
+   * Force refresh with cache busting
+   */
+  async forceGetOverview() {
+    return await this.safeApiCall(`/overview?_t=${Date.now()}`);
+  }
+
+  async forceGetTrends(days = 30) {
+    return await this.safeApiCall(`/trends?days=${days}&_t=${Date.now()}`);
+  }
+
+  async forceGetCampaigns(limit = 10) {
+    return await this.safeApiCall(`/campaigns?limit=${limit}&_t=${Date.now()}`);
+  }
+
+  async forceGetBrands(limit = 8) {
+    return await this.safeApiCall(`/brands?limit=${limit}&_t=${Date.now()}`);
+  }
 }
 
 export default new SafeDashboardService();
