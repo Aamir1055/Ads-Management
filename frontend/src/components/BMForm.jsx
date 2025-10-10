@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { X, Building2, Save, AlertCircle, Mail, Phone } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { handleAccessDenied, isAccessDeniedError } from '../utils/accessDeniedHandler';
 import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
-const BMForm = ({ bm, onClose, onSave }) => {
+const BMForm = ({ bm, onClose, onSave, setMessage }) => {
   const [formData, setFormData] = useState({
     bm_name: '',
     email: '',
@@ -162,7 +163,17 @@ const BMForm = ({ bm, onClose, onSave }) => {
     } catch (error) {
       console.error('❌ Error saving BM:', error);
       
-      if (error.response) {
+      // Handle access denied errors first
+      if (isAccessDeniedError(error)) {
+        handleAccessDenied({
+          closeForm: () => {
+            onClose();
+          },
+          setMessage,
+          error,
+          context: 'saving Business Manager'
+        });
+      } else if (error.response) {
         console.log('📋 Error response data:', error.response.data);
         console.log('📋 Error status:', error.response.status);
         

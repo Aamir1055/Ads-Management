@@ -5,7 +5,7 @@ const crypto = require('crypto');
 // JWT Configuration
 const ACCESS_TOKEN_SECRET = process.env.JWT_SECRET || 'access_token_secret';
 const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || 'refresh_token_secret';
-const ACCESS_TOKEN_EXPIRES_IN = '15m'; // Short-lived access token
+const ACCESS_TOKEN_EXPIRES_IN = '24h'; // 24-hour access token
 const REFRESH_TOKEN_EXPIRES_IN = '7d'; // Long-lived refresh token
 
 // Generate tokens

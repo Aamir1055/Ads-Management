@@ -231,10 +231,11 @@ class DashboardService {
    */
   async getTopCampaigns(userId, userRole, limit = 10) {
     try {
-      const roleFilter = userRole !== 'super_admin' ? 'AND (r.created_by = ? OR r.created_by IS NULL)' : '';
-      const params = userRole !== 'super_admin' ? [limit, userId] : [limit];
+      // First, get campaigns with performance data from reports
+      const reportsRoleFilter = userRole !== 'super_admin' ? 'AND (r.created_by = ? OR r.created_by IS NULL)' : '';
+      const reportsParams = userRole !== 'super_admin' ? [userId, limit] : [limit];
 
-      const [campaigns] = await pool.execute(`
+      const [campaignsWithReports] = await pool.execute(`
         SELECT 
           r.campaign_id,
           r.campaign_name,
@@ -247,17 +248,68 @@ class DashboardService {
           AVG(r.cost_per_lead) as avg_cost_per_lead,
           COUNT(*) as report_days,
           MAX(r.report_date) as last_active_date,
-          MIN(r.report_date) as first_active_date
+          MIN(r.report_date) as first_active_date,
+          'with_reports' as data_source
         FROM reports r
         WHERE r.report_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-        ${roleFilter}
+        ${reportsRoleFilter}
         GROUP BY r.campaign_id, r.campaign_name, r.brand, r.campaign_type
         HAVING total_leads > 0
         ORDER BY total_leads DESC, total_spent DESC
         LIMIT ?
-      `, params);
+      `, reportsParams);
 
-      return campaigns.map(campaign => ({
+      // Then, get campaigns without reports (newly created campaigns)
+      const campaignIdsWithReports = campaignsWithReports.map(c => c.campaign_id);
+      
+      // Build the exclude condition safely
+      let excludeCondition = '';
+      let campaignsParams = [];
+      
+      if (campaignIdsWithReports.length > 0) {
+        const placeholders = campaignIdsWithReports.map(() => '?').join(',');
+        excludeCondition = `AND c.id NOT IN (${placeholders})`;
+        campaignsParams = [...campaignIdsWithReports];
+      }
+      
+      // Add role-based filtering
+      const campaignsRoleFilter = userRole !== 'super_admin' ? 'AND (c.created_by = ? OR c.created_by IS NULL)' : '';
+      if (userRole !== 'super_admin') {
+        campaignsParams.push(userId);
+      }
+      
+      // Add limit
+      campaignsParams.push(limit);
+      
+      const [campaignsWithoutReports] = await pool.execute(`
+        SELECT 
+          c.id as campaign_id,
+          c.name as campaign_name,
+          b.name as brand,
+          ct.type_name as campaign_type,
+          0 as total_leads,
+          0 as facebook_leads,
+          0 as zoho_leads,
+          0 as total_spent,
+          0 as avg_cost_per_lead,
+          0 as report_days,
+          NULL as last_active_date,
+          c.created_at as first_active_date,
+          'without_reports' as data_source
+        FROM campaigns c
+        LEFT JOIN campaign_types ct ON c.campaign_type_id = ct.id
+        LEFT JOIN brands b ON c.brand = b.id
+        WHERE c.is_enabled = 1 
+        ${excludeCondition}
+        ${campaignsRoleFilter}
+        ORDER BY c.created_at DESC
+        LIMIT ?
+      `, campaignsParams);
+
+      // Combine both results
+      const allCampaigns = [...campaignsWithReports, ...campaignsWithoutReports];
+
+      return allCampaigns.slice(0, limit).map(campaign => ({
         campaign_id: campaign.campaign_id,
         campaign_name: campaign.campaign_name || 'Unknown Campaign',
         brand: campaign.brand || 'Unknown Brand',
@@ -270,7 +322,9 @@ class DashboardService {
         report_days: parseInt(campaign.report_days) || 0,
         performance_score: this.calculatePerformanceScore(campaign),
         last_active_date: campaign.last_active_date,
-        first_active_date: campaign.first_active_date
+        first_active_date: campaign.first_active_date,
+        data_source: campaign.data_source,
+        status: campaign.data_source === 'with_reports' ? 'Active with Data' : 'New Campaign'
       }));
     } catch (error) {
       console.error('Error fetching top campaigns:', error);

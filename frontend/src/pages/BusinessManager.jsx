@@ -707,6 +707,7 @@ const BusinessManager = () => {
             setEditingBM(null);
           }}
           onSave={handleBMSaved}
+          setMessage={setMessage}
         />
       )}
 
@@ -720,6 +721,7 @@ const BusinessManager = () => {
             setEditingAdsManager(null);
           }}
           onSave={handleAdsManagerSaved}
+          setMessage={setMessage}
         />
       )}
     </>

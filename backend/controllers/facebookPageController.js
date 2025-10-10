@@ -351,11 +351,15 @@ class FacebookPageController {
         }
     }
     
-    // Get Facebook accounts for dropdown
+    // Get Facebook accounts for dropdown (filtered by user)
     static async getFacebookAccountsForDropdown(req, res) {
         try {
-            // Get only enabled Facebook accounts for the dropdown
-            const enabledAccounts = await FacebookAccountModel.getByStatus('enabled');
+            // Get user info from auth middleware
+            const userId = req.user.id;
+            const userRole = req.user.role?.name || 'user';
+            
+            // Get only enabled Facebook accounts for the dropdown (filtered by user)
+            const enabledAccounts = await FacebookAccountModel.getByStatus('enabled', userId, userRole);
             
             // Format for dropdown
             const accountOptions = enabledAccounts.map(account => ({

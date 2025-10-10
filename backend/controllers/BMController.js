@@ -310,10 +310,14 @@ class BMController {
         }
     }
 
-    // Get BMs for dropdown
+    // Get BMs for dropdown (filtered by user)
     static async getForDropdown(req, res) {
         try {
-            const bms = await BMModel.getForDropdown();
+            // Get user info from auth middleware
+            const userId = req.user.id;
+            const userRole = req.user.role?.name || 'user';
+            
+            const bms = await BMModel.getForDropdown(userId, userRole);
 
             return res.status(200).json({
                 success: true,

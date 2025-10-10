@@ -230,7 +230,7 @@ const FacebookAccountForm = ({ account, onClose, onSave, setMessage }) => {
       console.log('✅ [FacebookAccountForm] API Response received:', response.data);
 
       if (response.data.success) {
-        showSuccessMessage(response.data.message);
+        toast.success(response.data.message);
         onSave();
       } else {
         toast.error(response.data.message || 'Failed to save account');

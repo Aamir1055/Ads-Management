@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { X, UserCheck, Save, AlertCircle, Mail, Phone, Building2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { handleAccessDenied, isAccessDeniedError } from '../utils/accessDeniedHandler';
 import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
-const AdsManagerForm = ({ adsManager, selectedBMId, onClose, onSave }) => {
+const AdsManagerForm = ({ adsManager, selectedBMId, onClose, onSave, setMessage }) => {
   const [formData, setFormData] = useState({
     ads_manager_name: '',
     email: '',
@@ -196,7 +197,17 @@ const AdsManagerForm = ({ adsManager, selectedBMId, onClose, onSave }) => {
     } catch (error) {
       console.error('❌ Error saving Ads Manager:', error);
       
-      if (error.response) {
+      // Handle access denied errors first
+      if (isAccessDeniedError(error)) {
+        handleAccessDenied({
+          closeForm: () => {
+            onClose();
+          },
+          setMessage,
+          error,
+          context: 'saving Ads Manager'
+        });
+      } else if (error.response) {
         console.log('📋 Error response data:', error.response.data);
         console.log('📋 Error status:', error.response.status);
         console.log('📋 Error message:', error.response.data.message);
