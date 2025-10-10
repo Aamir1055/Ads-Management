@@ -4,7 +4,7 @@ const { validationResult } = require('express-validator');
 
 class FacebookAccountController {
     
-    // Get all Facebook accounts
+    // Get all Facebook accounts (filtered by user)
     static async getAllAccounts(req, res) {
         try {
             const {
@@ -14,11 +14,17 @@ class FacebookAccountController {
                 search
             } = req.query;
             
+            // Get user info from auth middleware
+            const userId = req.user.id;
+            const userRole = req.user.role?.name || 'user';
+            
             const result = await FacebookAccountModel.getAll(
                 parseInt(page),
                 parseInt(limit),
                 status,
-                search
+                search,
+                userId,
+                userRole
             );
             
             res.status(200).json({
@@ -48,12 +54,16 @@ class FacebookAccountController {
                 });
             }
             
-            const account = await FacebookAccountModel.getById(parseInt(id));
+            // Get user info from auth middleware
+            const userId = req.user.id;
+            const userRole = req.user.role?.name || 'user';
+            
+            const account = await FacebookAccountModel.getById(parseInt(id), userId, userRole);
             
             if (!account) {
                 return res.status(404).json({
                     success: false,
-                    message: 'Facebook account not found'
+                    message: 'Facebook account not found or you do not have permission to access it'
                 });
             }
             
@@ -164,15 +174,18 @@ class FacebookAccountController {
                 });
             }
             
-            // Check if account exists
-            const existingAccount = await FacebookAccountModel.getById(parseInt(id));
+            // Check if account exists and user has permission to update it
+            const userId = req.user.id;
+            const userRole = req.user.role?.name || 'user';
+            
+            const existingAccount = await FacebookAccountModel.getById(parseInt(id), userId, userRole);
             if (!existingAccount) {
                 if (req.file) {
                     deleteUploadedFile(req.file.path);
                 }
                 return res.status(404).json({
                     success: false,
-                    message: 'Facebook account not found'
+                    message: 'Facebook account not found or you do not have permission to update it'
                 });
             }
             
@@ -242,12 +255,15 @@ class FacebookAccountController {
                 });
             }
             
-            // Check if account exists and get image path for deletion
-            const existingAccount = await FacebookAccountModel.getById(parseInt(id));
+            // Check if account exists and user has permission to delete it
+            const userId = req.user.id;
+            const userRole = req.user.role?.name || 'user';
+            
+            const existingAccount = await FacebookAccountModel.getById(parseInt(id), userId, userRole);
             if (!existingAccount) {
                 return res.status(404).json({
                     success: false,
-                    message: 'Facebook account not found'
+                    message: 'Facebook account not found or you do not have permission to delete it'
                 });
             }
             
@@ -279,7 +295,7 @@ class FacebookAccountController {
         }
     }
     
-    // Get accounts by status
+    // Get accounts by status (filtered by user)
     static async getAccountsByStatus(req, res) {
         try {
             const { status } = req.params;
@@ -291,7 +307,11 @@ class FacebookAccountController {
                 });
             }
             
-            const accounts = await FacebookAccountModel.getByStatus(status);
+            // Get user info from auth middleware
+            const userId = req.user.id;
+            const userRole = req.user.role?.name || 'user';
+            
+            const accounts = await FacebookAccountModel.getByStatus(status, userId, userRole);
             
             res.status(200).json({
                 success: true,
@@ -320,11 +340,15 @@ class FacebookAccountController {
                 });
             }
             
-            const existingAccount = await FacebookAccountModel.getById(parseInt(id));
+            // Check if account exists and user has permission to toggle it
+            const userId = req.user.id;
+            const userRole = req.user.role?.name || 'user';
+            
+            const existingAccount = await FacebookAccountModel.getById(parseInt(id), userId, userRole);
             if (!existingAccount) {
                 return res.status(404).json({
                     success: false,
-                    message: 'Facebook account not found'
+                    message: 'Facebook account not found or you do not have permission to modify it'
                 });
             }
             
@@ -350,13 +374,17 @@ class FacebookAccountController {
         }
     }
     
-    // Get account statistics
+    // Get account statistics (filtered by user)
     static async getAccountStats(req, res) {
         try {
+            // Get user info from auth middleware
+            const userId = req.user.id;
+            const userRole = req.user.role?.name || 'user';
+            
             const [enabledAccounts, disabledAccounts, suspendedAccounts] = await Promise.all([
-                FacebookAccountModel.getByStatus('enabled'),
-                FacebookAccountModel.getByStatus('disabled'),
-                FacebookAccountModel.getByStatus('suspended_temporarily')
+                FacebookAccountModel.getByStatus('enabled', userId, userRole),
+                FacebookAccountModel.getByStatus('disabled', userId, userRole),
+                FacebookAccountModel.getByStatus('suspended_temporarily', userId, userRole)
             ]);
             
             const totalAccounts = enabledAccounts.length + disabledAccounts.length + suspendedAccounts.length;

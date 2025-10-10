@@ -29,33 +29,31 @@ class SafeDashboardService {
    */
   async safeApiCall(endpoint, options = {}) {
     try {
-      console.log(`SafeDashboard: Making API call to ${endpoint}`);
       const axiosInstance = this.createAxiosInstance();
-      
       const response = await axiosInstance.get(endpoint, options);
       
       if (response.data.success) {
-        console.log(`SafeDashboard: API call to ${endpoint} successful`);
         return response.data;
       } else {
         throw new Error(response.data.message || 'API call failed');
       }
     } catch (error) {
-      console.error(`SafeDashboard: API call to ${endpoint} failed:`, error.message);
-      
-      // Handle specific error cases WITHOUT redirecting
+      // Handle specific error cases WITHOUT redirecting or showing confusing errors
       if (error.response?.status === 401) {
-        console.warn('SafeDashboard: Authentication failed but NOT redirecting to prevent loops');
-        throw new Error('Authentication required - please refresh the page');
+        // Silent handling for auth errors - user might just need to refresh
+        throw new Error('Please refresh the page to reload your session');
       }
       
       if (error.response?.status === 403) {
-        console.warn('SafeDashboard: Access forbidden');
-        throw new Error('Access denied');
+        throw new Error('You don\'t have permission to view this data');
       }
       
-      // For other errors, just throw them
-      throw new Error(error.response?.data?.message || error.message || 'Network error');
+      // For other errors, provide user-friendly messages
+      if (error.code === 'ECONNREFUSED' || error.message.includes('Network Error')) {
+        throw new Error('Unable to connect to server. Please check if the backend is running.');
+      }
+      
+      throw new Error(error.response?.data?.message || 'Unable to load dashboard data');
     }
   }
 
@@ -109,7 +107,17 @@ class SafeDashboardService {
       const response = await this.createAxiosInstance().get('/summary');
       return { success: true, message: 'API connection successful' };
     } catch (error) {
-      return { success: false, message: error.message };
+      // Provide user-friendly error messages
+      if (error.response?.status === 401) {
+        return { success: false, message: 'Session expired. Please refresh the page.' };
+      }
+      if (error.response?.status === 403) {
+        return { success: false, message: 'Access denied. You may not have permission to view dashboard data.' };
+      }
+      if (error.code === 'ECONNREFUSED' || error.message.includes('Network Error')) {
+        return { success: false, message: 'Cannot connect to server. Please check if the backend is running.' };
+      }
+      return { success: false, message: 'Unable to connect to dashboard service.' };
     }
   }
 

@@ -2,8 +2,8 @@ const { pool } = require('../config/database');
 
 class FacebookPageModel {
     
-    // Get all Facebook pages with pagination, filtering, and account info
-    static async getAll(page = 1, limit = 10, status = null, search = null, accountId = null) {
+    // Get all Facebook pages with pagination, filtering, and account info (filtered by user)
+    static async getAll(page = 1, limit = 10, status = null, search = null, accountId = null, userId = null, userRole = null) {
         try {
             const offset = (page - 1) * limit;
             let query = `
@@ -24,6 +24,12 @@ class FacebookPageModel {
             
             const conditions = [];
             const params = [];
+            
+            // Filter by user - only show pages linked to Facebook accounts created by the current user (unless super admin)
+            if (userRole !== 'super_admin' && userId) {
+                conditions.push('fa.created_by = ?');
+                params.push(userId);
+            }
             
             if (status) {
                 conditions.push('fp.status = ?');

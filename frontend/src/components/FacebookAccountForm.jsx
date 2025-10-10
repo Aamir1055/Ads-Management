@@ -14,11 +14,12 @@ import {
   Shield
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { handleAccessDenied, isAccessDeniedError } from '../utils/accessDeniedHandler';
 import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
-const FacebookAccountForm = ({ account, onClose, onSave }) => {
+const FacebookAccountForm = ({ account, onClose, onSave, setMessage }) => {
   const [formData, setFormData] = useState({
     email: account?.email || '',
     password: '',
@@ -229,7 +230,7 @@ const FacebookAccountForm = ({ account, onClose, onSave }) => {
       console.log('✅ [FacebookAccountForm] API Response received:', response.data);
 
       if (response.data.success) {
-        toast.success(response.data.message);
+        showSuccessMessage(response.data.message);
         onSave();
       } else {
         toast.error(response.data.message || 'Failed to save account');
@@ -242,15 +243,26 @@ const FacebookAccountForm = ({ account, onClose, onSave }) => {
         data: error.response?.data
       });
       
-      if (error.response?.data?.errors) {
-        // Handle validation errors from backend
+      // Handle access denied errors first
+      if (isAccessDeniedError(error)) {
+        handleAccessDenied({
+          closeForm: () => {
+            onClose();
+          },
+          setMessage,
+          error,
+          context: 'saving Facebook account'
+        });
+      } else if (error.response?.data?.errors) {
+        // Handle validation errors
         const backendErrors = {};
         error.response.data.errors.forEach(err => {
-          backendErrors[err.path || err.param] = err.msg;
+          backendErrors[err.path || err.param || err.field] = err.msg || err.message;
         });
         setErrors(backendErrors);
         toast.error('Please fix the validation errors');
       } else {
+        // Handle other types of errors
         toast.error(error.response?.data?.message || 'Failed to save account');
       }
     } finally {

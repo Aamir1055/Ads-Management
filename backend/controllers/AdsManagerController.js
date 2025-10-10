@@ -2,7 +2,7 @@ const AdsManagerModel = require('../models/AdsManagerModel');
 const { body, validationResult, param } = require('express-validator');
 
 class AdsManagerController {
-    // Get all Ads Managers
+    // Get all Ads Managers (filtered by user)
     static async getAll(req, res) {
         try {
             const {
@@ -15,6 +15,10 @@ class AdsManagerController {
                 sortOrder = 'DESC'
             } = req.query;
 
+            // Get user info from auth middleware
+            const userId = req.user.id;
+            const userRole = req.user.role?.name || 'user';
+
             const result = await AdsManagerModel.getAll({
                 page: parseInt(page),
                 limit: parseInt(limit),
@@ -22,7 +26,9 @@ class AdsManagerController {
                 status,
                 bm_id: bm_id ? parseInt(bm_id) : '',
                 sortBy,
-                sortOrder: sortOrder.toUpperCase()
+                sortOrder: sortOrder.toUpperCase(),
+                userId,
+                userRole
             });
 
             return res.status(200).json({

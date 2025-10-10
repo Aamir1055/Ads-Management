@@ -1,14 +1,16 @@
 const { pool } = require('../config/database');
 
 class BMModel {
-    // Get all BMs with pagination, filtering, and search
+    // Get all BMs with pagination, filtering, and search (filtered by user)
     static async getAll({ 
         page = 1, 
         limit = 10, 
         search = '', 
         status = '', 
         sortBy = 'created_at', 
-        sortOrder = 'DESC' 
+        sortOrder = 'DESC',
+        userId = null,
+        userRole = null
     } = {}) {
         try {
             const offset = (page - 1) * limit;
@@ -16,7 +18,14 @@ class BMModel {
             let queryParams = [];
             
             // Debug logging
-            console.log('🔍 BMModel.getAll params:', { page, limit, search, status, sortBy, sortOrder });
+            console.log('🔍 BMModel.getAll params:', { page, limit, search, status, sortBy, sortOrder, userId, userRole });
+            
+            // Filter by user - only show BMs created by the current user (unless super admin)
+            if (userRole !== 'super_admin' && userId) {
+                whereConditions.push('bm.created_by = ?');
+                queryParams.push(userId);
+                console.log('🔎 User filter applied:', userId);
+            }
             
             // Search functionality
             if (search) {
@@ -82,10 +91,10 @@ class BMModel {
         }
     }
     
-    // Get BM by ID
-    static async getById(id) {
+    // Get BM by ID (with user filtering)
+    static async getById(id, userId = null, userRole = null) {
         try {
-            const query = `
+            let query = `
                 SELECT 
                     bm.id,
                     bm.bm_name,
@@ -104,7 +113,15 @@ class BMModel {
                 WHERE bm.id = ?
             `;
             
-            const [rows] = await pool.query(query, [id]);
+            const params = [id];
+            
+            // Filter by user - only allow access to BMs created by the current user (unless super admin)
+            if (userRole !== 'super_admin' && userId) {
+                query += ' AND bm.created_by = ?';
+                params.push(userId);
+            }
+            
+            const [rows] = await pool.query(query, params);
             return rows.length > 0 ? rows[0] : null;
         } catch (error) {
             console.error('Error in BMModel.getById:', error);
@@ -237,10 +254,10 @@ class BMModel {
         }
     }
     
-    // Get BM stats
-    static async getStats() {
+    // Get BM stats (filtered by user)
+    static async getStats(userId = null, userRole = null) {
         try {
-            const query = `
+            let query = `
                 SELECT 
                     COUNT(*) as total,
                     COUNT(CASE WHEN status = 'enabled' THEN 1 END) as enabled,
@@ -249,7 +266,15 @@ class BMModel {
                 FROM bm
             `;
             
-            const [rows] = await pool.query(query);
+            const params = [];
+            
+            // Filter by user - only count BMs created by the current user (unless super admin)
+            if (userRole !== 'super_admin' && userId) {
+                query += ' WHERE created_by = ?';
+                params.push(userId);
+            }
+            
+            const [rows] = await pool.query(query, params);
             return rows[0];
         } catch (error) {
             console.error('Error in BMModel.getStats:', error);
@@ -276,17 +301,26 @@ class BMModel {
         }
     }
     
-    // Get BMs for dropdown (enabled only)
-    static async getForDropdown() {
+    // Get BMs for dropdown (enabled only, filtered by user)
+    static async getForDropdown(userId = null, userRole = null) {
         try {
-            const query = `
+            let query = `
                 SELECT id, bm_name, email 
                 FROM bm 
-                WHERE status = 'enabled' 
-                ORDER BY bm_name ASC
+                WHERE status = 'enabled'
             `;
             
-            const [rows] = await pool.query(query);
+            const params = [];
+            
+            // Filter by user - only show BMs created by the current user (unless super admin)
+            if (userRole !== 'super_admin' && userId) {
+                query += ' AND created_by = ?';
+                params.push(userId);
+            }
+            
+            query += ' ORDER BY bm_name ASC';
+            
+            const [rows] = await pool.query(query, params);
             return rows;
         } catch (error) {
             console.error('Error in BMModel.getForDropdown:', error);

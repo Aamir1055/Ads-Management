@@ -469,7 +469,7 @@ class DashboardService {
         FROM reports 
         WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
         ${roleFilter}
-      `);
+      `, params);
 
       const today = todayStats[0];
       const yesterday = yesterdayStats[0];

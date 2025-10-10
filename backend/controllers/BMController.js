@@ -2,7 +2,7 @@ const BMModel = require('../models/BMModel');
 const { body, validationResult, param } = require('express-validator');
 
 class BMController {
-    // Get all BMs
+    // Get all BMs (filtered by user)
     static async getAll(req, res) {
         try {
             const {
@@ -14,9 +14,13 @@ class BMController {
                 sortOrder = 'DESC'
             } = req.query;
 
+            // Get user info from auth middleware
+            const userId = req.user.id;
+            const userRole = req.user.role?.name || 'user';
+
             // Debug logging
             console.log('🔍 BM getAll called with params:', {
-                page, limit, search, status, sortBy, sortOrder
+                page, limit, search, status, sortBy, sortOrder, userId, userRole
             });
 
             const result = await BMModel.getAll({
@@ -25,7 +29,9 @@ class BMController {
                 search,
                 status,
                 sortBy,
-                sortOrder: sortOrder.toUpperCase()
+                sortOrder: sortOrder.toUpperCase(),
+                userId,
+                userRole
             });
 
             return res.status(200).json({
@@ -57,12 +63,16 @@ class BMController {
                 });
             }
 
-            const bm = await BMModel.getById(parseInt(id));
+            // Get user info from auth middleware
+            const userId = req.user.id;
+            const userRole = req.user.role?.name || 'user';
+
+            const bm = await BMModel.getById(parseInt(id), userId, userRole);
 
             if (!bm) {
                 return res.status(404).json({
                     success: false,
-                    message: 'BM not found',
+                    message: 'BM not found or you do not have permission to access it',
                     timestamp: new Date().toISOString()
                 });
             }

@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import FacebookPageForm from '../components/FacebookPageForm';
 import { toast } from 'react-hot-toast';
+import { handleAccessDenied, isAccessDeniedError } from '../utils/accessDeniedHandler';
 import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -41,6 +42,7 @@ const FacebookPages = () => {
   const [itemsPerPage] = useState(10);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
   const [facebookAccounts, setFacebookAccounts] = useState([]);
+  const [message, setMessage] = useState(null);
 
   // Get auth token
   const getAuthToken = () => {
@@ -64,7 +66,18 @@ const FacebookPages = () => {
         setFacebookAccounts(response.data.data || []);
       }
     } catch (error) {
-      console.error('Error fetching Facebook accounts:', error);
+      if (isAccessDeniedError(error)) {
+        handleAccessDenied({
+          closeForm: () => {
+            // No form to close for data fetching
+          },
+          setMessage,
+          error,
+          context: 'loading Facebook accounts'
+        });
+      } else {
+        console.error('Error fetching Facebook accounts:', error);
+      }
     }
   };
 
@@ -92,8 +105,19 @@ const FacebookPages = () => {
         toast.error('Failed to fetch Facebook pages');
       }
     } catch (error) {
-      console.error('Error fetching pages:', error);
-      toast.error(error.response?.data?.message || 'Failed to fetch pages');
+      if (isAccessDeniedError(error)) {
+        handleAccessDenied({
+          closeForm: () => {
+            // No form to close for data fetching
+          },
+          setMessage,
+          error,
+          context: 'loading Facebook pages'
+        });
+      } else {
+        console.error('Error fetching pages:', error);
+        toast.error(error.response?.data?.message || 'Failed to fetch pages');
+      }
     } finally {
       setLoading(false);
     }
@@ -156,8 +180,18 @@ const FacebookPages = () => {
         toast.error('Failed to toggle page status');
       }
     } catch (error) {
-      console.error('Error toggling status:', error);
-      toast.error(error.response?.data?.message || 'Failed to toggle status');
+      if (isAccessDeniedError(error)) {
+        handleAccessDenied({
+          closeForm: () => {
+            // No form to close for toggle, but could clear selections if needed
+          },
+          setMessage,
+          error,
+          context: 'updating Facebook page status'
+        });
+      } else {
+        toast.error(error.response?.data?.message || 'Failed to toggle page status');
+      }
     }
   };
 
@@ -174,8 +208,18 @@ const FacebookPages = () => {
         toast.error('Failed to delete page');
       }
     } catch (error) {
-      console.error('Error deleting page:', error);
-      toast.error(error.response?.data?.message || 'Failed to delete page');
+      if (isAccessDeniedError(error)) {
+        handleAccessDenied({
+          closeForm: () => {
+            setShowDeleteConfirm(null);
+          },
+          setMessage,
+          error,
+          context: 'deleting Facebook page'
+        });
+      } else {
+        toast.error(error.response?.data?.message || 'Failed to delete page');
+      }
     }
   };
 
@@ -339,6 +383,37 @@ const FacebookPages = () => {
           </div>
         </div>
       </div>
+
+      {/* Access Denied Message */}
+      {message && message.type === 'error' && message.isAccessDenied && (
+        <div className="mb-6 bg-red-100 border-2 border-red-300 shadow-lg rounded-lg p-4">
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3 flex-1">
+              <h3 className="text-sm font-medium text-red-800">Access Denied</h3>
+              <p className="mt-1 text-sm text-red-700">{message.content}</p>
+              <div className="mt-3 flex space-x-3">
+                <button
+                  onClick={() => window.location.reload()}
+                  className="bg-red-600 text-white px-4 py-2 rounded text-sm hover:bg-red-700"
+                >
+                  Refresh Page
+                </button>
+                <button
+                  onClick={() => setMessage(null)}
+                  className="bg-gray-600 text-white px-4 py-2 rounded text-sm hover:bg-gray-700"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="mb-6 bg-white p-4 rounded-lg shadow">
@@ -542,6 +617,7 @@ const FacebookPages = () => {
             setEditingPage(null);
           }}
           onSave={handlePageSaved}
+          setMessage={setMessage}
         />
       )}
 

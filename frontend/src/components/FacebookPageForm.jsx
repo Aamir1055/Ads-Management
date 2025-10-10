@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { X, FileText, Save, AlertCircle, CheckCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { handleAccessDenied, isAccessDeniedError } from '../utils/accessDeniedHandler';
 import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
-const FacebookPageForm = ({ page, onClose, onSave }) => {
+const FacebookPageForm = ({ page, onClose, onSave, setMessage }) => {
   const [formData, setFormData] = useState({
     facebook_account_id: '',
     page_name: '',
@@ -172,7 +173,17 @@ const FacebookPageForm = ({ page, onClose, onSave }) => {
     } catch (error) {
       console.error('❌ Error saving page:', error);
       
-      if (error.response) {
+      // Handle access denied errors first
+      if (isAccessDeniedError(error)) {
+        handleAccessDenied({
+          closeForm: () => {
+            onClose();
+          },
+          setMessage,
+          error,
+          context: 'saving Facebook page'
+        });
+      } else if (error.response) {
         console.log('📋 Error response data:', error.response.data);
         console.log('📋 Error status:', error.response.status);
         

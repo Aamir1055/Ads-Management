@@ -1,7 +1,7 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const AdsManagerController = require('../controllers/AdsManagerController');
-const { authenticateToken } = require('../middleware/authMiddleware');
+const { authenticateToken, requirePermission } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
@@ -37,28 +37,40 @@ router.use(authenticateToken);
 router.use(generalLimiter);
 
 // GET /api/ads-managers - Get all Ads Managers with pagination and filtering
-router.get('/', AdsManagerController.getAll);
+router.get('/', 
+    requirePermission('ads_manager_view'),
+    AdsManagerController.getAll
+);
 
 // GET /api/ads-managers/stats - Get Ads Manager statistics
-router.get('/stats', AdsManagerController.getStats);
+router.get('/stats', 
+    requirePermission('ads_manager_view'),
+    AdsManagerController.getStats
+);
 
 // GET /api/ads-managers/stats-by-bm - Get Ads Manager statistics grouped by BM
-router.get('/stats-by-bm', AdsManagerController.getStatsByBM);
+router.get('/stats-by-bm', 
+    requirePermission('ads_manager_view'),
+    AdsManagerController.getStatsByBM
+);
 
 // GET /api/ads-managers/bm/:bm_id - Get Ads Managers by BM ID
 router.get('/bm/:bm_id',
+    requirePermission('ads_manager_view'),
     AdsManagerController.getValidationRules().getByBMId,
     AdsManagerController.getByBMId
 );
 
 // GET /api/ads-managers/:id - Get Ads Manager by ID
 router.get('/:id', 
+    requirePermission('ads_manager_view'),
     AdsManagerController.getValidationRules().getById,
     AdsManagerController.getById
 );
 
 // POST /api/ads-managers - Create new Ads Manager
 router.post('/',
+    requirePermission('ads_manager_create'),
     createUpdateLimiter,
     AdsManagerController.getValidationRules().create,
     AdsManagerController.create
@@ -66,6 +78,7 @@ router.post('/',
 
 // PUT /api/ads-managers/:id - Update Ads Manager
 router.put('/:id',
+    requirePermission('ads_manager_update'),
     createUpdateLimiter,
     AdsManagerController.getValidationRules().update,
     AdsManagerController.update
@@ -73,6 +86,7 @@ router.put('/:id',
 
 // DELETE /api/ads-managers/:id - Delete Ads Manager
 router.delete('/:id',
+    requirePermission('ads_manager_delete'),
     createUpdateLimiter,
     AdsManagerController.getValidationRules().delete,
     AdsManagerController.delete
@@ -80,6 +94,7 @@ router.delete('/:id',
 
 // PATCH /api/ads-managers/:id/toggle-status - Toggle Ads Manager status
 router.patch('/:id/toggle-status',
+    requirePermission('ads_manager_update'),
     createUpdateLimiter,
     AdsManagerController.getValidationRules().toggleStatus,
     AdsManagerController.toggleStatus

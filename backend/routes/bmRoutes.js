@@ -1,7 +1,7 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const BMController = require('../controllers/BMController');
-const { authenticateToken } = require('../middleware/authMiddleware');
+const { authenticateToken, requirePermission } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
@@ -37,22 +37,33 @@ router.use(authenticateToken);
 router.use(generalLimiter);
 
 // GET /api/bm - Get all BMs with pagination and filtering
-router.get('/', BMController.getAll);
+router.get('/', 
+    requirePermission('business_manager_view'),
+    BMController.getAll
+);
 
 // GET /api/bm/stats - Get BM statistics
-router.get('/stats', BMController.getStats);
+router.get('/stats', 
+    requirePermission('business_manager_view'),
+    BMController.getStats
+);
 
 // GET /api/bm/dropdown - Get BMs for dropdown (enabled only)
-router.get('/dropdown', BMController.getForDropdown);
+router.get('/dropdown', 
+    requirePermission('business_manager_view'),
+    BMController.getForDropdown
+);
 
 // GET /api/bm/:id - Get BM by ID
 router.get('/:id', 
+    requirePermission('business_manager_view'),
     BMController.getValidationRules().getById,
     BMController.getById
 );
 
 // POST /api/bm - Create new BM
 router.post('/',
+    requirePermission('business_manager_create'),
     createUpdateLimiter,
     BMController.getValidationRules().create,
     BMController.create
@@ -60,6 +71,7 @@ router.post('/',
 
 // PUT /api/bm/:id - Update BM
 router.put('/:id',
+    requirePermission('business_manager_update'),
     createUpdateLimiter,
     BMController.getValidationRules().update,
     BMController.update
@@ -67,6 +79,7 @@ router.put('/:id',
 
 // DELETE /api/bm/:id - Delete BM
 router.delete('/:id',
+    requirePermission('business_manager_delete'),
     createUpdateLimiter,
     BMController.getValidationRules().delete,
     BMController.delete
@@ -74,6 +87,7 @@ router.delete('/:id',
 
 // PATCH /api/bm/:id/toggle-status - Toggle BM status
 router.patch('/:id/toggle-status',
+    requirePermission('business_manager_update'),
     createUpdateLimiter,
     BMController.getValidationRules().toggleStatus,
     BMController.toggleStatus

@@ -1,7 +1,7 @@
 const { pool } = require('../config/database');
 
 class AdsManagerModel {
-    // Get all Ads Managers with pagination, filtering, and search
+    // Get all Ads Managers with pagination, filtering, and search (filtered by user)
     static async getAll({ 
         page = 1, 
         limit = 10, 
@@ -9,12 +9,20 @@ class AdsManagerModel {
         status = '', 
         bm_id = '',
         sortBy = 'created_at', 
-        sortOrder = 'DESC' 
+        sortOrder = 'DESC',
+        userId = null,
+        userRole = null
     } = {}) {
         try {
             const offset = (page - 1) * limit;
             let whereConditions = [];
             let queryParams = [];
+            
+            // Filter by user - only show Ads Managers created by the current user (unless super admin)
+            if (userRole !== 'super_admin' && userId) {
+                whereConditions.push('am.created_by = ?');
+                queryParams.push(userId);
+            }
             
             // Search functionality
             if (search) {

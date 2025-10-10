@@ -20,6 +20,7 @@ import {
 import BMForm from '../components/BMForm';
 import AdsManagerForm from '../components/AdsManagerForm';
 import { toast } from 'react-hot-toast';
+import { handleAccessDenied, isAccessDeniedError } from '../utils/accessDeniedHandler';
 import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -36,6 +37,7 @@ const BusinessManager = () => {
   const [editingAdsManager, setEditingAdsManager] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [message, setMessage] = useState(null);
 
   // Get auth token
   const getAuthToken = () => {
@@ -77,8 +79,19 @@ const BusinessManager = () => {
         toast.error('Failed to fetch Business Managers');
       }
     } catch (error) {
-      console.error('Error fetching BMs:', error);
-      toast.error(error.response?.data?.message || 'Failed to fetch BMs');
+      if (isAccessDeniedError(error)) {
+        handleAccessDenied({
+          closeForm: () => {
+            // No form to close for data fetching
+          },
+          setMessage,
+          error,
+          context: 'loading Business Managers'
+        });
+      } else {
+        console.error('Error fetching BMs:', error);
+        toast.error(error.response?.data?.message || 'Failed to fetch BMs');
+      }
     } finally {
       setLoading(false);
     }
@@ -101,8 +114,19 @@ const BusinessManager = () => {
         toast.error('Failed to fetch Ads Managers');
       }
     } catch (error) {
-      console.error('Error fetching Ads Managers:', error);
-      toast.error(error.response?.data?.message || 'Failed to fetch Ads Managers');
+      if (isAccessDeniedError(error)) {
+        handleAccessDenied({
+          closeForm: () => {
+            // No form to close for data fetching
+          },
+          setMessage,
+          error,
+          context: 'loading Ads Managers'
+        });
+      } else {
+        console.error('Error fetching Ads Managers:', error);
+        toast.error(error.response?.data?.message || 'Failed to fetch Ads Managers');
+      }
     } finally {
       setAdsManagersLoading(false);
     }
@@ -174,8 +198,19 @@ const BusinessManager = () => {
         toast.error('Failed to toggle BM status');
       }
     } catch (error) {
-      console.error('Error toggling BM status:', error);
-      toast.error(error.response?.data?.message || 'Failed to toggle status');
+      if (isAccessDeniedError(error)) {
+        handleAccessDenied({
+          closeForm: () => {
+            // No form to close for toggle
+          },
+          setMessage,
+          error,
+          context: 'updating Business Manager status'
+        });
+      } else {
+        console.error('Error toggling BM status:', error);
+        toast.error(error.response?.data?.message || 'Failed to toggle status');
+      }
     }
   };
 
@@ -193,8 +228,19 @@ const BusinessManager = () => {
         toast.error('Failed to toggle Ads Manager status');
       }
     } catch (error) {
-      console.error('Error toggling Ads Manager status:', error);
-      toast.error(error.response?.data?.message || 'Failed to toggle status');
+      if (isAccessDeniedError(error)) {
+        handleAccessDenied({
+          closeForm: () => {
+            // No form to close for toggle
+          },
+          setMessage,
+          error,
+          context: 'updating Ads Manager status'
+        });
+      } else {
+        console.error('Error toggling Ads Manager status:', error);
+        toast.error(error.response?.data?.message || 'Failed to toggle status');
+      }
     }
   };
 
@@ -218,8 +264,19 @@ const BusinessManager = () => {
         toast.error('Failed to delete BM');
       }
     } catch (error) {
-      console.error('Error deleting BM:', error);
-      toast.error(error.response?.data?.message || 'Failed to delete BM');
+      if (isAccessDeniedError(error)) {
+        handleAccessDenied({
+          closeForm: () => {
+            // No form to close for delete
+          },
+          setMessage,
+          error,
+          context: 'deleting Business Manager'
+        });
+      } else {
+        console.error('Error deleting BM:', error);
+        toast.error(error.response?.data?.message || 'Failed to delete BM');
+      }
     }
   };
 
@@ -241,8 +298,19 @@ const BusinessManager = () => {
         toast.error('Failed to delete Ads Manager');
       }
     } catch (error) {
-      console.error('Error deleting Ads Manager:', error);
-      toast.error(error.response?.data?.message || 'Failed to delete Ads Manager');
+      if (isAccessDeniedError(error)) {
+        handleAccessDenied({
+          closeForm: () => {
+            // No form to close for delete
+          },
+          setMessage,
+          error,
+          context: 'deleting Ads Manager'
+        });
+      } else {
+        console.error('Error deleting Ads Manager:', error);
+        toast.error(error.response?.data?.message || 'Failed to delete Ads Manager');
+      }
     }
   };
 
@@ -300,6 +368,37 @@ const BusinessManager = () => {
 
   return (
     <>
+      {/* Access Denied Message */}
+      {message && message.type === 'error' && message.isAccessDenied && (
+        <div className="bg-red-100 border-2 border-red-300 shadow-lg rounded-lg p-4 m-4">
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3 flex-1">
+              <h3 className="text-sm font-medium text-red-800">Access Denied</h3>
+              <p className="mt-1 text-sm text-red-700">{message.content}</p>
+              <div className="mt-3 flex space-x-3">
+                <button
+                  onClick={() => window.location.reload()}
+                  className="bg-red-600 text-white px-4 py-2 rounded text-sm hover:bg-red-700"
+                >
+                  Refresh Page
+                </button>
+                <button
+                  onClick={() => setMessage(null)}
+                  className="bg-gray-600 text-white px-4 py-2 rounded text-sm hover:bg-gray-700"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex h-screen bg-gray-50">
         {/* Left Panel - Business Managers */}
         <div className="w-1/3 bg-white border-r border-gray-200 flex flex-col">

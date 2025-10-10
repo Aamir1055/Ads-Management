@@ -3,8 +3,8 @@ const bcrypt = require('bcryptjs');
 
 class FacebookAccountModel {
     
-    // Get all Facebook accounts with pagination and filtering
-    static async getAll(page = 1, limit = 10, status = null, search = null) {
+    // Get all Facebook accounts with pagination and filtering (filtered by user)
+    static async getAll(page = 1, limit = 10, status = null, search = null, userId = null, userRole = null) {
         try {
             const offset = (page - 1) * limit;
             let query = `
@@ -23,6 +23,12 @@ class FacebookAccountModel {
             
             const conditions = [];
             const params = [];
+            
+            // Filter by user - only show accounts created by the current user (unless super admin)
+            if (userRole !== 'super_admin' && userId) {
+                conditions.push('fa.created_by = ?');
+                params.push(userId);
+            }
             
             if (status) {
                 conditions.push('fa.status = ?');
@@ -46,15 +52,26 @@ class FacebookAccountModel {
             // Get total count for pagination
             let countQuery = 'SELECT COUNT(*) as total FROM facebook_accounts fa';
             const countParams = [];
+            const countConditions = [];
+            
+            // Filter by user - only count accounts created by the current user (unless super admin)
+            if (userRole !== 'super_admin' && userId) {
+                countConditions.push('fa.created_by = ?');
+                countParams.push(userId);
+            }
             
             if (status) {
-                countQuery += ' WHERE fa.status = ?';
+                countConditions.push('fa.status = ?');
                 countParams.push(status);
             }
             
             if (search) {
-                countQuery += (status ? ' AND' : ' WHERE') + ' (fa.email LIKE ? OR fa.phone_number LIKE ?)';
+                countConditions.push('(fa.email LIKE ? OR fa.phone_number LIKE ?)');
                 countParams.push(`%${search}%`, `%${search}%`);
+            }
+            
+            if (countConditions.length > 0) {
+                countQuery += ' WHERE ' + countConditions.join(' AND ');
             }
             
             const [countResult] = await pool.query(countQuery, countParams);
@@ -78,10 +95,10 @@ class FacebookAccountModel {
         }
     }
     
-    // Get Facebook account by ID
-    static async getById(id) {
+    // Get Facebook account by ID (with user filtering)
+    static async getById(id, userId = null, userRole = null) {
         try {
-            const query = `
+            let query = `
                 SELECT 
                     fa.id, 
                     fa.email, 
@@ -96,7 +113,15 @@ class FacebookAccountModel {
                 WHERE fa.id = ?
             `;
             
-            const [rows] = await pool.query(query, [id]);
+            const params = [id];
+            
+            // Filter by user - only allow access to accounts created by the current user (unless super admin)
+            if (userRole !== 'super_admin' && userId) {
+                query += ' AND fa.created_by = ?';
+                params.push(userId);
+            }
+            
+            const [rows] = await pool.query(query, params);
             
             if (rows.length === 0) {
                 return null;
@@ -244,10 +269,10 @@ class FacebookAccountModel {
         }
     }
     
-    // Get accounts by status
-    static async getByStatus(status) {
+    // Get accounts by status (filtered by user)
+    static async getByStatus(status, userId = null, userRole = null) {
         try {
-            const query = `
+            let query = `
                 SELECT 
                     fa.id, 
                     fa.email, 
@@ -260,10 +285,19 @@ class FacebookAccountModel {
                     fa.updated_at
                 FROM facebook_accounts fa
                 WHERE fa.status = ?
-                ORDER BY fa.created_at DESC
             `;
             
-            const [accounts] = await pool.query(query, [status]);
+            const params = [status];
+            
+            // Filter by user - only show accounts created by the current user (unless super admin)
+            if (userRole !== 'super_admin' && userId) {
+                query += ' AND fa.created_by = ?';
+                params.push(userId);
+            }
+            
+            query += ' ORDER BY fa.created_at DESC';
+            
+            const [accounts] = await pool.query(query, params);
             
             return accounts.map(account => ({
                 ...account,

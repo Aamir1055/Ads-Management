@@ -77,7 +77,6 @@ const Dashboard = () => {
 
   // Load data for specific tab - SAFE VERSION
   const loadTabData = useCallback(async (tab) => {
-    console.log(`SafeDashboard: Loading data for ${tab} tab...`);
     try {
       setLoading(prev => ({ ...prev, [tab]: true }));
       setError(null); // Clear any previous errors
@@ -91,10 +90,8 @@ const Dashboard = () => {
             const realtime = await safeDashboardService.getRealTimeMetrics();
             if (realtime?.data) {
               setRealTimeData(realtime.data);
-              console.log('SafeDashboard: Real-time data loaded');
             }
           } catch (realtimeErr) {
-            console.log('SafeDashboard: Real-time data not available:', realtimeErr.message);
             // Not a critical error, continue without real-time data
           }
           break;
@@ -110,28 +107,29 @@ const Dashboard = () => {
       
       if (data?.data) {
         setDashboardData(prev => ({ ...prev, [tab]: data.data }));
-        console.log(`SafeDashboard: ${tab} data loaded successfully:`, data.data);
         
-        // Debug: Log the structure to understand available fields
-        if (tab === 'overview') {
-          console.log('SafeDashboard: Overview data structure:', {
-            fullData: data.data,
-            campaigns: data.data?.campaigns,
-            performance: data.data?.performance,
-            todayFields: Object.keys(data.data || {}).filter(key => key.toLowerCase().includes('today')),
-            allFields: Object.keys(data.data || {})
-          });
+        // Show success message only if there's actual data
+        const hasData = Object.values(data.data).some(value => 
+          (typeof value === 'object' && Object.values(value).some(v => v > 0)) ||
+          (typeof value === 'number' && value > 0)
+        );
+        
+        if (hasData) {
+          toast.success(`${tab.charAt(0).toUpperCase() + tab.slice(1)} data loaded`);
         }
-        
-        toast.success(`${tab} data loaded successfully`);
       } else {
-        console.warn(`SafeDashboard: No data received for ${tab}`);
-        setError(`No data available for ${tab}`);
+        // Don't show error for empty data - it's normal for new users
+        setDashboardData(prev => ({ ...prev, [tab]: {} }));
       }
     } catch (err) {
-      console.error(`SafeDashboard: Failed to load ${tab} data:`, err.message);
-      setError(`Failed to load ${tab} data: ${err.message}`);
-      toast.error(`Failed to load ${tab} data`);
+      // Handle specific error types
+      if (err.message.includes('refresh') || err.message.includes('session')) {
+        setError('Your session has expired. Please refresh the page to continue.');
+      } else if (err.message.includes('permission')) {
+        setError('You don\'t have permission to view this data.');
+      } else {
+        setError(`Unable to load ${tab} data. Please try refreshing the page.`);
+      }
     } finally {
       setLoading(prev => ({ ...prev, [tab]: false }));
     }
@@ -139,31 +137,32 @@ const Dashboard = () => {
 
   // Initialize dashboard - Test connection and load overview data
   useEffect(() => {
-    console.log('SafeDashboard: Component mounted, initializing...');
-    
     const initDashboard = async () => {
       try {
         // Test API connection first
-        console.log('SafeDashboard: Testing API connection...');
         const connectionTest = await safeDashboardService.testConnection();
         
         if (connectionTest.success) {
-          console.log('SafeDashboard: API connection successful, loading overview data...');
           await loadTabData('overview');
         } else {
-          console.error('SafeDashboard: API connection failed:', connectionTest.message);
-          setError('Unable to connect to the server. Please check if the backend is running.');
-          toast.error('Backend connection failed');
+          // Handle different types of connection failures
+          if (connectionTest.message.includes('Session expired') || connectionTest.message.includes('refresh')) {
+            setError('Your session has expired. Please refresh the page to continue.');
+          } else if (connectionTest.message.includes('Access denied')) {
+            setError('You don\'t have permission to view dashboard data. Please contact your administrator.');
+          } else if (connectionTest.message.includes('server')) {
+            setError('Unable to connect to the server. Please check if the backend is running.');
+          } else {
+            setError('Unable to load dashboard. Please try refreshing the page.');
+          }
         }
       } catch (err) {
-        console.error('SafeDashboard: Initialization failed:', err.message);
-        setError('Failed to initialize dashboard');
-        toast.error('Dashboard initialization failed');
+        setError('Failed to initialize dashboard. Please refresh the page.');
       }
     };
     
     // Delay initialization to ensure auth is stable
-    const timer = setTimeout(initDashboard, 2000);
+    const timer = setTimeout(initDashboard, 1000);
     
     return () => clearTimeout(timer);
   }, []); // Empty dependency array - runs only once on mount
@@ -178,8 +177,7 @@ const Dashboard = () => {
 
   // Refresh function - ENABLED with force refresh
   const refreshAll = async () => {
-    console.log('Dashboard: Starting FORCE REFRESH...');
-    toast.info('Force refreshing all data...');
+    toast.loading('Force refreshing all data...');
     
     try {
       setLoading({ overview: true, trends: true, campaigns: true });
@@ -435,9 +433,8 @@ const Dashboard = () => {
               <div className="flex items-center space-x-2">
                 <button
                   onClick={() => {
-                    console.log('Dashboard: Quick refresh current tab...');
                     loadTabData(activeTab);
-                    toast.info('Refreshing current tab...');
+                    toast.loading('Refreshing current tab...');
                   }}
                   disabled={Object.values(loading).some(Boolean)}
                   className="flex items-center space-x-2 px-3 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
@@ -521,15 +518,37 @@ const Dashboard = () => {
       {/* Error Banner */}
       {error && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-start space-x-3">
-            <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <h3 className="text-sm font-medium text-yellow-800">Data Loading Issue</h3>
-              <p className="text-sm text-yellow-700 mt-1">{error}</p>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start space-x-3">
+            <AlertTriangle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="text-sm font-medium text-blue-800">Dashboard Notice</h3>
+              <p className="text-sm text-blue-700 mt-1">{error}</p>
+              {error.includes('session') || error.includes('refresh') ? (
+                <button 
+                  onClick={() => window.location.reload()}
+                  className="mt-2 text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 transition-colors"
+                >
+                  Refresh Page
+                </button>
+              ) : error.includes('permission') ? (
+                <p className="text-xs text-blue-600 mt-1">
+                  Contact your administrator if you believe you should have access to this data.
+                </p>
+              ) : (
+                <button 
+                  onClick={() => {
+                    setError(null);
+                    loadTabData(activeTab);
+                  }}
+                  className="mt-2 text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 transition-colors"
+                >
+                  Try Again
+                </button>
+              )}
             </div>
             <button 
               onClick={() => setError(null)}
-              className="ml-auto text-yellow-600 hover:text-yellow-800"
+              className="text-blue-600 hover:text-blue-800"
             >
               <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -548,14 +567,14 @@ const Dashboard = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               <MetricCard
                 title="Total Campaigns"
-                value={dashboardData.overview?.campaigns?.total}
+                value={dashboardData.overview?.campaigns?.total || 0}
                 icon={Target}
                 color="blue"
                 loading={loading.overview}
               />
               <MetricCard
                 title="Total Leads"
-                value={dashboardData.overview?.performance?.total_leads}
+                value={dashboardData.overview?.performance?.total_leads || 0}
                 icon={Users}
                 color="green"
                 loading={loading.overview}
@@ -575,6 +594,28 @@ const Dashboard = () => {
                 loading={loading.overview}
               />
             </div>
+
+            {/* Empty State for New Users */}
+            {!loading.overview && 
+             (!dashboardData.overview?.campaigns?.total || dashboardData.overview.campaigns.total === 0) && 
+             !error && (
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
+                <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                  <BarChart3 className="h-8 w-8 text-blue-600" />
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Welcome to your Dashboard!</h3>
+                <p className="text-gray-600 mb-6">
+                  You don't have any campaigns or reports yet. Get started by creating your first campaign.
+                </p>
+                <button
+                  onClick={() => navigateTo('/campaigns?action=create')}
+                  className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  <Target className="h-4 w-4 mr-2" />
+                  Create Your First Campaign
+                </button>
+              </div>
+            )}
 
 
             {/* Quick Actions */}
