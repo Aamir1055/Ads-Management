@@ -25,9 +25,9 @@ class FacebookPageModel {
             const conditions = [];
             const params = [];
             
-            // Filter by user - only show pages linked to Facebook accounts created by the current user (unless super admin)
+            // Filter by user - only show pages created by the current user (unless super admin)
             if (userRole !== 'super_admin' && userId) {
-                conditions.push('fa.created_by = ?');
+                conditions.push('fp.created_by = ?');
                 params.push(userId);
             }
             
@@ -57,22 +57,32 @@ class FacebookPageModel {
             
             // Get total count for pagination
             let countQuery = 'SELECT COUNT(*) as total FROM facebook_pages fp INNER JOIN facebook_accounts fa ON fp.facebook_account_id = fa.id';
+            const countConditions = [];
             const countParams = [];
             
+            // Apply same user filtering to count query
+            if (userRole !== 'super_admin' && userId) {
+                countConditions.push('fp.created_by = ?');
+                countParams.push(userId);
+            }
+            
             if (status) {
-                countQuery += ' WHERE fp.status = ?';
+                countConditions.push('fp.status = ?');
                 countParams.push(status);
             }
             
             if (accountId) {
-                countQuery += (status ? ' AND' : ' WHERE') + ' fp.facebook_account_id = ?';
+                countConditions.push('fp.facebook_account_id = ?');
                 countParams.push(accountId);
             }
             
             if (search) {
-                const whereClause = (status || accountId) ? ' AND' : ' WHERE';
-                countQuery += whereClause + ' (fp.page_name LIKE ? OR fp.page_description LIKE ? OR fa.email LIKE ?)';
+                countConditions.push('(fp.page_name LIKE ? OR fp.page_description LIKE ? OR fa.email LIKE ?)');
                 countParams.push(`%${search}%`, `%${search}%`, `%${search}%`);
+            }
+            
+            if (countConditions.length > 0) {
+                countQuery += ' WHERE ' + countConditions.join(' AND ');
             }
             
             const [countResult] = await pool.query(countQuery, countParams);
@@ -94,9 +104,9 @@ class FacebookPageModel {
     }
     
     // Get Facebook page by ID
-    static async getById(id) {
+    static async getById(id, userId = null, userRole = null) {
         try {
-            const query = `
+            let query = `
                 SELECT 
                     fp.id, 
                     fp.facebook_account_id, 
@@ -113,7 +123,15 @@ class FacebookPageModel {
                 WHERE fp.id = ?
             `;
             
-            const [rows] = await pool.query(query, [id]);
+            const params = [id];
+            
+            // Add user filtering for non-super-admin users
+            if (userRole !== 'super_admin' && userId) {
+                query += ' AND fp.created_by = ?';
+                params.push(userId);
+            }
+            
+            const [rows] = await pool.query(query, params);
             
             if (rows.length === 0) {
                 return null;
@@ -237,10 +255,10 @@ class FacebookPageModel {
         }
     }
     
-    // Get pages by status
-    static async getByStatus(status) {
+    // Get pages by status (filtered by user)
+    static async getByStatus(status, userId = null, userRole = null) {
         try {
-            const query = `
+            let query = `
                 SELECT 
                     fp.id, 
                     fp.facebook_account_id, 
@@ -255,10 +273,19 @@ class FacebookPageModel {
                 FROM facebook_pages fp
                 INNER JOIN facebook_accounts fa ON fp.facebook_account_id = fa.id
                 WHERE fp.status = ?
-                ORDER BY fp.created_at DESC
             `;
             
-            const [pages] = await pool.query(query, [status]);
+            const params = [status];
+            
+            // Add user filtering for non-super-admin users
+            if (userRole !== 'super_admin' && userId) {
+                query += ' AND fp.created_by = ?';
+                params.push(userId);
+            }
+            
+            query += ' ORDER BY fp.created_at DESC';
+            
+            const [pages] = await pool.query(query, params);
             return pages;
         } catch (error) {
             console.error('Error in FacebookPageModel.getByStatus:', error);
@@ -267,9 +294,9 @@ class FacebookPageModel {
     }
     
     // Get pages by Facebook account ID
-    static async getByAccountId(accountId) {
+    static async getByAccountId(accountId, userId = null, userRole = null) {
         try {
-            const query = `
+            let query = `
                 SELECT 
                     fp.id, 
                     fp.facebook_account_id, 
@@ -284,10 +311,19 @@ class FacebookPageModel {
                 FROM facebook_pages fp
                 INNER JOIN facebook_accounts fa ON fp.facebook_account_id = fa.id
                 WHERE fp.facebook_account_id = ?
-                ORDER BY fp.created_at DESC
             `;
             
-            const [pages] = await pool.query(query, [accountId]);
+            const params = [accountId];
+            
+            // Add user filtering for non-super-admin users
+            if (userRole !== 'super_admin' && userId) {
+                query += ' AND fp.created_by = ?';
+                params.push(userId);
+            }
+            
+            query += ' ORDER BY fp.created_at DESC';
+            
+            const [pages] = await pool.query(query, params);
             return pages;
         } catch (error) {
             console.error('Error in FacebookPageModel.getByAccountId:', error);

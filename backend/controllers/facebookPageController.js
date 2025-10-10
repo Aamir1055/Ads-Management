@@ -15,12 +15,18 @@ class FacebookPageController {
                 accountId
             } = req.query;
             
+            // Get user info from auth middleware
+            const userId = req.user.id;
+            const userRole = req.user.role?.name || 'user';
+            
             const result = await FacebookPageModel.getAll(
                 parseInt(page),
                 parseInt(limit),
                 status,
                 search,
-                accountId ? parseInt(accountId) : null
+                accountId ? parseInt(accountId) : null,
+                userId,
+                userRole
             );
             
             res.status(200).json({
@@ -50,7 +56,11 @@ class FacebookPageController {
                 });
             }
             
-            const page = await FacebookPageModel.getById(parseInt(id));
+            // Get user info from auth middleware
+            const userId = req.user.id;
+            const userRole = req.user.role?.name || 'user';
+            
+            const page = await FacebookPageModel.getById(parseInt(id), userId, userRole);
             
             if (!page) {
                 return res.status(404).json({
@@ -144,12 +154,15 @@ class FacebookPageController {
                 });
             }
             
-            // Check if page exists
-            const existingPage = await FacebookPageModel.getById(parseInt(id));
+            // Check if page exists and user has permission to update it
+            const userId = req.user.id;
+            const userRole = req.user.role?.name || 'user';
+            
+            const existingPage = await FacebookPageModel.getById(parseInt(id), userId, userRole);
             if (!existingPage) {
                 return res.status(404).json({
                     success: false,
-                    message: 'Facebook page not found'
+                    message: 'Facebook page not found or you do not have permission to update it'
                 });
             }
             
@@ -200,12 +213,15 @@ class FacebookPageController {
                 });
             }
             
-            // Check if page exists
-            const existingPage = await FacebookPageModel.getById(parseInt(id));
+            // Check if page exists and user has permission to delete it
+            const userId = req.user.id;
+            const userRole = req.user.role?.name || 'user';
+            
+            const existingPage = await FacebookPageModel.getById(parseInt(id), userId, userRole);
             if (!existingPage) {
                 return res.status(404).json({
                     success: false,
-                    message: 'Facebook page not found'
+                    message: 'Facebook page not found or you do not have permission to delete it'
                 });
             }
             
@@ -243,7 +259,11 @@ class FacebookPageController {
                 });
             }
             
-            const pages = await FacebookPageModel.getByStatus(status);
+            // Get user info from auth middleware
+            const userId = req.user.id;
+            const userRole = req.user.role?.name || 'user';
+            
+            const pages = await FacebookPageModel.getByStatus(status, userId, userRole);
             
             res.status(200).json({
                 success: true,
@@ -272,7 +292,11 @@ class FacebookPageController {
                 });
             }
             
-            const pages = await FacebookPageModel.getByAccountId(parseInt(accountId));
+            // Get user info from auth middleware
+            const userId = req.user.id;
+            const userRole = req.user.role?.name || 'user';
+            
+            const pages = await FacebookPageModel.getByAccountId(parseInt(accountId), userId, userRole);
             
             res.status(200).json({
                 success: true,
@@ -301,11 +325,15 @@ class FacebookPageController {
                 });
             }
             
-            const existingPage = await FacebookPageModel.getById(parseInt(id));
+            // Check if page exists and user has permission to modify it
+            const userId = req.user.id;
+            const userRole = req.user.role?.name || 'user';
+            
+            const existingPage = await FacebookPageModel.getById(parseInt(id), userId, userRole);
             if (!existingPage) {
                 return res.status(404).json({
                     success: false,
-                    message: 'Facebook page not found'
+                    message: 'Facebook page not found or you do not have permission to modify it'
                 });
             }
             

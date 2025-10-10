@@ -510,9 +510,6 @@ const FacebookPages = () => {
                       Status
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Created
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
@@ -549,14 +546,6 @@ const FacebookPages = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <StatusBadge status={page.status} />
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <div>{formatDate(page.created_at)}</div>
-                        {page.created_by_name && (
-                          <div className="text-xs text-gray-400">
-                            by {page.created_by_name}
-                          </div>
-                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex items-center space-x-2">

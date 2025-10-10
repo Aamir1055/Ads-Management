@@ -43,12 +43,18 @@ const reportController = {
       if (campaignId) options.campaignId = campaignId;
       if (brandId) options.brandId = brandId;
 
-      console.log(`📊 Generating reports from ${dateFrom} to ${dateTo}`, options);
+      // Get user info from auth middleware
+      const userId = req.user.id;
+      const userRole = req.user.role?.name || 'user';
+
+      console.log(`📊 Generating reports from ${dateFrom} to ${dateTo}`, options, `User: ${userId}, Role: ${userRole}`);
 
       const result = await ReportService.generateReportsFromCampaignData(
         dateFrom, 
         dateTo, 
-        options
+        options,
+        userId,
+        userRole
       );
 
       if (result.success) {
@@ -88,12 +94,18 @@ const reportController = {
       if (campaignId) options.campaignId = campaignId;
       if (brandId) options.brandId = brandId;
 
-      console.log(`🔄 Syncing reports from ${dateFrom} to ${dateTo}`, options);
+      // Get user info from auth middleware
+      const userId = req.user.id;
+      const userRole = req.user.role?.name || 'user';
+
+      console.log(`🔄 Syncing reports from ${dateFrom} to ${dateTo}`, options, `User: ${userId}, Role: ${userRole}`);
 
       const result = await ReportService.syncReportsToTable(
         dateFrom, 
         dateTo, 
-        options
+        options,
+        userId,
+        userRole
       );
 
       if (result.success) {
@@ -135,11 +147,15 @@ const reportController = {
 
       const pagination = { page, limit };
 
-      console.log(`📋 Fetching reports - Page: ${page}, Limit: ${limit}`, filters);
+      // Get user info from auth middleware
+      const userId = req.user.id;
+      const userRole = req.user.role?.name || 'user';
+
+      console.log(`📋 Fetching reports - Page: ${page}, Limit: ${limit}, User: ${userId}, Role: ${userRole}`, filters);
 
       const [reports, totalCount] = await Promise.all([
-        Report.findAll(filters, pagination),
-        Report.getCount(filters)
+        Report.findAll(filters, pagination, userId, userRole),
+        Report.getCount(filters, userId, userRole)
       ]);
 
       const totalPages = Math.ceil(totalCount / limit);
@@ -180,10 +196,14 @@ const reportController = {
         return res.status(400).json(createResponse(false, 'Invalid report ID'));
       }
 
-      const report = await Report.findById(id);
+      // Get user info from auth middleware
+      const userId = req.user.id;
+      const userRole = req.user.role?.name || 'user';
+
+      const report = await Report.findById(id, userId, userRole);
       
       if (!report) {
-        return res.status(404).json(createResponse(false, 'Report not found'));
+        return res.status(404).json(createResponse(false, 'Report not found or you do not have permission to access it'));
       }
 
       return res.status(200).json(createResponse(
@@ -233,6 +253,16 @@ const reportController = {
         return res.status(400).json(createResponse(false, 'Invalid report ID'));
       }
 
+      // Get user info from auth middleware
+      const userId = req.user.id;
+      const userRole = req.user.role?.name || 'user';
+
+      // First check if the report exists and user has permission to access it
+      const existingReport = await Report.findById(id, userId, userRole);
+      if (!existingReport) {
+        return res.status(404).json(createResponse(false, 'Report not found or you do not have permission to update it'));
+      }
+
       const report = await Report.update(id, req.body);
 
       return res.status(200).json(createResponse(
@@ -256,6 +286,16 @@ const reportController = {
       
       if (isNaN(id)) {
         return res.status(400).json(createResponse(false, 'Invalid report ID'));
+      }
+
+      // Get user info from auth middleware
+      const userId = req.user.id;
+      const userRole = req.user.role?.name || 'user';
+
+      // First check if the report exists and user has permission to access it
+      const existingReport = await Report.findById(id, userId, userRole);
+      if (!existingReport) {
+        return res.status(404).json(createResponse(false, 'Report not found or you do not have permission to delete it'));
       }
 
       await Report.delete(id);

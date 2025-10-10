@@ -22,14 +22,25 @@ class Report {
     this.created_by = data.created_by || null;
   }
 
-  // Get all reports with pagination and filters
-  static async findAll(filters = {}, pagination = { page: 1, limit: 20 }) {
+  // Get all reports with pagination and filters (filtered by user)
+  static async findAll(filters = {}, pagination = { page: 1, limit: 20 }, userId = null, userRole = null) {
     try {
+      console.log(`🔍 [Report.findAll] Called with userId=${userId}, userRole=${userRole}`);
+      
       const { page, limit } = pagination;
       const offset = (page - 1) * limit;
 
       let whereClause = 'WHERE 1=1';
       const params = [];
+
+      // Apply user filtering for non-super-admin users - filter by campaign creator, not report creator
+      if (userRole !== 'super_admin' && userId) {
+        console.log(`🔍 [Report.findAll] Applying user filter: c.created_by = ${userId}`);
+        whereClause += ' AND c.created_by = ?';
+        params.push(userId);
+      } else {
+        console.log(`🔍 [Report.findAll] No user filter applied (super_admin or no userId)`);
+      }
 
       // Apply filters
       if (filters.campaign_id) {
@@ -83,7 +94,13 @@ class Report {
       `;
 
       params.push(limit, offset);
+      
+      console.log(`🔍 [Report.findAll] Final query:`, query);
+      console.log(`🔍 [Report.findAll] Query params:`, params);
+      
       const [rows] = await pool.execute(query, params);
+      
+      console.log(`🔍 [Report.findAll] Query returned ${rows.length} rows`);
       
       return rows.map(row => new Report(row));
     } catch (error) {
@@ -92,11 +109,17 @@ class Report {
     }
   }
 
-  // Get report count with filters
-  static async getCount(filters = {}) {
+  // Get report count with filters (filtered by user)
+  static async getCount(filters = {}, userId = null, userRole = null) {
     try {
       let whereClause = 'WHERE 1=1';
       const params = [];
+
+      // Apply user filtering for non-super-admin users - filter by campaign creator, not report creator
+      if (userRole !== 'super_admin' && userId) {
+        whereClause += ' AND c.created_by = ?';
+        params.push(userId);
+      }
 
       // Apply same filters as findAll
       if (filters.campaign_id) {
@@ -134,7 +157,12 @@ class Report {
         params.push(filters.report_month);
       }
 
-      const query = `SELECT COUNT(*) as total FROM reports r ${whereClause}`;
+      const query = `
+        SELECT COUNT(*) as total 
+        FROM reports r
+        LEFT JOIN campaigns c ON r.campaign_id = c.id
+        ${whereClause}
+      `;
       const [rows] = await pool.execute(query, params);
       
       return rows[0].total;
@@ -145,9 +173,9 @@ class Report {
   }
 
   // Find report by ID
-  static async findById(id) {
+  static async findById(id, userId = null, userRole = null) {
     try {
-      const query = `
+      let query = `
         SELECT 
           r.*,
           b.name as brand_table_name,
@@ -160,7 +188,15 @@ class Report {
         WHERE r.id = ?
       `;
 
-      const [rows] = await pool.execute(query, [id]);
+      const params = [id];
+
+      // Add user filtering for non-super-admin users - filter by campaign creator, not report creator
+      if (userRole !== 'super_admin' && userId) {
+        query += ' AND c.created_by = ?';
+        params.push(userId);
+      }
+
+      const [rows] = await pool.execute(query, params);
       
       if (rows.length === 0) {
         return null;

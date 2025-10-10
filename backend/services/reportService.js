@@ -6,7 +6,7 @@ class ReportService {
    * Generate reports by aggregating data from campaign_data, campaigns, and campaign_types tables
    * This is the main function that fetches data from different tables and calculates metrics
    */
-  static async generateReportsFromCampaignData(dateFrom, dateTo, options = {}) {
+  static async generateReportsFromCampaignData(dateFrom, dateTo, options = {}, userId = null, userRole = null) {
     try {
       console.log(`📊 Generating reports from ${dateFrom} to ${dateTo}`);
       
@@ -76,6 +76,7 @@ class ReportService {
           DATE(cd.created_at) >= ? AND DATE(cd.created_at) <= ?
           OR DATE(cd.updated_at) >= ? AND DATE(cd.updated_at) <= ?
         )
+        ${userRole !== 'super_admin' && userId ? 'AND c.created_by = ?' : ''}
         ${options.campaignId ? 'AND cd.campaign_id = ?' : ''}
         ${options.brandId ? 'AND c.brand = ?' : ''}
         GROUP BY DATE(
@@ -88,6 +89,7 @@ class ReportService {
       `;
 
       const params = [dateFrom, dateTo, dateFrom, dateTo];
+      if (userRole !== 'super_admin' && userId) params.push(userId);
       if (options.campaignId) params.push(options.campaignId);
       if (options.brandId) params.push(options.brandId);
 
@@ -165,12 +167,12 @@ class ReportService {
    * Sync data from campaign_data to reports table
    * This function takes the aggregated data and stores it in the reports table
    */
-  static async syncReportsToTable(dateFrom, dateTo, options = {}) {
+  static async syncReportsToTable(dateFrom, dateTo, options = {}, userId = null, userRole = null) {
     try {
       console.log(`🔄 Syncing reports to table from ${dateFrom} to ${dateTo}`);
 
       // First, generate the report data
-      const reportData = await this.generateReportsFromCampaignData(dateFrom, dateTo, options);
+      const reportData = await this.generateReportsFromCampaignData(dateFrom, dateTo, options, userId, userRole);
       
       if (!reportData.success) {
         return reportData;
