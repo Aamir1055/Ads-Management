@@ -2,14 +2,14 @@ import React, { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
 import ErrorAlert from './common/ErrorAlert'
 
-const CardForm = ({ isOpen, onClose, onSubmit, editData = null, isLoading = false }) => {
+const CardForm = ({ isOpen, onClose, onSubmit, editData = null, isLoading = false, accounts = [] }) => {
   const [submitError, setSubmitError] = useState('')
   const [formData, setFormData] = useState({
     card_name: '',
     card_number_last4: '',
     card_type: '',
-    current_balance: '',
-    is_active: true
+    is_active: true,
+    account_id: ''
   })
   const [errors, setErrors] = useState({})
 
@@ -21,7 +21,7 @@ const CardForm = ({ isOpen, onClose, onSubmit, editData = null, isLoading = fals
         card_name: editData.card_name || '',
         card_number_last4: editData.card_number_last4 || '',
         card_type: editData.card_type || '',
-        current_balance: editData.current_balance || '',
+        account_id: editData.account_id || '',
         is_active: editData.is_active !== undefined ? editData.is_active : true
       })
     } else {
@@ -29,7 +29,7 @@ const CardForm = ({ isOpen, onClose, onSubmit, editData = null, isLoading = fals
         card_name: '',
         card_number_last4: '',
         card_type: '',
-        current_balance: '',
+        account_id: '',
         is_active: true
       })
     }
@@ -61,10 +61,13 @@ const CardForm = ({ isOpen, onClose, onSubmit, editData = null, isLoading = fals
       newErrors.card_type = 'Card type is required'
     }
 
-    if (!formData.current_balance.toString().trim()) {
-      newErrors.current_balance = 'Current balance is required'
-    } else if (isNaN(parseFloat(formData.current_balance)) || parseFloat(formData.current_balance) < 0) {
-      newErrors.current_balance = 'Current balance must be a valid positive number'
+    if (!formData.account_id) {
+      newErrors.account_id = 'Account selection is required'
+    }
+
+
+    if (!formData.account_id) {
+      newErrors.account_id = 'Account selection is required'
     }
 
     setErrors(newErrors)
@@ -80,14 +83,6 @@ const CardForm = ({ isOpen, onClose, onSubmit, editData = null, isLoading = fals
       newValue = value.replace(/\D/g, '').slice(0, 4)
     }
 
-    // Special handling for current_balance - allow decimal numbers
-    if (name === 'current_balance') {
-      if (value === '' || /^\d*\.?\d*$/.test(value)) {
-        newValue = value
-      } else {
-        return // Don't update if invalid format
-      }
-    }
 
     setFormData(prev => ({
       ...prev,
@@ -112,10 +107,9 @@ const CardForm = ({ isOpen, onClose, onSubmit, editData = null, isLoading = fals
 
     try {
       setSubmitError('')
-      // Convert current_balance to number for submission
       const submissionData = {
         ...formData,
-        current_balance: parseFloat(formData.current_balance)
+        account_id: formData.account_id ? Number(formData.account_id) : null
       }
       await onSubmit(submissionData)
     } catch (error) {
@@ -150,6 +144,31 @@ const CardForm = ({ isOpen, onClose, onSubmit, editData = null, isLoading = fals
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Account Selection */}
+          <div>
+            <label htmlFor="account_id" className="block text-sm font-medium text-gray-700 mb-1">
+              Account <span className="text-red-500">*</span>
+            </label>
+            <select
+              id="account_id"
+              name="account_id"
+              value={formData.account_id}
+              onChange={handleInputChange}
+              className={`mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${
+                errors.account_id ? 'border-red-500' : ''
+              }`}
+              disabled={isLoading}
+            >
+              <option value="">Select an account</option>
+              {accounts.map(acc => (
+                <option key={acc.id} value={acc.id}>{acc.account_name}</option>
+              ))}
+            </select>
+            {errors.account_id && (
+              <p className="mt-1 text-sm text-red-600">{errors.account_id}</p>
+            )}
+          </div>
+
           {/* Card Name */}
           <div>
             <label htmlFor="card_name" className="block text-sm font-medium text-gray-700 mb-1">
@@ -219,30 +238,6 @@ const CardForm = ({ isOpen, onClose, onSubmit, editData = null, isLoading = fals
             )}
           </div>
 
-          {/* Current Balance */}
-          <div>
-            <label htmlFor="current_balance" className="block text-sm font-medium text-gray-700 mb-1">
-              Current Balance <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <span className="absolute left-3 top-2 text-gray-500">₹</span>
-              <input
-                type="text"
-                id="current_balance"
-                name="current_balance"
-                value={formData.current_balance}
-                onChange={handleInputChange}
-                className={`mt-1 block w-full pl-7 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${
-                  errors.current_balance ? 'border-red-500' : ''
-                }`}
-                placeholder="0.00"
-                disabled={isLoading}
-              />
-            </div>
-            {errors.current_balance && (
-              <p className="mt-1 text-sm text-red-600">{errors.current_balance}</p>
-            )}
-          </div>
 
           {/* Is Active */}
           <div className="flex items-center">

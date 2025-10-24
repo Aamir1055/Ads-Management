@@ -1,5 +1,5 @@
 const BMModel = require('../models/BMModel');
-const { body, validationResult, param } = require('express-validator');
+const { body, param, validationResult } = require('express-validator');
 
 class BMController {
     // Get all BMs (filtered by user)
@@ -98,6 +98,7 @@ class BMController {
             // Validate request
             const errors = validationResult(req);
             if (!errors.isEmpty()) {
+                console.log('❌ Validation errors:', errors.array());
                 return res.status(400).json({
                     success: false,
                     message: 'Validation failed',
@@ -106,36 +107,47 @@ class BMController {
                 });
             }
 
-            const { bm_name, email, phone_number, status = 'enabled' } = req.body;
-            const created_by = req.user?.id || null;
+            // Get user info from auth middleware
+            const userId = req.user.id;
+            const userRole = req.user.role?.name || 'user';
+
+            // Extract validated data
+            const { 
+                bm_name,
+                email,
+                phone_number,
+                status = 'enabled'
+            } = req.body;
 
             const newBM = await BMModel.create({
                 bm_name,
                 email,
                 phone_number,
                 status,
-                created_by
+                created_by: userId
             });
 
             return res.status(201).json({
                 success: true,
-                message: 'BM created successfully',
+                message: 'Business Manager created successfully',
                 data: newBM
             });
         } catch (error) {
             console.error('Error in BMController.create:', error);
-
-            if (error.message.includes('already exists')) {
-                return res.status(409).json({
-                    success: false,
-                    message: error.message,
-                    timestamp: new Date().toISOString()
-                });
-            }
+            
+                // Map DB duplicate-key error to 409 conflict
+                if (error && error.code === 'ER_DUP_ENTRY') {
+                    return res.status(409).json({
+                        success: false,
+                        message: 'A Business Manager with this email already exists',
+                        details: error.sqlMessage || error.message,
+                        timestamp: new Date().toISOString()
+                    });
+                }
 
             return res.status(500).json({
                 success: false,
-                message: error.message,
+                message: error.message || 'An error occurred while creating the Business Manager',
                 timestamp: new Date().toISOString()
             });
         }
@@ -156,18 +168,42 @@ class BMController {
             }
 
             const { id } = req.params;
-            const { bm_name, email, phone_number, status } = req.body;
-
             if (!id || isNaN(parseInt(id))) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Invalid BM ID provided',
+                    message: 'Invalid Business Manager ID provided',
+                    timestamp: new Date().toISOString()
+                });
+            }
+
+            // Get user info from auth middleware
+            const userId = req.user.id;
+            const userRole = req.user.role?.name || 'user';
+
+            // Extract validated data
+            const { 
+                bm_name, 
+                account_name, 
+                facebook_account_id, 
+                email, 
+                phone_number, 
+                status 
+            } = req.body;
+
+            // Check if user has permission to update this BM
+            const bm = await BMModel.getById(parseInt(id), userId, userRole);
+            if (!bm) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Business Manager not found or access denied',
                     timestamp: new Date().toISOString()
                 });
             }
 
             const updatedBM = await BMModel.update(parseInt(id), {
                 bm_name,
+                account_name,
+                facebook_account_id,
                 email,
                 phone_number,
                 status
@@ -334,88 +370,38 @@ class BMController {
         }
     }
 
-    // Validation rules
+    // Validation rules for create and update operations
     static getValidationRules() {
-        return {
-            create: [
-                body('bm_name')
-                    .trim()
-                    .notEmpty()
-                    .withMessage('BM name is required')
-                    .isLength({ min: 2, max: 255 })
-                    .withMessage('BM name must be between 2 and 255 characters'),
-                
-                body('email')
-                    .trim()
-                    .notEmpty()
-                    .withMessage('Email is required')
-                    .isEmail()
-                    .withMessage('Please provide a valid email address')
-                    .normalizeEmail(),
-
-                body('phone_number')
-                    .optional()
-                    .trim()
-                    .isLength({ max: 50 })
-                    .withMessage('Phone number must be less than 50 characters'),
-
-                body('status')
-                    .optional()
-                    .isIn(['enabled', 'disabled', 'suspended_temporarily'])
-                    .withMessage('Status must be enabled, disabled, or suspended_temporarily')
-            ],
-
-            update: [
-                param('id')
-                    .isInt({ min: 1 })
-                    .withMessage('Invalid BM ID'),
-
-                body('bm_name')
-                    .trim()
-                    .notEmpty()
-                    .withMessage('BM name is required')
-                    .isLength({ min: 2, max: 255 })
-                    .withMessage('BM name must be between 2 and 255 characters'),
-                
-                body('email')
-                    .trim()
-                    .notEmpty()
-                    .withMessage('Email is required')
-                    .isEmail()
-                    .withMessage('Please provide a valid email address')
-                    .normalizeEmail(),
-
-                body('phone_number')
-                    .optional()
-                    .trim()
-                    .isLength({ max: 50 })
-                    .withMessage('Phone number must be less than 50 characters'),
-
-                body('status')
-                    .notEmpty()
-                    .withMessage('Status is required')
-                    .isIn(['enabled', 'disabled', 'suspended_temporarily'])
-                    .withMessage('Status must be enabled, disabled, or suspended_temporarily')
-            ],
-
-            getById: [
-                param('id')
-                    .isInt({ min: 1 })
-                    .withMessage('Invalid BM ID')
-            ],
-
-            delete: [
-                param('id')
-                    .isInt({ min: 1 })
-                    .withMessage('Invalid BM ID')
-            ],
-
-            toggleStatus: [
-                param('id')
-                    .isInt({ min: 1 })
-                    .withMessage('Invalid BM ID')
-            ]
-        };
+        return [
+            body('bm_name')
+                .trim()
+                .notEmpty()
+                .withMessage('Business Manager name is required')
+                .isLength({ min: 2, max: 255 })
+                .withMessage('Business Manager name must be between 2 and 255 characters'),
+            body('email')
+                .trim()
+                .notEmpty()
+                .withMessage('Email is required')
+                .isEmail()
+                .withMessage('Please provide a valid email address')
+                .normalizeEmail(),
+            body('phone_number')
+                .optional()
+                .custom((value) => {
+                    // Allow empty or null values since field is optional
+                    if (!value || value.trim() === '') {
+                        return true;
+                    }
+                    // Validate format only if value is provided
+                    return /^\+?[1-9]\d{1,14}$/.test(value.trim());
+                })
+                .withMessage('Please provide a valid phone number or leave it empty'),
+            body('status')
+                .optional()
+                .isIn(['enabled', 'disabled'])
+                .withMessage('Status must be either enabled or disabled')
+        ];
     }
 }
 

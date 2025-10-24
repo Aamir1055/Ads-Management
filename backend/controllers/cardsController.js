@@ -12,6 +12,12 @@ const createResponse = (success, message, data = null, errors = null) => ({
 // Validation schemas
 const cardValidation = {
   createCard: Joi.object({
+    account_id: Joi.number().integer().positive().optional().allow(null).messages({
+      'number.base': 'Account ID must be a number',
+      'number.integer': 'Account ID must be an integer',
+      'number.positive': 'Account ID must be positive',
+    }),
+
     card_name: Joi.string().trim().min(2).max(255).required().messages({
       'string.empty': 'Card name is required',
       'string.min': 'Card name must be at least 2 characters long',
@@ -106,7 +112,7 @@ const cardsController = {
         return res.status(400).json(createResponse(false, 'Validation failed', null, validation.errors));
       }
 
-      const { card_name, card_number_last4 = null, card_type = null, current_balance = 0.0, credit_limit = null, is_active = true } = validation.data;
+  const { card_name, card_number_last4 = null, card_type = null, current_balance = 0.0, credit_limit = null, is_active = true, account_id = null } = validation.data;
       
       // Get user ID from request (set by auth middleware)
       const userId = req.user?.id;
@@ -126,9 +132,9 @@ const cardsController = {
 
         // Insert card with created_by field
         const [result] = await connection.query(
-          `INSERT INTO cards (card_name, card_number_last4, card_type, current_balance, credit_limit, is_active, created_by, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
-          [card_name, card_number_last4, card_type, Number(current_balance), credit_limit !== null ? Number(credit_limit) : null, is_active ? 1 : 0, userId]
+          `INSERT INTO cards (card_name, card_number_last4, card_type, current_balance, credit_limit, is_active, account_id, created_by, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+          [card_name, card_number_last4, card_type, Number(current_balance), credit_limit !== null ? Number(credit_limit) : null, is_active ? 1 : 0, account_id !== null ? Number(account_id) : null, userId]
         );
 
         if (!result || !result.insertId) {
@@ -193,6 +199,7 @@ const cardsController = {
           current_balance,
           credit_limit,
           is_active,
+          account_id,
           created_at,
           updated_at
         FROM cards`;

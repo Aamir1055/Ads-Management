@@ -316,14 +316,8 @@ class User {
       for (const field of allowedFields) {
         if (sanitizedData[field] !== undefined) {
           if (field === 'password') {
-            // CRITICAL FIX: Validate password confirmation before hashing
-            if (!sanitizedData.confirm_password || sanitizedData[field] !== sanitizedData.confirm_password) {
-              throw new Error('Passwords do not match');
-            }
-            if (sanitizedData[field].length < 6) {
-              throw new Error('Password must be at least 6 characters long');
-            }
             // Hash the new password if provided
+            // Note: Password validation is handled by the controller
             const saltRounds = 12;
             fieldsToUpdate['hashed_password'] = await bcrypt.hash(sanitizedData[field], saltRounds);
           } else if (field === 'enable_2fa') {

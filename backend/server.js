@@ -1,11 +1,12 @@
 const app = require('./app');
 const { pool, testConnection } = require('./config/database');
-// const ReportAnalyticsWebSocket = require('./websocket/reportAnalyticsSocket');
 require('dotenv').config();
+
+// Increase event listener limit to prevent warnings
+require('events').EventEmitter.defaultMaxListeners = 15;
 
 const PORT = process.env.PORT;
 let server; // HTTP server instance
-let analyticsWS = null; // WebSocket server instance
 let forceCloseTimer = null;
 
 // Optional: track open sockets to close idle keep-alive during shutdown

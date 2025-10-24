@@ -17,6 +17,7 @@ import Campaigns from './pages/Campaigns'
 import Brands from './pages/Brands'
 import CampaignDetail from './pages/CampaignDetail'
 import Cards from './components/Cards'
+import AccountCards from './pages/AccountCards'
 import CardUsers from './pages/CardUsers'
 import FacebookAccounts from './pages/FacebookAccounts'
 import FacebookPages from './pages/FacebookPages'
@@ -142,6 +143,15 @@ function App() {
               <PermissionProvider>
                 <Layout>
                   <Cards />
+                </Layout>
+              </PermissionProvider>
+            </ProtectedRoute>
+          } />
+          <Route path="/cards/account/:accountId" element={
+            <ProtectedRoute>
+              <PermissionProvider>
+                <Layout>
+                  <AccountCards />
                 </Layout>
               </PermissionProvider>
             </ProtectedRoute>

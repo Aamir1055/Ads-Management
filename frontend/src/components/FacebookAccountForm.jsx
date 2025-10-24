@@ -121,11 +121,8 @@ const FacebookAccountForm = ({ account, onClose, onSave, setMessage }) => {
     // Password validation (required for new accounts, optional for updates)
     if (!isEditing && !formData.password) {
       newErrors.password = 'Password is required';
-    } else if (formData.password && formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters long';
-    } else if (formData.password && !/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) {
-      newErrors.password = 'Password must contain at least one uppercase letter, one lowercase letter, and one number';
     }
+    // NOTE: Removed regex and minimum-length enforcement so users can set any password.
 
     // Phone number validation (if provided)
     if (formData.phone_number && !/^\+?[\d\s\-\(\)]+$/.test(formData.phone_number)) {
@@ -242,8 +239,18 @@ const FacebookAccountForm = ({ account, onClose, onSave, setMessage }) => {
         statusText: error.response?.statusText,
         data: error.response?.data
       });
+
+      // Handle duplicate email conflict (409)
+      if (error.response?.status === 409) {
+        setErrors(prev => ({
+          ...prev,
+          email: 'This email address is already registered. Please use a different email.'
+        }));
+        toast.error('Account with this email already exists');
+        return;
+      }
       
-      // Handle access denied errors first
+      // Handle access denied errors
       if (isAccessDeniedError(error)) {
         handleAccessDenied({
           closeForm: () => {
@@ -320,10 +327,21 @@ const FacebookAccountForm = ({ account, onClose, onSave, setMessage }) => {
               required
             />
             {errors.email && (
-              <p className="mt-1 text-sm text-red-600 flex items-center">
-                <AlertCircle className="w-4 h-4 mr-1" />
-                {errors.email}
-              </p>
+              <div className="mt-2">
+                <div className="bg-red-50 border-l-4 border-red-400 p-4">
+                  <div className="flex items-center">
+                    <AlertCircle className="w-5 h-5 text-red-400 mr-2" />
+                    <p className="text-sm text-red-700">
+                      {errors.email}
+                    </p>
+                  </div>
+                  {errors.email.includes('already') && (
+                    <p className="mt-2 text-sm text-red-600">
+                      Please use a different email address or edit the existing account.
+                    </p>
+                  )}
+                </div>
+              </div>
             )}
           </div>
 
@@ -365,11 +383,7 @@ const FacebookAccountForm = ({ account, onClose, onSave, setMessage }) => {
                 {errors.password}
               </p>
             )}
-            {!errors.password && formData.password && (
-              <p className="mt-1 text-xs text-gray-500">
-                Use a strong password with uppercase, lowercase, and numbers
-              </p>
-            )}
+            {/* No password composition hints or regex enforcement - allow any password */}
           </div>
 
           {/* Phone Number Field */}

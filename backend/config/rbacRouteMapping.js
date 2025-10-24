@@ -39,6 +39,15 @@ const ROUTE_PERMISSIONS = {
     DELETE: 'cards_delete'             // DELETE /api/cards/:id
   },
 
+  // Accounts Module
+  accounts: {
+    GET: 'accounts_read',              // GET /api/accounts
+    POST: 'accounts_create',           // POST /api/accounts
+    PUT: 'accounts_update',            // Reserved for future
+    PATCH: 'accounts_update',          // POST /api/accounts/:id/add-amount (treated as update)
+    DELETE: 'accounts_delete'          // Reserved for future
+  },
+
   // Campaigns Module
   campaigns: {
     GET: 'campaigns_read',             // GET /api/campaigns, GET /api/campaigns/:id
@@ -156,6 +165,14 @@ const createPermissionMiddleware = {
     create: () => getPermissionMiddleware('cards', 'POST'),
     update: () => getPermissionMiddleware('cards', 'PUT'),
     delete: () => getPermissionMiddleware('cards', 'DELETE')
+  },
+
+  // Accounts
+  accounts: {
+    read: () => getPermissionMiddleware('accounts', 'GET'),
+    create: () => getPermissionMiddleware('accounts', 'POST'),
+    update: () => getPermissionMiddleware('accounts', 'PUT'),
+    delete: () => getPermissionMiddleware('accounts', 'DELETE')
   },
 
   // Campaigns

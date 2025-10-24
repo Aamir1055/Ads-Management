@@ -12,6 +12,11 @@ const createResponse = (success, message, data = null, errors = null) => ({
 // Validation schemas
 const cardValidation = {
   createCard: Joi.object({
+    account_id: Joi.number().integer().positive().optional().allow(null).messages({
+      'number.base': 'Account ID must be a number',
+      'number.integer': 'Account ID must be an integer',
+      'number.positive': 'Account ID must be positive',
+    }),
     card_name: Joi.string().trim().min(2).max(255).required().messages({
       'string.empty': 'Card name is required',
       'string.min': 'Card name must be at least 2 characters long',
@@ -120,7 +125,7 @@ const cardsController = {
         return res.status(400).json(createResponse(false, 'Validation failed', null, validation.errors));
       }
 
-      const { card_name, card_number_last4 = null, card_type = null, current_balance = 0.0, credit_limit = null, is_active = true } = validation.data;
+  const { card_name, card_number_last4 = null, card_type = null, current_balance = 0.0, credit_limit = null, is_active = true, account_id = null } = validation.data;
       
       // Get user from token (set by authentication middleware)
       const currentUserId = req.user.id;
@@ -145,9 +150,9 @@ const cardsController = {
         await connection.beginTransaction();
 
         const [result] = await connection.query(
-          `INSERT INTO cards (card_name, card_number_last4, card_type, current_balance, credit_limit, is_active, created_by, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
-          [card_name, card_number_last4, card_type, Number(current_balance), credit_limit !== null ? Number(credit_limit) : null, is_active ? 1 : 0, currentUserId]
+          `INSERT INTO cards (card_name, card_number_last4, card_type, current_balance, credit_limit, is_active, account_id, created_by, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+          [card_name, card_number_last4, card_type, Number(current_balance), credit_limit !== null ? Number(credit_limit) : null, is_active ? 1 : 0, account_id !== null ? Number(account_id) : null, currentUserId]
         );
 
         if (!result || !result.insertId) {
@@ -330,6 +335,7 @@ const cardsController = {
             current_balance,
             credit_limit,
             is_active,
+            account_id,
             created_by,
             created_at,
             updated_at
@@ -348,6 +354,7 @@ const cardsController = {
             c.current_balance,
             c.credit_limit,
             c.is_active,
+            c.account_id,
             c.created_by,
             c.created_at,
             c.updated_at
@@ -439,6 +446,32 @@ const cardsController = {
       return res.status(200).json(createResponse(true, 'Card retrieved successfully', { card: card }));
     } catch (error) {
       return handleDatabaseError(error, 'fetch card', res);
+    }
+  },
+
+  // Get cards by Account ID (privacy-aware)
+  getCardsByAccount: async (req, res) => {
+    try {
+      const accountId = parseInt(req.params.accountId, 10);
+      if (!Number.isInteger(accountId) || accountId <= 0) {
+        return res.status(400).json(createResponse(false, 'Invalid account ID'));
+      }
+
+      // Admins can see all cards for the account; others only those they created
+      const isAdmin = req.user.role && (req.user.role.level >= 8 || req.user.role.name === 'super_admin' || req.user.role.name === 'admin');
+
+      let query = 'SELECT * FROM cards WHERE account_id = ?';
+      const params = [accountId];
+      if (!isAdmin) {
+        query += ' AND created_by = ?';
+        params.push(req.user.id);
+      }
+      query += ' ORDER BY created_at DESC';
+
+      const [cards] = await pool.query(query, params);
+      return res.status(200).json(createResponse(true, 'Cards fetched for account', { cards }));
+    } catch (error) {
+      return handleDatabaseError(error, 'fetch cards by account', res);
     }
   },
 

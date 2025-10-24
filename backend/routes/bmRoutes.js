@@ -1,5 +1,6 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
+const { body, param } = require('express-validator');
 const BMController = require('../controllers/BMController');
 const { authenticateToken, requirePermission } = require('../middleware/authMiddleware');
 
@@ -42,14 +43,8 @@ router.get('/',
     BMController.getAll
 );
 
-// GET /api/bm/stats - Get BM statistics
-router.get('/stats', 
-    requirePermission('business_manager_view'),
-    BMController.getStats
-);
-
-// GET /api/bm/dropdown - Get BMs for dropdown (enabled only)
-router.get('/dropdown', 
+// GET /api/bm/dropdown - Get enabled BMs for dropdown (filtered by user)
+router.get('/dropdown',
     requirePermission('business_manager_view'),
     BMController.getForDropdown
 );
@@ -57,7 +52,7 @@ router.get('/dropdown',
 // GET /api/bm/:id - Get BM by ID
 router.get('/:id', 
     requirePermission('business_manager_view'),
-    BMController.getValidationRules().getById,
+    param('id').isInt().withMessage('Invalid BM ID'),
     BMController.getById
 );
 
@@ -65,7 +60,7 @@ router.get('/:id',
 router.post('/',
     requirePermission('business_manager_create'),
     createUpdateLimiter,
-    BMController.getValidationRules().create,
+    BMController.getValidationRules(),
     BMController.create
 );
 
@@ -73,7 +68,8 @@ router.post('/',
 router.put('/:id',
     requirePermission('business_manager_update'),
     createUpdateLimiter,
-    BMController.getValidationRules().update,
+    param('id').isInt().withMessage('Invalid BM ID'),
+    BMController.getValidationRules(),
     BMController.update
 );
 
@@ -81,7 +77,6 @@ router.put('/:id',
 router.delete('/:id',
     requirePermission('business_manager_delete'),
     createUpdateLimiter,
-    BMController.getValidationRules().delete,
     BMController.delete
 );
 
@@ -89,7 +84,7 @@ router.delete('/:id',
 router.patch('/:id/toggle-status',
     requirePermission('business_manager_update'),
     createUpdateLimiter,
-    BMController.getValidationRules().toggleStatus,
+    param('id').isInt().withMessage('Invalid BM ID'),
     BMController.toggleStatus
 );
 

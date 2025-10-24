@@ -20,10 +20,7 @@ async function createBMAndAdsManagerTables() {
                 INDEX idx_bm_status (status),
                 INDEX idx_bm_created_by (created_by),
                 INDEX idx_bm_email (email),
-                INDEX idx_bm_name (bm_name),
-                
-                -- Unique constraint on email
-                UNIQUE KEY unique_bm_email (email)
+                INDEX idx_bm_name (bm_name)
             )
         `;
 

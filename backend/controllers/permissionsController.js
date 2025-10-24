@@ -604,6 +604,11 @@ const permissionsController = {
           description: 'Card management permissions'
         },
         {
+          name: 'Cards Account',
+          categories: ['accounts'],
+          description: 'Card Accounts management permissions (create/read/update/add-amount)'
+        },
+        {
           name: 'Card Users',
           categories: ['card_users'],
           description: 'Card user management permissions'

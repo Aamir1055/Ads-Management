@@ -35,9 +35,14 @@ const FacebookPageForm = ({ page, onClose, onSave, setMessage }) => {
   // Fetch Facebook accounts for dropdown
   const fetchFacebookAccounts = async () => {
     try {
-      const response = await apiRequest.get('/facebook-accounts?limit=1000&status=enabled');
+      const response = await apiRequest.get('/facebook-accounts?limit=1000');
       if (response.data.success) {
-        setFacebookAccounts(response.data.data || []);
+        const accounts = response.data.data || [];
+        console.log('🗺 Fetched Facebook accounts:', accounts);
+        accounts.forEach(account => {
+          console.log('🗺 Account ID:', account.id, 'type:', typeof account.id, 'email:', account.email);
+        });
+        setFacebookAccounts(accounts);
       }
     } catch (error) {
       console.error('Error fetching Facebook accounts:', error);
@@ -50,8 +55,10 @@ const FacebookPageForm = ({ page, onClose, onSave, setMessage }) => {
     fetchFacebookAccounts();
     
     if (page) {
+      console.log('🔧 Editing page data:', page);
+      console.log('🔧 facebook_account_id value:', page.facebook_account_id, 'type:', typeof page.facebook_account_id);
       setFormData({
-        facebook_account_id: page.facebook_account_id || '',
+        facebook_account_id: page.facebook_account_id ? String(page.facebook_account_id) : '',
         page_name: page.page_name || '',
         page_description: page.page_description || '',
         status: page.status || 'enabled'
@@ -252,11 +259,16 @@ const FacebookPageForm = ({ page, onClose, onSave, setMessage }) => {
                 required
               >
                 <option value="">Select Facebook Account</option>
-                {facebookAccounts.map((account) => (
-                  <option key={account.id} value={account.id}>
-                    {account.email}
-                  </option>
-                ))}
+                {facebookAccounts.map((account) => {
+                  const isSelected = String(account.id) === formData.facebook_account_id;
+                  console.log(`🔍 Option ${account.id} (${typeof account.id}) vs formData ${formData.facebook_account_id} (${typeof formData.facebook_account_id}) = ${isSelected}`);
+                  const statusLabel = account.status === 'enabled' ? '' : ` (${account.status.charAt(0).toUpperCase() + account.status.slice(1)})`;
+                  return (
+                    <option key={account.id} value={account.id} disabled={account.status !== 'enabled'}>
+                      {account.email}{statusLabel}
+                    </option>
+                  );
+                })}
               </select>
               {(errors.facebook_account_id || validationErrors.facebook_account_id) && (
                 <div className="mt-1 flex items-center text-sm text-red-600">

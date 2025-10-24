@@ -144,6 +144,13 @@ router.get('/active',
   getActiveCards
 );
 
+// Get cards by account ID
+router.get('/by-account/:accountId',
+  getOneLimiter,
+  createPermissionMiddleware.cards.read(),
+  require('../controllers/cardsController_privacy').getCardsByAccount
+);
+
 /**
  * GET /api/cards/:id
  * Gets single card with ownership validation

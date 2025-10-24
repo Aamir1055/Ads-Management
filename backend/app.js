@@ -40,6 +40,7 @@ const bmRoutes = require('./routes/bmRoutes');
 const adsManagerRoutes = require('./routes/adsManagerRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
+const accountsRoutes = require('./routes/accountsRoutes');
 
 const app = express();
 
@@ -238,6 +239,7 @@ app.use('/api/bm', bmRoutes);
 app.use('/api/ads-managers', adsManagerRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/accounts', accountsRoutes);
 // Root
 app.get('/', (req, res) => {
   res.json({

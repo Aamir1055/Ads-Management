@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Building2, Save, AlertCircle, Mail, Phone } from 'lucide-react';
+import { X, Building2, Save, AlertCircle, Phone } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { handleAccessDenied, isAccessDeniedError } from '../utils/accessDeniedHandler';
 import axios from 'axios';
@@ -13,9 +13,38 @@ const BMForm = ({ bm, onClose, onSave, setMessage }) => {
     phone_number: '',
     status: 'enabled'
   });
+  const [facebookAccounts, setFacebookAccounts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [validationErrors, setValidationErrors] = useState({});
+
+  // Fetch Facebook accounts
+  useEffect(() => {
+    const fetchFacebookAccounts = async () => {
+      try {
+        const response = await axios.get(`${API_BASE_URL}/facebook-accounts`);
+        if (Array.isArray(response.data)) {
+          setFacebookAccounts(response.data);
+        } else if (response.data.data && Array.isArray(response.data.data)) {
+          setFacebookAccounts(response.data.data);
+        } else {
+          console.error('Invalid Facebook accounts response format:', response.data);
+          toast.error('Failed to load Facebook accounts: Invalid data format');
+          setFacebookAccounts([]);
+        }
+      } catch (error) {
+        if (isAccessDeniedError(error)) {
+          handleAccessDenied();
+        } else {
+          console.error('Error fetching Facebook accounts:', error);
+          toast.error('Failed to load Facebook accounts');
+        }
+        setFacebookAccounts([]);
+      }
+    };
+
+    fetchFacebookAccounts();
+  }, []);
 
   // Get auth token
   const getAuthToken = () => {
@@ -92,10 +121,8 @@ const BMForm = ({ bm, onClose, onSave, setMessage }) => {
     }
 
     // Email validation
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
-      newErrors.email = 'Please provide a valid email address';
+    if (!formData.email) {
+      newErrors.email = 'Please select an email address';
     }
 
     // Phone validation (optional)
@@ -133,7 +160,7 @@ const BMForm = ({ bm, onClose, onSave, setMessage }) => {
       
       const submitData = {
         bm_name: formData.bm_name.trim(),
-        email: formData.email.trim(),
+        email: formData.email,
         phone_number: formData.phone_number.trim() || null,
         status: formData.status
       };
@@ -181,8 +208,9 @@ const BMForm = ({ bm, onClose, onSave, setMessage }) => {
           setErrors(error.response.data.errors);
           toast.error('Please fix the validation errors');
         } else if (error.response.status === 409) {
-          toast.error('A Business Manager with this email already exists');
-          setErrors({ email: 'Email already exists' });
+          // Previously we blocked on 409 email uniqueness. We now allow duplicate emails
+          // at the DB level; show a notification and allow the user to proceed or retry.
+          toast.error(error.response.data?.message || 'Conflict: resource already exists');
         } else {
           toast.error(error.response.data.message || 'Failed to save Business Manager');
         }
@@ -252,29 +280,31 @@ const BMForm = ({ bm, onClose, onSave, setMessage }) => {
               )}
             </div>
 
-            {/* Email */}
+
+
+            {/* Email Selection */}
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                 Email Address *
               </label>
-              <div className="mt-1 relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-4 w-4 text-gray-400" />
-                </div>
-                <input
-                  type="email"
-                  id="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  disabled={loading}
-                  placeholder="Enter email address"
-                  className={`block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${
-                    (errors.email || validationErrors.email) ? 'border-red-500' : ''
-                  }`}
-                  required
-                />
-              </div>
+              <select
+                id="email"
+                name="email"
+                value={formData.email}
+                onChange={handleInputChange}
+                disabled={loading}
+                className={`mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${
+                  (errors.email || validationErrors.email) ? 'border-red-500' : ''
+                }`}
+                required
+              >
+                <option value="">Select an Email Address</option>
+                {Array.isArray(facebookAccounts) && facebookAccounts.map(account => (
+                  <option key={account?.id} value={account?.email}>
+                    {account?.email}
+                  </option>
+                ))}
+              </select>
               {(errors.email || validationErrors.email) && (
                 <div className="mt-1 flex items-center text-sm text-red-600">
                   <AlertCircle className="h-4 w-4 mr-1" />

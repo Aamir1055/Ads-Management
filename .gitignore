@@ -1,1 +1,16 @@
 node_modules
+package-lock.json
+.env
+.env.*
+.gitignore
+.vscode/
+config/*.json
+dist/
+build/
+tmp/
+*.local
+*.development
+*.test
+frontend/package-lock.json
+frontend/node_modules/
+frontend/dist/assets/

@@ -36,6 +36,17 @@ const cardsService = {
     }
   },
 
+  // Get cards by account ID
+  getByAccount: async (accountId) => {
+    try {
+      const response = await api.get(`${ENDPOINT}/by-account/${accountId}`);
+      return response.data;
+    } catch (error) {
+      console.error('API get cards by account error:', error.response?.data || error);
+      throw error;
+    }
+  },
+
   // Create new card
   create: async (cardData) => {
     try {

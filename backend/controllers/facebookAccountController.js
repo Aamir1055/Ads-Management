@@ -1,4 +1,5 @@
 const FacebookAccountModel = require('../models/facebookAccountModel');
+const FacebookPageModel = require('../models/facebookPageModel');
 const { getRelativeImagePath, deleteUploadedFile, getAbsoluteImagePath } = require('../middleware/uploadMiddleware');
 const { validationResult } = require('express-validator');
 
@@ -223,6 +224,17 @@ class FacebookAccountController {
             }
             
             const updatedAccount = await FacebookAccountModel.update(parseInt(id), updateData, req.user.id);
+            
+            // Cascade status changes to Facebook pages if status was changed
+            if (status && status !== existingAccount.status) {
+                if (status === 'disabled') {
+                    // Auto-disable all pages using this account
+                    const affectedPages = await FacebookPageModel.autoDisableByAccountId(parseInt(id));
+                    console.log(`Auto-disabled ${affectedPages} Facebook pages for account ${id}`);
+                }
+                // Note: When account is enabled, pages remain disabled to allow manual review
+                // This prevents accidental re-activation of pages that were intentionally disabled
+            }
             
             res.status(200).json({
                 success: true,

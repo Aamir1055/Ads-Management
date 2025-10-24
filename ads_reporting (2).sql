@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Oct 09, 2025 at 10:38 AM
+-- Generation Time: Oct 24, 2025 at 12:08 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.0.30
 
@@ -20,6 +20,35 @@ SET time_zone = "+00:00";
 --
 -- Database: `ads reporting`
 --
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `account`
+--
+
+CREATE TABLE `account` (
+  `id` int(11) NOT NULL,
+  `account_name` varchar(255) NOT NULL,
+  `amount` decimal(10,2) DEFAULT 0.00,
+  `created_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `account`
+--
+
+INSERT INTO `account` (`id`, `account_name`, `amount`, `created_by`, `created_at`, `updated_at`) VALUES
+(1, 'Aamir', 12000.00, NULL, '2025-10-23 21:07:54', '2025-10-23 21:07:54'),
+(2, 'Aamirs New Account', 2340.00, NULL, '2025-10-23 21:07:54', '2025-10-23 21:07:54'),
+(3, 'Karim123', 2300.00, NULL, '2025-10-23 21:07:54', '2025-10-23 21:07:54'),
+(4, 'kjm', 890.00, NULL, '2025-10-23 21:07:54', '2025-10-23 21:07:54'),
+(5, 'qwe', 123.00, 73, '2025-10-23 21:20:46', '2025-10-23 21:20:46'),
+(6, 'Abc12', 1200.00, 73, '2025-10-23 21:22:00', '2025-10-23 21:22:00'),
+(7, 'AAM', 120000.00, 73, '2025-10-23 21:28:54', '2025-10-23 21:28:54'),
+(8, 'avvv', 3345.00, 73, '2025-10-23 22:04:07', '2025-10-23 22:04:07');
 
 -- --------------------------------------------------------
 
@@ -48,7 +77,17 @@ INSERT INTO `ads_managers` (`id`, `bm_id`, `ads_manager_name`, `email`, `phone_n
 (2, 2, 'Ads Manager Testing 32', 'shaikhaamir056@gmail.com', '8291149099', 'enabled', 35, '2025-10-08 09:43:36', '2025-10-08 11:44:43'),
 (3, 2, 'Ads Manager Testing 7', 'ektap785@gmail.com', '8291149097', 'enabled', 35, '2025-10-08 09:44:01', '2025-10-08 09:45:49'),
 (4, 1, 'Great Learner', 'abdc@gmail.com', '8291149095', 'enabled', 35, '2025-10-08 09:48:46', '2025-10-08 09:48:46'),
-(5, 3, 'Kya baat hai 20', 'Sabau1250@gmail.com', '8291149087', 'enabled', 35, '2025-10-08 12:16:44', '2025-10-08 12:16:54');
+(5, 3, 'Kya baat hai 20', 'Sabau1250@gmail.com', '8291149087', 'enabled', 35, '2025-10-08 12:16:44', '2025-10-08 12:16:54'),
+(6, 4, 'Ads Manager Testing 9', 'shaikhaamir056@gmail.com', '82911490998', 'enabled', 35, '2025-10-09 09:34:31', '2025-10-09 09:34:38'),
+(7, 5, 'Ads Manager 3', NULL, NULL, 'enabled', 69, '2025-10-09 11:40:06', '2025-10-10 06:03:01'),
+(8, 5, 'Ads Manager 1', NULL, NULL, 'enabled', 69, '2025-10-09 12:39:02', '2025-10-10 06:02:35'),
+(9, 5, 'Ads Manager 2', NULL, NULL, 'enabled', 69, '2025-10-09 13:24:02', '2025-10-10 06:02:46'),
+(10, 6, 'Ads Manager BM2', NULL, NULL, 'enabled', 69, '2025-10-10 06:07:35', '2025-10-10 06:07:35'),
+(11, 6, 'Ads Manager Testing', 'ektap785@gmail.com', '8291149097', 'enabled', 69, '2025-10-10 06:44:32', '2025-10-10 06:44:32'),
+(12, 5, 'Ads Manager 4', NULL, NULL, 'enabled', 69, '2025-10-10 06:44:59', '2025-10-10 06:44:59'),
+(13, 7, 'ADS by admin', NULL, NULL, 'enabled', 35, '2025-10-10 07:51:32', '2025-10-10 07:51:39'),
+(14, 8, 'Ads Manager for BM Aamir12', 'bmaamir12@gmail.com', NULL, 'enabled', 70, '2025-10-10 07:59:50', '2025-10-10 07:59:50'),
+(15, 9, 'Ahemd Ads Manager', 'ahmedfarooque@gmail.com', NULL, 'enabled', 72, '2025-10-11 06:59:52', '2025-10-11 06:59:52');
 
 -- --------------------------------------------------------
 
@@ -74,7 +113,17 @@ CREATE TABLE `bm` (
 INSERT INTO `bm` (`id`, `bm_name`, `email`, `phone_number`, `status`, `created_by`, `created_at`, `updated_at`) VALUES
 (1, 'Business Manager Test', 'mdimran26533@gmail.com', '8291149097', 'enabled', 35, '2025-10-08 09:34:12', '2025-10-08 09:34:12'),
 (2, 'Business Manager Test 20', 'shaikhaamir056@gmail.com', '8291149097', 'enabled', 35, '2025-10-08 09:35:05', '2025-10-08 09:46:37'),
-(3, 'Sab sahi hai', 'ektap785@gmail.com', '8291149093', 'enabled', 35, '2025-10-08 12:16:13', '2025-10-08 12:16:13');
+(3, 'Sab sahi hai', 'ektap785@gmail.com', '8291149093', 'enabled', 35, '2025-10-08 12:16:13', '2025-10-08 12:16:13'),
+(4, 'Ek or naya BM', 'atchayapk26@gmail.com', '8291149098', 'enabled', 35, '2025-10-09 09:34:07', '2025-10-09 09:34:37'),
+(5, 'Aamir BM', 'abcder@gmail.com', '82911490970', 'enabled', 69, '2025-10-09 11:38:56', '2025-10-10 06:02:22'),
+(6, 'Aamir BM2', 'aamirshaikh056@gmail.com', '', 'enabled', 69, '2025-10-10 06:03:23', '2025-10-10 06:03:23'),
+(7, 'Bm by admin', 'admin@audiencetargetcrm.online', '8291149097', 'enabled', 35, '2025-10-10 07:51:04', '2025-10-10 07:51:37'),
+(8, 'BM by Aamir12', 'aamir12@gmail.com', '8291149097', 'enabled', 70, '2025-10-10 07:59:15', '2025-10-10 07:59:15'),
+(9, 'Ahmed BM', 'ahmedfarooque@gmail.com', '', 'enabled', 72, '2025-10-11 06:59:28', '2025-10-11 06:59:28'),
+(10, 'Business Manager Test870', 'farzanafarzu1208@gmail.com', '8291149097', 'enabled', 73, '2025-10-23 19:19:47', '2025-10-23 19:19:47'),
+(17, 'Business Manager Test87908', 'farzanafarzu1208@gmail.com', '8291149023', 'enabled', 73, '2025-10-23 19:55:15', '2025-10-23 19:55:15'),
+(18, 'Business Manager Test87123', 'farzanafarzu1208@gmail.com', NULL, 'enabled', 73, '2025-10-23 20:06:19', '2025-10-23 20:06:19'),
+(19, 'Business Manager Test87234', 'farzanafarzu1208@gmail.com', NULL, 'enabled', 73, '2025-10-23 20:07:20', '2025-10-23 20:07:20');
 
 --
 -- Triggers `bm`
@@ -114,7 +163,9 @@ CREATE TABLE `brands` (
 
 INSERT INTO `brands` (`id`, `name`, `description`, `is_active`, `created_by`, `updated_by`, `created_at`, `updated_at`) VALUES
 (56, 'Whatsaap', '', 1, 35, NULL, '2025-10-08 12:05:03', '2025-10-08 12:05:03'),
-(57, 'Instagram', '', 1, 35, NULL, '2025-10-08 12:15:51', '2025-10-08 12:15:51');
+(57, 'Instagram', '', 1, 35, NULL, '2025-10-08 12:15:51', '2025-10-08 12:15:51'),
+(58, 'Tik Tok', '', 1, 35, 35, '2025-10-09 09:33:28', '2025-10-09 09:51:27'),
+(59, 'Mx tka tak', '', 1, 35, NULL, '2025-10-10 07:50:36', '2025-10-10 07:50:36');
 
 -- --------------------------------------------------------
 
@@ -165,9 +216,19 @@ CREATE TABLE `campaigns` (
 --
 
 INSERT INTO `campaigns` (`id`, `name`, `persona`, `gender`, `min_age`, `max_age`, `location`, `creatives`, `is_enabled`, `status`, `campaign_type_id`, `brand`, `created_by`, `created_at`, `updated_at`) VALUES
-(77, 'Aamir Shaikh', '[\"Mid Age\",\"Old Age\"]', '[\"Male\",\"Female\"]', 20, 60, '[\"Mumbai\",\"Pune\"]', 'carousel', 1, 'active', 56, 56, 35, '2025-10-08 12:06:15', '2025-10-08 12:06:15'),
+(77, 'Aamir Shaikh', '[\"Mid Age\",\"Old Age\"]', '[\"Male\",\"Female\"]', 20, 60, '[\"Mumbai\",\"Pune\"]', 'carousel', 1, 'active', 56, 56, 69, '2025-10-08 12:06:15', '2025-10-09 18:20:22'),
 (78, 'ALTHAF HARIS', '[\"Mid\",\"old\",\"kid\"]', '[\"Male\",\"Female\"]', 32, 70, '[\"Mumbai\",\"Pune\",\"Japan\"]', 'video', 1, 'active', 57, 57, 35, '2025-10-08 12:17:53', '2025-10-08 12:18:05'),
-(79, 'John Smith', '[\"Mid age\",\"Old Age\"]', '[\"Male\",\"Female\"]', 18, 24, '[\"Mumbai\",\"Tamil\",\"Telgu\"]', 'carousel', 1, 'active', 57, 57, 35, '2025-10-09 05:39:20', '2025-10-09 05:39:20');
+(79, 'John Smith', '[\"Mid age\",\"Old Age\"]', '[\"Male\",\"Female\"]', 18, 24, '[\"Mumbai\",\"Tamil\",\"Telgu\"]', 'carousel', 1, 'active', 57, 57, 69, '2025-10-09 05:39:20', '2025-10-09 18:20:22'),
+(80, 'ABds', '[\"Meri\",\"marxi\"]', '[\"Female\",\"Male\"]', 90, 100, NULL, 'image', 1, 'active', 57, 58, 35, '2025-10-09 09:52:27', '2025-10-09 09:52:37'),
+(81, 'Aamir  Dasboard Check', '[\"Mid\",\"Kid\",\"Young\"]', '[\"Male\",\"Female\"]', 18, 90, '[\"India\"]', 'image', 1, 'active', 57, 57, 69, '2025-10-10 06:36:29', '2025-10-10 06:36:29'),
+(82, 'Admin Cammpaign', '[\"Mid\",\"Mild\",\"New\"]', '[\"Male\",\"Female\"]', 18, 30, '[\"Mumbai\",\"Up\",\"Bihar\"]', 'carousel', 1, 'active', 59, 59, 35, '2025-10-10 07:52:57', '2025-10-10 07:52:57'),
+(83, 'Aamir 12 Campaign', NULL, '[\"Male\",\"Female\"]', 18, 40, '[\"India\",\"Pakistan\"]', 'image', 1, 'active', 59, 59, 70, '2025-10-10 08:01:23', '2025-10-10 08:01:23'),
+(84, 'Prod Campaign', '[\"Mid\",\"New\"]', '[\"Male\",\"Female\"]', 18, 35, '[\"Mumbai\",\"Pune\"]', 'image', 1, 'active', 59, 57, 35, '2025-10-10 10:05:06', '2025-10-10 10:05:06'),
+(85, 'Ahmed Campaign', '[\"Mid\",\"Old\"]', '[\"Male\",\"Female\"]', 18, 40, '[\"Mumbai\",\"Up\",\"Pune\"]', 'image', 1, 'active', 59, 57, 72, '2025-10-11 07:00:41', '2025-10-11 07:00:41'),
+(86, 'Faraz Campaign', '[\"Young\"]', '[\"Male\"]', 18, 34, '[\"India\"]', 'image', 1, 'active', 59, 57, 73, '2025-10-13 05:22:32', '2025-10-13 05:22:32'),
+(87, 'Aamir Shaikh', '[\"Young\",\"Old\"]', '[\"Female\",\"Male\"]', 25, 80, '[\"Mumbai\",\"Pune\"]', 'video', 1, 'active', 59, 57, 73, '2025-10-23 20:14:30', '2025-10-23 20:14:30'),
+(88, 'Aamir Shaikh1243', '[\"Young\",\"Old\"]', '[\"Male\",\"Female\"]', 24, 80, '[\"Mumbai\"]', 'image', 1, 'active', 59, 57, 73, '2025-10-23 20:20:39', '2025-10-23 20:20:39'),
+(89, 'Aamir Shaikh1267', '[\"Young\",\"Old\"]', '[\"Male\",\"Female\"]', 25, 70, '[\"Mumbai\"]', 'image', 1, 'active', 59, 57, 73, '2025-10-23 20:26:43', '2025-10-23 20:26:43');
 
 -- --------------------------------------------------------
 
@@ -196,7 +257,12 @@ CREATE TABLE `campaign_data` (
 INSERT INTO `campaign_data` (`id`, `campaign_id`, `facebook_result`, `xoho_result`, `spent`, `data_date`, `card_id`, `card_name`, `created_by`, `created_at`, `updated_at`) VALUES
 (114, 77, 80, 90, 8999.00, '2025-10-07', 54, 'Check updated', 35, '2025-10-08 12:08:10', '2025-10-08 12:08:10'),
 (115, 78, 121, 897, 9000.00, '2025-10-07', 54, 'Check updated', 35, '2025-10-08 12:18:23', '2025-10-08 12:18:23'),
-(116, 79, 120, 230, 899.00, '2025-10-08', 54, 'Check updated', 35, '2025-10-09 05:39:39', '2025-10-09 05:39:39');
+(116, 79, 123, 230, 899.00, '2025-10-08', 54, 'Check updated', 35, '2025-10-09 05:39:39', '2025-10-09 09:22:26'),
+(117, 80, 600, 1200, 1000.00, '2025-10-08', 55, 'Aamir', 35, '2025-10-09 09:52:49', '2025-10-09 09:52:49'),
+(118, 81, 89, 56, 2340.00, '2025-10-09', 56, 'yes its by card', 69, '2025-10-10 06:48:22', '2025-10-10 06:48:22'),
+(119, 82, 900, 987, 4532.00, '2025-10-09', 59, 'Admin Card', 35, '2025-10-10 07:55:25', '2025-10-10 07:55:25'),
+(120, 83, 890, 987, 900000.00, '2025-10-09', 60, 'By Aamir12', 70, '2025-10-10 08:03:28', '2025-10-10 08:03:28'),
+(121, 85, 100, 900, 900000.00, '2025-10-10', 61, 'Ahmed', 72, '2025-10-11 07:01:57', '2025-10-11 07:01:57');
 
 --
 -- Triggers `campaign_data`
@@ -297,7 +363,9 @@ CREATE TABLE `campaign_types` (
 
 INSERT INTO `campaign_types` (`id`, `type_name`, `description`, `is_active`, `created_at`, `updated_at`, `created_by`) VALUES
 (56, 'Test Campaign', '', 1, '2025-10-08 12:05:14', '2025-10-08 12:05:14', NULL),
-(57, 'Test Update', '', 1, '2025-10-08 12:17:05', '2025-10-08 12:17:05', NULL);
+(57, 'Test Update', '', 1, '2025-10-08 12:17:05', '2025-10-08 12:17:05', NULL),
+(58, 'New', 'hy', 0, '2025-10-09 09:51:48', '2025-10-09 09:51:57', NULL),
+(59, 'New Campaign By Admin', '', 1, '2025-10-10 07:51:54', '2025-10-10 07:51:54', NULL);
 
 -- --------------------------------------------------------
 
@@ -313,6 +381,7 @@ CREATE TABLE `cards` (
   `current_balance` decimal(15,2) DEFAULT 0.00,
   `credit_limit` decimal(15,2) DEFAULT NULL,
   `is_active` tinyint(1) DEFAULT 1,
+  `account_id` int(11) DEFAULT NULL,
   `created_by` int(11) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
@@ -322,8 +391,15 @@ CREATE TABLE `cards` (
 -- Dumping data for table `cards`
 --
 
-INSERT INTO `cards` (`id`, `card_name`, `card_number_last4`, `card_type`, `current_balance`, `credit_limit`, `is_active`, `created_by`, `created_at`, `updated_at`) VALUES
-(54, 'Check updated', '1234', 'Visa', 2000.00, NULL, 1, 35, '2025-10-08 12:06:31', '2025-10-08 12:06:31');
+INSERT INTO `cards` (`id`, `card_name`, `card_number_last4`, `card_type`, `current_balance`, `credit_limit`, `is_active`, `account_id`, `created_by`, `created_at`, `updated_at`) VALUES
+(54, 'Check updated', '1234', 'Visa', 2000.00, NULL, 1, NULL, 35, '2025-10-08 12:06:31', '2025-10-09 09:35:49'),
+(55, 'Aamir', '3333', 'Visa', 2000.00, NULL, 1, NULL, 35, '2025-10-09 09:35:35', '2025-10-09 09:35:35'),
+(56, 'yes its by card', '1396', 'Redot', 2000.00, NULL, 1, NULL, 69, '2025-10-09 18:30:38', '2025-10-09 18:30:38'),
+(58, 'Aamir New Card', '1234', 'Redot', 0.00, NULL, 1, NULL, 69, '2025-10-10 06:49:13', '2025-10-10 06:49:13'),
+(59, 'Admin Card', '9999', 'Redot', 2200.00, NULL, 1, NULL, 35, '2025-10-10 07:53:22', '2025-10-10 07:53:22'),
+(60, 'By Aamir12', '3333', 'Visa', 9000.00, NULL, 1, NULL, 70, '2025-10-10 08:01:38', '2025-10-10 08:01:38'),
+(61, 'Ahmed', '1234', 'Visa', 2000.00, NULL, 1, NULL, 72, '2025-10-11 07:00:55', '2025-10-11 07:00:55'),
+(64, 'Check updated bb', '1234', 'Visa', 2200.00, NULL, 1, 5, 73, '2025-10-23 22:04:33', '2025-10-23 22:04:33');
 
 -- --------------------------------------------------------
 
@@ -347,7 +423,13 @@ CREATE TABLE `card_users` (
 --
 
 INSERT INTO `card_users` (`id`, `card_id`, `user_id`, `assigned_date`, `is_primary`, `created_at`, `updated_at`, `created_by`) VALUES
-(33, 54, 35, '2025-10-08', 1, '2025-10-08 12:06:31', '2025-10-08 12:06:31', NULL);
+(34, 55, 35, '2025-10-09', 1, '2025-10-09 09:35:35', '2025-10-09 09:35:35', NULL),
+(35, 56, 69, '2025-10-10', 1, '2025-10-09 18:30:38', '2025-10-09 18:30:38', NULL),
+(36, 58, 69, '2025-10-10', 0, '2025-10-10 06:49:13', '2025-10-10 06:49:13', NULL),
+(37, 59, 35, '2025-10-10', 0, '2025-10-10 07:53:22', '2025-10-10 07:53:22', NULL),
+(38, 60, 70, '2025-10-10', 1, '2025-10-10 08:01:38', '2025-10-10 08:01:38', NULL),
+(39, 61, 72, '2025-10-11', 1, '2025-10-11 07:00:55', '2025-10-11 07:00:55', NULL),
+(40, 64, 73, '2025-10-24', 1, '2025-10-23 22:04:33', '2025-10-23 22:04:33', NULL);
 
 -- --------------------------------------------------------
 
@@ -373,8 +455,20 @@ CREATE TABLE `facebook_accounts` (
 --
 
 INSERT INTO `facebook_accounts` (`id`, `email`, `password`, `authenticator`, `phone_number`, `id_image_path`, `status`, `created_by`, `created_at`, `updated_at`) VALUES
-(2, 'shaikhaamir056@gmail.com', '$2b$12$zI/oILT7Fae2twdTUr1giOMGRzKz/DwfEuLkNIG.gYaM41qFwLizm', 'asdfgfds', '8291149097', '/uploads/id-images/fb-id-1759912502249-408712354-WhatsApp_Image_2025_09_03_at_01.42.26_cf58901f.jpg', 'enabled', 35, '2025-10-08 08:35:02', '2025-10-08 11:43:15'),
-(3, 'aamir@demo.com', '$2b$12$/hMIs21VOwcD2wkCfbvF/u9DyczocBE2OeY0Mf756xbAVx4LE9qVG', 'asdfghgfd', '8291149099', NULL, 'enabled', 35, '2025-10-08 12:07:08', '2025-10-08 12:07:08');
+(2, 'shaikhaamir056@gmail.com', '$2b$12$zI/oILT7Fae2twdTUr1giOMGRzKz/DwfEuLkNIG.gYaM41qFwLizm', 'asdfgfds', '8291149097', '/uploads/id-images/fb-id-1759912502249-408712354-WhatsApp_Image_2025_09_03_at_01.42.26_cf58901f.jpg', 'enabled', 35, '2025-10-08 08:35:02', '2025-10-09 09:53:01'),
+(3, 'aamir@demo.com', '$2b$12$/hMIs21VOwcD2wkCfbvF/u9DyczocBE2OeY0Mf756xbAVx4LE9qVG', 'asdfghgfd', '8291149099', NULL, 'enabled', 35, '2025-10-08 12:07:08', '2025-10-09 09:53:00'),
+(4, 'kamranshaikh342@gmail.com', '$2b$12$5DP.wortFpiQ3mZglIXwReX/4DepoqYEdb313YcqYPR6fKnX9v1vC', 'asdf1234', '8291149095', NULL, 'enabled', 35, '2025-10-09 09:53:44', '2025-10-09 09:53:44'),
+(5, 'atchayapk26@gmail.com', '$2b$12$4S.Lshx3uU2YDwdQdmo1quUWjOl9aroratpXUpllM4.TvCK5m0rhG', 'asdfgfds12345', '8291149098', NULL, 'disabled', 69, '2025-10-09 11:48:48', '2025-10-09 17:41:44'),
+(6, 'adsw@gmail.com', '$2b$12$EYOBQZl.PO5gp1tUozG.LOAf9S95lgAu77ChG5WqgWAaRKLQSh.gK', 'asdfghgf1234', '9320646953', NULL, 'enabled', 69, '2025-10-09 19:18:55', '2025-10-09 19:18:55'),
+(7, 'kamranshaikh34dd2@gmail.com', '$2b$12$PLYuY8JmXp1WiaBWK4XILumVoVwRb8K/dpBWCLf3eaPd.yEet.9cS', 'asdfghh123', '8291149095', NULL, 'enabled', 69, '2025-10-10 06:52:16', '2025-10-10 06:52:16'),
+(8, 'asdf@gmail.com', '$2b$12$DdRzZuLtOw.2qyu2oCoCH.OfQk2bO0fxLZBatEXEzYCl9BbQaAKk.', '123rfsjvsfbd233', '8291149097', NULL, 'enabled', 69, '2025-10-10 06:55:37', '2025-10-10 06:55:37'),
+(9, 'hy@gmail.com', '$2b$12$4cOCxn2hCETy1/X1zTVdu.BOpOoVOSvKQWaOIRfxux2v3YnUL3K0q', 'assddfvsf123', '8291149987', NULL, 'enabled', 69, '2025-10-10 06:57:31', '2025-10-10 06:57:31'),
+(10, 'admin@audiencetargetcrm.online', '$2b$12$UjnY5bacyjRgnNHIqsCFSuYSfl.HbhqYLESUN3CQxmlU30wL5BHqi', 'asdfvb123e', '8291149000', NULL, 'enabled', 35, '2025-10-10 07:54:16', '2025-10-10 07:54:34'),
+(11, 'aamir12@gmail.com', '$2b$12$SXoUF9UmN.pmONBRqSlGYO7PHS1bb73PeTnKRrHbWZuw/7U8g885W', 'hljkmnjkhn', '8291149098', NULL, 'enabled', 70, '2025-10-10 08:02:30', '2025-10-10 08:02:30'),
+(12, 'ahmedfarooque@gmail.com', '$2b$12$r2zvoHZ5SIanOlUQv2Rho.snuRVIMABJhdO/FkJrG5NxLtuM8qJqu', 'qwerfc124', '8291149097', NULL, 'enabled', 72, '2025-10-11 07:01:26', '2025-10-11 07:01:26'),
+(13, 'ektap785@gmail.com', '$2b$12$/Ab6zfxOnkddWDlWkC8aROrWlONv3sMt589Ee6cEhojCrs02OGKIm', '1234bndgbbn', '8291149097', NULL, 'enabled', 35, '2025-10-23 17:50:00', '2025-10-23 17:50:00'),
+(14, 'ektap7805@gmail.com', '$2b$12$DTw0VTB9re.zSXBhUVGuBerWU//9sVePjJ2vDTiHndbVZdqvnPmqK', '12345', '8291149098', NULL, 'enabled', 35, '2025-10-23 17:56:11', '2025-10-23 17:56:11'),
+(15, 'farzanafarzu1208@gmail.com', '$2b$12$RW4EWSQXWfE4eAmbLJrESO2z3q.PHOeZKPSG2S2KFjQBuoONzERIi', '123sdfb', '8291149097', NULL, 'enabled', 73, '2025-10-23 18:53:24', '2025-10-23 18:53:24');
 
 --
 -- Triggers `facebook_accounts`
@@ -413,9 +507,15 @@ CREATE TABLE `facebook_pages` (
 --
 
 INSERT INTO `facebook_pages` (`id`, `facebook_account_id`, `page_name`, `page_description`, `status`, `created_by`, `created_at`, `updated_at`) VALUES
-(1, 2, 'Yes page test', 'checking', 'enabled', 35, '2025-10-08 08:35:47', '2025-10-08 11:43:22'),
-(2, 2, 'hey', NULL, 'enabled', 35, '2025-10-08 08:37:58', '2025-10-08 11:43:18'),
-(3, 3, 'Yes page test2', NULL, 'enabled', 35, '2025-10-08 12:07:38', '2025-10-08 12:07:38');
+(2, 2, 'hey', NULL, 'enabled', 35, '2025-10-08 08:37:58', '2025-10-09 09:54:09'),
+(3, 3, 'Yes page test2', NULL, 'enabled', 35, '2025-10-08 12:07:38', '2025-10-09 09:54:09'),
+(4, 3, 'Yes page test 56', NULL, 'enabled', 35, '2025-10-09 09:36:45', '2025-10-09 09:54:08'),
+(5, 4, 'Yes page test9000', '990', 'enabled', 35, '2025-10-09 09:54:22', '2025-10-09 17:41:55'),
+(6, 5, 'Yes page test 5698', NULL, 'disabled', 69, '2025-10-09 12:00:46', '2025-10-09 17:41:44'),
+(7, 9, 'Yes page test', '89', 'enabled', 69, '2025-10-10 06:57:54', '2025-10-10 06:57:54'),
+(8, 10, 'admin Page', NULL, 'enabled', 35, '2025-10-10 07:54:51', '2025-10-10 07:54:51'),
+(9, 11, 'BY Aamir12', NULL, 'enabled', 70, '2025-10-10 08:02:56', '2025-10-10 08:02:56'),
+(10, 12, 'Working Page', NULL, 'enabled', 72, '2025-10-11 07:01:37', '2025-10-11 07:01:37');
 
 -- --------------------------------------------------------
 
@@ -1101,7 +1201,50 @@ INSERT INTO `refresh_tokens` (`id`, `user_id`, `token_id`, `expires_at`, `is_act
 (733, 35, 'cc186ff0-9908-4ffd-aefa-02f1be7485fe', '2025-10-16 13:48:45', 1, '2025-10-09 08:18:45', '2025-10-09 08:18:45'),
 (734, 35, '385321dc-6571-4424-8aef-8708b549df3d', '2025-10-16 13:54:37', 1, '2025-10-09 08:24:37', '2025-10-09 08:24:37'),
 (735, 35, 'd603c615-9f09-4d26-9860-57bee42956d7', '2025-10-16 13:55:58', 1, '2025-10-09 08:25:58', '2025-10-09 08:25:58'),
-(736, 35, '1afcfcd5-057b-426d-b5dc-8be32d33e8fa', '2025-10-16 13:57:31', 1, '2025-10-09 08:27:31', '2025-10-09 08:27:31');
+(736, 35, '1afcfcd5-057b-426d-b5dc-8be32d33e8fa', '2025-10-16 13:57:31', 1, '2025-10-09 08:27:31', '2025-10-09 08:27:31'),
+(737, 35, '264cf0a4-7891-42b1-9d6d-47229ed93786', '2025-10-16 14:15:24', 1, '2025-10-09 08:45:24', '2025-10-09 08:45:24'),
+(738, 35, '492e1697-66c6-4d25-8f3e-1474ceb26685', '2025-10-16 14:31:11', 1, '2025-10-09 09:01:11', '2025-10-09 09:01:11'),
+(739, 35, '1d91b60a-f17a-4eea-bfad-0578722dd7e7', '2025-10-16 14:48:00', 1, '2025-10-09 09:18:00', '2025-10-09 09:18:00'),
+(740, 35, '9a836588-412f-4824-99d8-417cde1d500c', '2025-10-16 15:00:43', 1, '2025-10-09 09:30:43', '2025-10-09 09:30:43'),
+(741, 35, 'be8ea4ea-d904-48b8-a569-4aa8f754faed', '2025-10-16 15:20:46', 1, '2025-10-09 09:50:46', '2025-10-09 09:50:46'),
+(742, 69, 'de1856e8-1e80-4a05-acde-fd222fb1acfe', '2025-10-16 16:36:52', 1, '2025-10-09 11:06:52', '2025-10-09 11:06:52'),
+(743, 35, '2feef51c-7d1a-4d44-8492-aa310c6c62f6', '2025-10-16 16:47:03', 1, '2025-10-09 11:17:03', '2025-10-09 11:17:03'),
+(744, 69, '43df8442-9235-4e70-a609-9e8736a1ee00', '2025-10-16 16:47:45', 0, '2025-10-09 11:17:45', '2025-10-09 11:38:20'),
+(745, 69, '0d002cc5-8ef3-424e-b4af-b1a351ca5cb7', '2025-10-16 17:08:20', 1, '2025-10-09 11:38:20', '2025-10-09 11:38:20'),
+(746, 69, '20249daf-ab46-4a13-a17e-886bc955d08c', '2025-10-16 17:08:20', 1, '2025-10-09 11:38:20', '2025-10-09 11:38:20'),
+(747, 69, '95db96cd-293f-469e-b232-dc52cc0fd7f0', '2025-10-16 17:27:53', 0, '2025-10-09 11:57:53', '2025-10-09 12:38:42'),
+(748, 69, '49f006ab-fd61-43d4-ac6d-4af00bad1ac7', '2025-10-16 18:08:42', 1, '2025-10-09 12:38:42', '2025-10-09 12:38:42'),
+(749, 69, 'a345ddd7-2d33-414a-8df5-5dd10e5835b5', '2025-10-16 18:08:42', 1, '2025-10-09 12:38:42', '2025-10-09 12:38:42'),
+(750, 69, '872e3343-a86e-456c-9b74-d3c0410b53b5', '2025-10-16 18:08:42', 1, '2025-10-09 12:38:42', '2025-10-09 12:38:42'),
+(751, 69, '0d41c44f-7592-45b0-9d98-8dbbe1522141', '2025-10-16 18:30:53', 1, '2025-10-09 13:00:53', '2025-10-09 13:00:53'),
+(752, 69, '9be2a32c-2b31-4e83-b5ea-c76df41d5abb', '2025-10-16 18:51:18', 1, '2025-10-09 13:21:18', '2025-10-09 13:21:18'),
+(753, 35, 'd602a01d-14aa-4790-8cf7-2f3c5f6a9733', '2025-10-16 23:09:40', 1, '2025-10-09 17:39:40', '2025-10-09 17:39:40'),
+(754, 69, '01ab718f-0187-4306-89da-f5cbfa8fad52', '2025-10-16 23:13:46', 1, '2025-10-09 17:43:46', '2025-10-09 17:43:46'),
+(755, 69, '4cabd863-9e5c-45ad-9541-99c383d2a783', '2025-10-16 23:54:27', 1, '2025-10-09 18:24:27', '2025-10-09 18:24:27'),
+(756, 69, 'd5519ee9-f6d9-4794-b42f-b6abe1fe594f', '2025-10-17 00:10:05', 1, '2025-10-09 18:40:05', '2025-10-09 18:40:05'),
+(757, 69, '68c8df56-bb1d-46a4-b30a-7b58496fdac2', '2025-10-17 00:32:33', 1, '2025-10-09 19:02:33', '2025-10-09 19:02:33'),
+(758, 69, 'a214da72-6c77-4dea-aa17-88932caafd4d', '2025-10-17 00:45:59', 1, '2025-10-09 19:15:59', '2025-10-09 19:15:59'),
+(759, 69, '5fd01103-28ee-484e-beeb-47aee94d63d1', '2025-10-17 11:16:28', 1, '2025-10-10 05:46:28', '2025-10-10 05:46:28'),
+(760, 69, 'b83a9460-bc5c-4feb-8590-cee5a345ea58', '2025-10-17 11:31:10', 1, '2025-10-10 06:01:10', '2025-10-10 06:01:10'),
+(761, 35, '6a8a75e3-ec5a-4a95-b363-ec065ba6a1fb', '2025-10-17 11:38:25', 1, '2025-10-10 06:08:25', '2025-10-10 06:08:25'),
+(762, 69, '53711feb-c8b2-4f58-91b2-5097526fcee2', '2025-10-17 11:39:19', 1, '2025-10-10 06:09:19', '2025-10-10 06:09:19'),
+(763, 69, 'ec7565e2-4d68-4aea-a1d1-a2d01afb0daf', '2025-10-17 12:38:35', 1, '2025-10-10 07:08:35', '2025-10-10 07:08:35'),
+(764, 69, 'f562031a-4e06-4f37-9a8d-d0ed8743a1fd', '2025-10-17 13:02:01', 1, '2025-10-10 07:32:01', '2025-10-10 07:32:01'),
+(765, 35, '092559c1-3580-4883-b48b-b781d6388383', '2025-10-17 13:16:50', 1, '2025-10-10 07:46:50', '2025-10-10 07:46:50'),
+(766, 35, '839b81c7-0f01-496c-913c-d2720659c7eb', '2025-10-17 13:26:29', 1, '2025-10-10 07:56:29', '2025-10-10 07:56:29'),
+(767, 70, 'ee63e237-0989-407c-9394-420e83f4a5a5', '2025-10-17 13:28:07', 1, '2025-10-10 07:58:07', '2025-10-10 07:58:07'),
+(768, 35, 'e57809c4-1fae-48df-aea1-566f256832b4', '2025-10-17 15:33:22', 1, '2025-10-10 10:03:22', '2025-10-10 10:03:22'),
+(769, 35, 'e94f8bd4-2d14-4e4b-aa2f-b14c33341dcb', '2025-10-17 17:09:13', 1, '2025-10-10 11:39:13', '2025-10-10 11:39:13'),
+(770, 35, '1c701f9f-e921-4fc6-989e-b6a3ceaa015c', '2025-10-18 06:27:17', 1, '2025-10-11 06:27:17', '2025-10-11 06:27:17'),
+(771, 35, '24752556-58a3-42d3-a7da-37bfde99e0c9', '2025-10-18 06:27:37', 1, '2025-10-11 06:27:37', '2025-10-11 06:27:37'),
+(772, 35, 'a18992ec-9061-4411-8c4a-5f9278e9258b', '2025-10-18 06:27:56', 1, '2025-10-11 06:27:56', '2025-10-11 06:27:56'),
+(773, 35, 'e965a021-365a-4fbb-b1a1-5e09413dbf95', '2025-10-18 06:28:16', 1, '2025-10-11 06:28:16', '2025-10-11 06:28:16'),
+(774, 35, '48243062-4c48-48f5-bfb7-dbe37c5acd66', '2025-10-18 06:35:17', 1, '2025-10-11 06:35:17', '2025-10-11 06:35:17'),
+(775, 72, '6dcfdbfb-4440-49fe-844d-3957c3b9b685', '2025-10-18 12:29:06', 1, '2025-10-11 06:59:06', '2025-10-11 06:59:06'),
+(776, 35, 'ce8ef602-be70-48a2-866b-d0b903e253c6', '2025-10-20 10:51:13', 1, '2025-10-13 05:21:13', '2025-10-13 05:21:13'),
+(777, 73, '2a018b56-0de5-4c85-b589-cb5f5c3663f2', '2025-10-20 10:52:04', 1, '2025-10-13 05:22:04', '2025-10-13 05:22:04'),
+(778, 35, 'cd1919c2-6366-4bd8-aeea-30c8af036739', '2025-10-30 22:54:00', 1, '2025-10-23 17:24:00', '2025-10-23 17:24:00'),
+(779, 73, '04a66886-5f00-44d6-87fc-556e34a224ab', '2025-10-30 23:33:56', 1, '2025-10-23 18:03:56', '2025-10-23 18:03:56');
 
 -- --------------------------------------------------------
 
@@ -1135,9 +1278,14 @@ CREATE TABLE `reports` (
 --
 
 INSERT INTO `reports` (`id`, `report_date`, `report_month`, `campaign_id`, `campaign_name`, `campaign_type`, `brand`, `brand_name`, `leads`, `facebook_result`, `zoho_result`, `spent`, `created_at`, `updated_at`, `created_by`) VALUES
-(11, '2025-10-07', '2025-10', 77, 'Aamir Shaikh', 'Test Campaign', 56, 'Whatsaap', 170, 80, 90, 8999.00, '2025-10-08 12:08:10', '2025-10-08 12:08:10', 35),
+(11, '2025-10-07', '2025-10', 77, 'Aamir Shaikh', 'Test Campaign', 56, 'Whatsaap', 170, 80, 90, 8999.00, '2025-10-08 12:08:10', '2025-10-09 18:20:22', 69),
 (12, '2025-10-07', '2025-10', 78, 'ALTHAF HARIS', 'Test Update', 57, 'Instagram', 1018, 121, 897, 9000.00, '2025-10-08 12:18:23', '2025-10-08 12:18:23', 35),
-(14, '2025-10-08', '2025-10', 79, 'John Smith', 'Test Update', 57, 'Instagram', 350, 120, 230, 899.00, '2025-10-09 05:39:39', '2025-10-09 05:39:39', 35);
+(14, '2025-10-08', '2025-10', 79, 'John Smith', 'Test Update', 57, 'Instagram', 353, 123, 230, 899.00, '2025-10-09 05:39:39', '2025-10-09 18:20:22', 69),
+(15, '2025-10-08', '2025-10', 80, 'ABds', 'Test Update', 58, 'Tik Tok', 1800, 600, 1200, 1000.00, '2025-10-09 09:52:49', '2025-10-09 09:52:49', 35),
+(16, '2025-10-09', '2025-10', 81, 'Aamir  Dasboard Check', 'Test Update', 57, 'Instagram', 145, 89, 56, 2340.00, '2025-10-10 06:48:22', '2025-10-10 06:48:22', 69),
+(17, '2025-10-09', '2025-10', 82, 'Admin Cammpaign', 'New Campaign By Admin', 59, 'Mx tka tak', 1887, 900, 987, 4532.00, '2025-10-10 07:55:25', '2025-10-10 07:55:25', 35),
+(18, '2025-10-09', '2025-10', 83, 'Aamir 12 Campaign', 'New Campaign By Admin', 59, 'Mx tka tak', 1877, 890, 987, 900000.00, '2025-10-10 08:03:28', '2025-10-10 08:03:28', 70),
+(19, '2025-10-10', '2025-10', 85, 'Ahmed Campaign', 'New Campaign By Admin', 57, 'Instagram', 1000, 100, 900, 900000.00, '2025-10-11 07:01:57', '2025-10-11 07:01:57', 72);
 
 -- --------------------------------------------------------
 
@@ -1162,8 +1310,9 @@ CREATE TABLE `roles` (
 --
 
 INSERT INTO `roles` (`id`, `name`, `display_name`, `description`, `level`, `is_active`, `is_system_role`, `created_at`, `updated_at`) VALUES
-(5, 'super_admin', 'Super Administrator', 'Full system access with all permissions', 10, 1, 1, '2025-09-17 13:01:36', '2025-09-17 13:01:36'),
-(20, 'Testing', '', '', 1, 1, 0, '2025-10-08 12:04:40', '2025-10-08 12:04:40');
+(5, 'superadmin', 'Super Administrator', 'Full system access with all permissions', 10, 1, 1, '2025-09-17 13:01:36', '2025-10-23 18:05:11'),
+(21, 'Testing', '', '', 1, 1, 0, '2025-10-10 07:50:21', '2025-10-10 07:50:21'),
+(23, 'Aamir Testing', '', '', 1, 1, 0, '2025-10-11 06:57:44', '2025-10-11 06:57:44');
 
 -- --------------------------------------------------------
 
@@ -1243,29 +1392,51 @@ INSERT INTO `role_permissions` (`id`, `role_id`, `permission_id`, `created_at`, 
 (841, 5, 74, '2025-10-08 10:01:53', '2025-10-08 10:01:53'),
 (842, 5, 72, '2025-10-08 10:01:53', '2025-10-08 10:01:53'),
 (844, 5, 70, '2025-10-08 10:01:53', '2025-10-08 10:01:53'),
-(845, 20, 32, '2025-10-08 12:04:40', '2025-10-08 12:04:40'),
-(846, 20, 2, '2025-10-08 12:04:40', '2025-10-08 12:04:40'),
-(847, 20, 24, '2025-10-08 12:04:40', '2025-10-08 12:04:40'),
-(848, 20, 36, '2025-10-08 12:04:40', '2025-10-08 12:04:40'),
-(849, 20, 7, '2025-10-08 12:04:40', '2025-10-08 12:04:40'),
-(850, 20, 28, '2025-10-08 12:04:40', '2025-10-08 12:04:40'),
-(851, 20, 27, '2025-10-08 12:04:40', '2025-10-08 12:04:40'),
-(852, 20, 16, '2025-10-08 12:04:40', '2025-10-08 12:04:40'),
-(853, 20, 14, '2025-10-08 12:04:40', '2025-10-08 12:04:40'),
-(854, 20, 11, '2025-10-08 12:04:40', '2025-10-08 12:04:40'),
-(855, 20, 6, '2025-10-08 12:04:40', '2025-10-08 12:04:40'),
-(856, 20, 70, '2025-10-08 12:04:40', '2025-10-08 12:04:40'),
-(857, 20, 15, '2025-10-08 12:04:40', '2025-10-08 12:04:40'),
-(858, 20, 44, '2025-10-08 12:04:40', '2025-10-08 12:04:40'),
-(859, 20, 17, '2025-10-08 12:04:40', '2025-10-08 12:04:40'),
-(860, 20, 10, '2025-10-08 12:04:40', '2025-10-08 12:04:40'),
-(861, 20, 55, '2025-10-08 12:04:40', '2025-10-08 12:04:40'),
-(862, 20, 51, '2025-10-08 12:04:40', '2025-10-08 12:04:40'),
-(863, 20, 72, '2025-10-08 12:04:40', '2025-10-08 12:04:40'),
-(864, 20, 18, '2025-10-08 12:04:40', '2025-10-08 12:04:40'),
-(865, 20, 65, '2025-10-08 12:04:40', '2025-10-08 12:04:40'),
-(866, 20, 66, '2025-10-08 12:04:40', '2025-10-08 12:04:40'),
-(867, 20, 73, '2025-10-08 12:04:40', '2025-10-08 12:04:40');
+(924, 21, 36, '2025-10-10 07:50:21', '2025-10-10 07:50:21'),
+(925, 21, 2, '2025-10-10 07:50:21', '2025-10-10 07:50:21'),
+(926, 21, 32, '2025-10-10 07:50:21', '2025-10-10 07:50:21'),
+(927, 21, 24, '2025-10-10 07:50:21', '2025-10-10 07:50:21'),
+(928, 21, 14, '2025-10-10 07:50:21', '2025-10-10 07:50:21'),
+(929, 21, 15, '2025-10-10 07:50:21', '2025-10-10 07:50:21'),
+(930, 21, 28, '2025-10-10 07:50:21', '2025-10-10 07:50:21'),
+(931, 21, 27, '2025-10-10 07:50:21', '2025-10-10 07:50:21'),
+(932, 21, 6, '2025-10-10 07:50:21', '2025-10-10 07:50:21'),
+(933, 21, 18, '2025-10-10 07:50:21', '2025-10-10 07:50:21'),
+(934, 21, 11, '2025-10-10 07:50:21', '2025-10-10 07:50:21'),
+(935, 21, 10, '2025-10-10 07:50:21', '2025-10-10 07:50:21'),
+(936, 21, 7, '2025-10-10 07:50:21', '2025-10-10 07:50:21'),
+(937, 21, 70, '2025-10-10 07:50:21', '2025-10-10 07:50:21'),
+(938, 21, 44, '2025-10-10 07:50:21', '2025-10-10 07:50:21'),
+(939, 21, 17, '2025-10-10 07:50:21', '2025-10-10 07:50:21'),
+(940, 21, 55, '2025-10-10 07:50:21', '2025-10-10 07:50:21'),
+(941, 21, 51, '2025-10-10 07:50:21', '2025-10-10 07:50:21'),
+(942, 21, 72, '2025-10-10 07:50:21', '2025-10-10 07:50:21'),
+(943, 21, 73, '2025-10-10 07:50:21', '2025-10-10 07:50:21'),
+(944, 21, 65, '2025-10-10 07:50:21', '2025-10-10 07:50:21'),
+(945, 21, 66, '2025-10-10 07:50:21', '2025-10-10 07:50:21'),
+(946, 23, 2, '2025-10-11 06:57:46', '2025-10-11 06:57:46'),
+(947, 23, 36, '2025-10-11 06:57:46', '2025-10-11 06:57:46'),
+(948, 23, 32, '2025-10-11 06:57:46', '2025-10-11 06:57:46'),
+(949, 23, 24, '2025-10-11 06:57:46', '2025-10-11 06:57:46'),
+(950, 23, 28, '2025-10-11 06:57:46', '2025-10-11 06:57:46'),
+(951, 23, 16, '2025-10-11 06:57:46', '2025-10-11 06:57:46'),
+(952, 23, 27, '2025-10-11 06:57:46', '2025-10-11 06:57:46'),
+(953, 23, 14, '2025-10-11 06:57:46', '2025-10-11 06:57:46'),
+(954, 23, 7, '2025-10-11 06:57:46', '2025-10-11 06:57:46'),
+(955, 23, 6, '2025-10-11 06:57:46', '2025-10-11 06:57:46'),
+(956, 23, 11, '2025-10-11 06:57:46', '2025-10-11 06:57:46'),
+(957, 23, 15, '2025-10-11 06:57:46', '2025-10-11 06:57:46'),
+(958, 23, 10, '2025-10-11 06:57:46', '2025-10-11 06:57:46'),
+(959, 23, 18, '2025-10-11 06:57:46', '2025-10-11 06:57:46'),
+(960, 23, 70, '2025-10-11 06:57:46', '2025-10-11 06:57:46'),
+(961, 23, 55, '2025-10-11 06:57:46', '2025-10-11 06:57:46'),
+(962, 23, 73, '2025-10-11 06:57:46', '2025-10-11 06:57:46'),
+(963, 23, 51, '2025-10-11 06:57:46', '2025-10-11 06:57:46'),
+(964, 23, 44, '2025-10-11 06:57:46', '2025-10-11 06:57:46'),
+(965, 23, 17, '2025-10-11 06:57:46', '2025-10-11 06:57:46'),
+(966, 23, 72, '2025-10-11 06:57:46', '2025-10-11 06:57:46'),
+(967, 23, 65, '2025-10-11 06:57:46', '2025-10-11 06:57:46'),
+(968, 23, 66, '2025-10-11 06:57:46', '2025-10-11 06:57:46');
 
 -- --------------------------------------------------------
 
@@ -1297,11 +1468,24 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `username`, `hashed_password`, `auth_token`, `twofa_enabled`, `twofa_secret`, `twofa_verified_at`, `is_active`, `last_login`, `created_at`, `updated_at`, `is_2fa_enabled`, `two_factor_secret`, `two_factor_backup_codes`, `role_name`, `role_id`) VALUES
-(35, 'admin', '$2b$12$hFcNV40Nu1jcg36.jlA8euqYLJXGicMjzZOG0I0n734PVTaDfIsaq', 'NAYUW2ZMG46DA6DXOEXEINJMM5ZGIWTQ', 0, NULL, NULL, 1, '2025-10-09 08:27:31', '2025-09-13 08:20:12', '2025-10-09 08:27:31', 0, NULL, NULL, 'super_admin', 5);
+(35, 'admin', '$2a$12$9yHkqhBGIILEoXGyCVwUPuEONIqitBo.30XZa9kljMe25.ozjNs9W', 'NAYUW2ZMG46DA6DXOEXEINJMM5ZGIWTQ', 0, NULL, NULL, 1, '2025-10-23 17:24:00', '2025-09-13 08:20:12', '2025-10-23 17:24:00', 0, NULL, NULL, 'super_admin', 5),
+(69, 'Aamir', '$2b$12$lHzuSNc2M7BNLntHJLK75uj/hWc4wHKdnMoBVqaXuKFJJXGnMcP.6', 'KEYGQTSPIF3HARZQI5GDQL3LOJFG43TQ', 0, NULL, NULL, 0, '2025-10-10 07:32:01', '2025-10-09 09:51:16', '2025-10-10 07:48:48', 0, NULL, NULL, 'user', 20),
+(70, 'Aamir12', '$2b$12$0aNT0BotXcHrw3CEIBo0fuhmBRvnhXe8wcgi46BS7XsB3CClAD2xu', 'JJPDKQL3NY7SCYLPJIUXCR2YHAVFQ32H', 0, NULL, NULL, 1, '2025-10-10 07:58:07', '2025-10-10 07:57:13', '2025-10-10 07:58:07', 1, NULL, NULL, 'user', 21),
+(71, 'Prod User', '$2b$12$gjRcIwpStcBSxVgGWQY5oezP5PyhtQTVITWNGAQ9iTHu6LdUdf2vi', NULL, 0, NULL, NULL, 1, NULL, '2025-10-10 10:46:13', '2025-10-10 10:46:13', 0, NULL, NULL, 'user', 21),
+(72, 'Ahmed', '$2b$12$qoo1LpDfWlnEkQnroEuiRup5/yLcb0uZaPno6MVg4jofVrcHNzKJu', 'FBHUS3ZKMVBESTR6II7W6SJBHRYFAW33', 0, NULL, NULL, 1, '2025-10-11 06:59:06', '2025-10-11 06:58:20', '2025-10-11 06:59:06', 1, NULL, NULL, 'user', 23),
+(73, 'Faraz', '$2b$12$jmxT32Fsti3MJwl9l8qQ6emhy3V3ymR5Elknims8OMHwUfvsvaM5W', 'PEVGWQK3KQZUESZ2JEXTAI3GOZFDOPT2', 0, NULL, NULL, 1, '2025-10-23 18:03:56', '2025-10-13 05:21:50', '2025-10-23 18:03:56', 1, NULL, NULL, 'user', 23);
 
 --
 -- Indexes for dumped tables
 --
+
+--
+-- Indexes for table `account`
+--
+ALTER TABLE `account`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `account_name` (`account_name`),
+  ADD KEY `fk_account_created_by` (`created_by`);
 
 --
 -- Indexes for table `ads_managers`
@@ -1320,7 +1504,6 @@ ALTER TABLE `ads_managers`
 --
 ALTER TABLE `bm`
   ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `unique_bm_email` (`email`),
   ADD KEY `idx_bm_status` (`status`),
   ADD KEY `idx_bm_created_by` (`created_by`),
   ADD KEY `idx_bm_email` (`email`),
@@ -1382,7 +1565,8 @@ ALTER TABLE `cards`
   ADD UNIQUE KEY `card_name` (`card_name`),
   ADD KEY `idx_card_name` (`card_name`),
   ADD KEY `idx_active` (`is_active`),
-  ADD KEY `fk_cards_created_by` (`created_by`);
+  ADD KEY `fk_cards_created_by` (`created_by`),
+  ADD KEY `fk_cards_account` (`account_id`);
 
 --
 -- Indexes for table `card_users`
@@ -1489,22 +1673,28 @@ ALTER TABLE `users`
 --
 
 --
+-- AUTO_INCREMENT for table `account`
+--
+ALTER TABLE `account`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+
+--
 -- AUTO_INCREMENT for table `ads_managers`
 --
 ALTER TABLE `ads_managers`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
 
 --
 -- AUTO_INCREMENT for table `bm`
 --
 ALTER TABLE `bm`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=20;
 
 --
 -- AUTO_INCREMENT for table `brands`
 --
 ALTER TABLE `brands`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=58;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=60;
 
 --
 -- AUTO_INCREMENT for table `campaign`
@@ -1516,43 +1706,43 @@ ALTER TABLE `campaign`
 -- AUTO_INCREMENT for table `campaigns`
 --
 ALTER TABLE `campaigns`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=80;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=90;
 
 --
 -- AUTO_INCREMENT for table `campaign_data`
 --
 ALTER TABLE `campaign_data`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=117;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=122;
 
 --
 -- AUTO_INCREMENT for table `campaign_types`
 --
 ALTER TABLE `campaign_types`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=58;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=60;
 
 --
 -- AUTO_INCREMENT for table `cards`
 --
 ALTER TABLE `cards`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=55;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=65;
 
 --
 -- AUTO_INCREMENT for table `card_users`
 --
 ALTER TABLE `card_users`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=34;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=41;
 
 --
 -- AUTO_INCREMENT for table `facebook_accounts`
 --
 ALTER TABLE `facebook_accounts`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
 
 --
 -- AUTO_INCREMENT for table `facebook_pages`
 --
 ALTER TABLE `facebook_pages`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
 
 --
 -- AUTO_INCREMENT for table `modules`
@@ -1570,35 +1760,41 @@ ALTER TABLE `permissions`
 -- AUTO_INCREMENT for table `refresh_tokens`
 --
 ALTER TABLE `refresh_tokens`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=737;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=780;
 
 --
 -- AUTO_INCREMENT for table `reports`
 --
 ALTER TABLE `reports`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=15;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=20;
 
 --
 -- AUTO_INCREMENT for table `roles`
 --
 ALTER TABLE `roles`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=21;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=24;
 
 --
 -- AUTO_INCREMENT for table `role_permissions`
 --
 ALTER TABLE `role_permissions`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=874;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=969;
 
 --
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=69;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=74;
 
 --
 -- Constraints for dumped tables
 --
+
+--
+-- Constraints for table `account`
+--
+ALTER TABLE `account`
+  ADD CONSTRAINT `fk_account_created_by` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;
 
 --
 -- Constraints for table `ads_managers`
@@ -1637,6 +1833,7 @@ ALTER TABLE `campaign_types`
 -- Constraints for table `cards`
 --
 ALTER TABLE `cards`
+  ADD CONSTRAINT `fk_cards_account` FOREIGN KEY (`account_id`) REFERENCES `account` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_cards_created_by` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --

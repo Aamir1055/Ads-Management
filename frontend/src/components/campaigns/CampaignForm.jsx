@@ -180,6 +180,7 @@ const CampaignForm = ({ campaign = null, isOpen, onClose, onSave }) => {
   const validateForm = () => {
     const errors = {}
 
+    // Required field validations
     if (!formData.name.trim()) {
       errors.name = 'Campaign name is required'
     }
@@ -192,12 +193,32 @@ const CampaignForm = ({ campaign = null, isOpen, onClose, onSave }) => {
       errors.brand = 'Brand is required'
     }
 
-    // Validate min and max age
-    if (formData.min_age && (isNaN(formData.min_age) || formData.min_age < 0 || formData.min_age > 100)) {
+    if (formData.persona.length === 0) {
+      errors.persona = 'At least one persona is required'
+    }
+
+    if (formData.gender.length === 0) {
+      errors.gender = 'At least one gender is required'
+    }
+
+    if (formData.location.length === 0) {
+      errors.location = 'At least one location is required'
+    }
+
+    if (!formData.creatives) {
+      errors.creatives = 'Creative type is required'
+    }
+
+    // Age validations
+    if (!formData.min_age) {
+      errors.min_age = 'Minimum age is required'
+    } else if (isNaN(formData.min_age) || parseInt(formData.min_age) < 0 || parseInt(formData.min_age) > 100) {
       errors.min_age = 'Minimum age must be a number between 0 and 100'
     }
 
-    if (formData.max_age && (isNaN(formData.max_age) || formData.max_age < 0 || formData.max_age > 100)) {
+    if (!formData.max_age) {
+      errors.max_age = 'Maximum age is required'
+    } else if (isNaN(formData.max_age) || parseInt(formData.max_age) < 0 || parseInt(formData.max_age) > 100) {
       errors.max_age = 'Maximum age must be a number between 0 and 100'
     }
 
@@ -360,7 +381,7 @@ const CampaignForm = ({ campaign = null, isOpen, onClose, onSave }) => {
             {/* Min Age */}
             <div>
               <label htmlFor="min_age" className="block text-sm font-medium text-gray-700 mb-1">
-                Minimum Age
+                Minimum Age *
               </label>
               <input
                 type="number"
@@ -383,7 +404,7 @@ const CampaignForm = ({ campaign = null, isOpen, onClose, onSave }) => {
             {/* Max Age */}
             <div>
               <label htmlFor="max_age" className="block text-sm font-medium text-gray-700 mb-1">
-                Maximum Age
+                Maximum Age *
               </label>
               <input
                 type="number"
@@ -426,8 +447,11 @@ const CampaignForm = ({ campaign = null, isOpen, onClose, onSave }) => {
             {/* Persona Multi-Value Input */}
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Persona (Multiple Values)
+                Persona (Multiple Values) *
               </label>
+              {validationErrors.persona && (
+                <p className="mt-1 text-sm text-red-600">{validationErrors.persona}</p>
+              )}
               
               {/* Display selected personas */}
               <div className="mb-2 flex flex-wrap gap-2">
@@ -472,8 +496,11 @@ const CampaignForm = ({ campaign = null, isOpen, onClose, onSave }) => {
             {/* Gender Checkbox Selection */}
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-3">
-                Gender (Multiple Selection)
+                Gender (Multiple Selection) *
               </label>
+              {validationErrors.gender && (
+                <p className="mt-1 text-sm text-red-600">{validationErrors.gender}</p>
+              )}
               
               {/* Display selected genders */}
               {formData.gender.length > 0 && (
@@ -518,8 +545,11 @@ const CampaignForm = ({ campaign = null, isOpen, onClose, onSave }) => {
             {/* Location Multi-Value Input */}
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Location (Multiple Values)
+                Location (Multiple Values) *
               </label>
+              {validationErrors.location && (
+                <p className="mt-1 text-sm text-red-600">{validationErrors.location}</p>
+              )}
               
               {/* Display selected locations */}
               <div className="mb-2 flex flex-wrap gap-2">
@@ -565,7 +595,7 @@ const CampaignForm = ({ campaign = null, isOpen, onClose, onSave }) => {
             <div className="md:col-span-2">
               <div className="flex items-center justify-between">
                 <label htmlFor="is_enabled" className="block text-sm font-medium text-gray-700">
-                  Campaign Status
+                  Campaign Status *
                 </label>
                 <div className="flex items-center space-x-3">
                   <span className={`text-sm ${formData.is_enabled ? 'text-gray-500' : 'text-gray-900 font-medium'}`}>

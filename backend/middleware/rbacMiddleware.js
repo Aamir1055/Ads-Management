@@ -199,6 +199,12 @@ const modulePermissions = {
     update: checkModulePermission('cards', 'update'),
     delete: checkModulePermission('cards', 'delete')
   },
+  accounts: {
+    read: checkModulePermission('accounts', 'read'),
+    create: checkModulePermission('accounts', 'create'),
+    update: checkModulePermission('accounts', 'update'),
+    delete: checkModulePermission('accounts', 'delete')
+  },
   modules: {
     read: checkModulePermission('modules', 'read'),
     create: checkModulePermission('modules', 'create'),

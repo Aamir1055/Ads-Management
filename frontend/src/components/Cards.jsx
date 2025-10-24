@@ -14,6 +14,7 @@ import {
   CreditCard
 } from 'lucide-react'
 import cardsService from '../services/cardsService'
+import accountsService from '../services/accountsService'
 import CardForm from './CardForm'
 import { formatDate } from '../utils/dateUtils'
 
@@ -40,6 +41,49 @@ const Cards = () => {
   const [addBalanceCard, setAddBalanceCard] = useState(null)
   const [addBalanceAmount, setAddBalanceAmount] = useState('')
   const [addBalanceLoading, setAddBalanceLoading] = useState(false)
+  
+  // Add Account modal state
+  const [showAddAccountModal, setShowAddAccountModal] = useState(false)
+  const [newAccountName, setNewAccountName] = useState('')
+  const [newAccountAmount, setNewAccountAmount] = useState('')
+  const [addAccountLoading, setAddAccountLoading] = useState(false)
+  // Accounts list
+  const [accounts, setAccounts] = useState([])
+  // Add Account Amount modal state
+  const [showAddAcctAmountModal, setShowAddAcctAmountModal] = useState(false)
+  const [selectedAccount, setSelectedAccount] = useState(null)
+  const [accountAmountInput, setAccountAmountInput] = useState('')
+  const [addAcctAmountLoading, setAddAcctAmountLoading] = useState(false)
+
+  // Fetch accounts (handles multiple API response shapes)
+  const fetchAccounts = async () => {
+    try {
+      setLoading(true)
+      const response = await accountsService.getAll()
+      console.log('Accounts API response:', response)
+      let list = []
+      if (Array.isArray(response)) {
+        list = response
+      } else if (response?.success && Array.isArray(response?.data)) {
+        list = response.data
+      } else if (Array.isArray(response?.accounts)) {
+        list = response.accounts
+      } else if (Array.isArray(response?.data?.accounts)) {
+        list = response.data.accounts
+      }
+      setAccounts(list)
+      if (!Array.isArray(response)) {
+        // If backend returned an error, surface it on UI briefly in console
+        if (response?.success === false) {
+          console.error('Accounts fetch failed:', response?.message)
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching accounts:', err?.response?.data || err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   // Fetch cards
   const fetchCards = async () => {
@@ -68,22 +112,24 @@ const Cards = () => {
     }
   }
 
-  // Search handling with debounce
+  // Search handling with debounce (accounts)
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       setCurrentPage(1)
-      fetchCards()
+      fetchAccounts()
     }, 300)
     return () => clearTimeout(timeoutId)
   }, [searchTerm])
 
   useEffect(() => {
-    fetchCards()
+    fetchAccounts()
   }, [currentPage])
 
+  // Load accounts on component mount
   useEffect(() => {
-    fetchCards()
+    fetchAccounts()
   }, [])
+
 
   // Form handlers
   const handleOpenForm = (item = null) => {
@@ -113,7 +159,7 @@ const Cards = () => {
       }
       
       handleCloseForm()
-      await fetchCards()
+      await fetchAccounts()
     } catch (err) {
       console.error('Form submission error:', err)
       throw err // Re-throw to let the form handle the error
@@ -197,23 +243,20 @@ const Cards = () => {
     }
   }
 
-  // Filter cards based on search term
-  const filteredCards = useMemo(() => {
-    if (!searchTerm.trim()) return cards
-    
-    return cards.filter(card =>
-      card.card_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      card.card_number_last4?.includes(searchTerm) ||
-      card.card_type?.toLowerCase().includes(searchTerm.toLowerCase())
+  // Filter accounts based on search term
+  const filteredAccounts = useMemo(() => {
+    if (!searchTerm.trim()) return accounts
+    return accounts.filter(acct =>
+      acct.account_name?.toLowerCase().includes(searchTerm.toLowerCase())
     )
-  }, [cards, searchTerm])
+  }, [accounts, searchTerm])
 
-  // Pagination calculations
-  const totalItems = filteredCards.length
+  // Pagination calculations (accounts)
+  const totalItems = filteredAccounts.length
   const totalPages = Math.ceil(totalItems / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
   const endIndex = startIndex + itemsPerPage
-  const currentItems = filteredCards.slice(startIndex, endIndex)
+  const currentItems = filteredAccounts.slice(startIndex, endIndex)
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
@@ -221,11 +264,11 @@ const Cards = () => {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
           <CreditCard className="h-7 w-7 text-blue-600" />
-          Cards Management
+          Accounts Management
         </h1>
         <div className="flex items-center gap-3">
           <button
-            onClick={() => fetchCards()}
+            onClick={() => fetchAccounts()}
             disabled={loading}
             className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
@@ -238,6 +281,13 @@ const Cards = () => {
           >
             <Plus className="h-4 w-4 mr-2" />
             Add Card
+          </button>
+          <button
+            onClick={() => setShowAddAccountModal(true)}
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm bg-green-600 text-sm font-medium text-white hover:bg-green-700 transition-colors"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Account
           </button>
         </div>
       </div>
@@ -253,7 +303,7 @@ const Cards = () => {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="Search cards..."
+            placeholder="Search accounts..."
           />
         </div>
       </div>
@@ -268,111 +318,120 @@ const Cards = () => {
         </div>
       )}
 
-      {/* Cards Grid */}
-      {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <div className="animate-pulse">
-                <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                <div className="h-3 bg-gray-200 rounded w-1/2 mb-4"></div>
-                <div className="h-3 bg-gray-200 rounded w-full mb-2"></div>
-                <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+      {/* Add Account Amount Modal */}
+      {showAddAcctAmountModal && selectedAccount && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
+            <div className="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-md sm:w-full sm:p-6">
+              <div className="sm:flex sm:items-start">
+                <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left flex-1">
+                  <h3 className="text-lg leading-6 font-medium text-gray-900">Add Amount to {selectedAccount.account_name}</h3>
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Amount (integer)</label>
+                    <input type="number" step="1" value={accountAmountInput} onChange={(e) => setAccountAmountInput(e.target.value)} className="block w-full px-3 py-2 border border-gray-300 rounded-md" placeholder="0" />
+                  </div>
+                </div>
+              </div>
+              <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
+                <button
+                  onClick={async () => {
+                    const amt = parseInt(accountAmountInput, 10)
+                    if (!Number.isFinite(amt)) { alert('Please enter a valid integer amount'); return }
+                    try {
+                      setAddAcctAmountLoading(true)
+                      const resp = await accountsService.addAmount(selectedAccount.id, amt)
+                      if (resp?.success === false) { alert(resp?.message || 'Failed to add amount'); }
+                      setShowAddAcctAmountModal(false)
+                      setSelectedAccount(null)
+                      setAccountAmountInput('')
+                      await fetchAccounts()
+                    } catch (err) {
+                      console.error('Add account amount error:', err)
+                      alert(err?.response?.data?.message || 'Failed to add amount')
+                    } finally {
+                      setAddAcctAmountLoading(false)
+                    }
+                  }}
+                  disabled={addAcctAmountLoading}
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 disabled:opacity-50 sm:ml-3 sm:w-auto sm:text-sm transition-colors"
+                >
+                  {addAcctAmountLoading ? 'Saving...' : 'Save'}
+                </button>
+                <button
+                  onClick={() => { setShowAddAcctAmountModal(false); setSelectedAccount(null); setAccountAmountInput('') }}
+                  disabled={addAcctAmountLoading}
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 sm:mt-0 sm:w-auto sm:text-sm transition-colors"
+                >
+                  Cancel
+                </button>
               </div>
             </div>
-          ))}
+          </div>
+        </div>
+      )}
+
+      {/* Accounts are the primary view now */}
+
+      {/* Accounts Table */}
+      {loading ? (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="animate-pulse">
+            <div className="h-4 bg-gray-200 rounded w-1/3 mb-4"></div>
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="h-3 bg-gray-200 rounded w-full mb-2"></div>
+            ))}
+          </div>
         </div>
       ) : currentItems.length === 0 ? (
         <div className="text-center py-12">
           <CreditCard className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No cards found</h3>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No accounts found</h3>
           <p className="text-gray-500 mb-4">
-            {searchTerm ? 'Try adjusting your search terms.' : 'Get started by adding your first card.'}
+            {searchTerm ? 'Try adjusting your search terms.' : 'Create an account to get started.'}
           </p>
           {!searchTerm && (
             <button
-              onClick={() => handleOpenForm()}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm bg-blue-600 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+              onClick={() => setShowAddAccountModal(true)}
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm bg-green-600 text-sm font-medium text-white hover:bg-green-700 transition-colors"
             >
               <Plus className="h-4 w-4 mr-2" />
-              Add Card
+              Add Account
             </button>
           )}
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {currentItems.map((card) => (
-              <div key={card.id || card._id} className="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
-                <div className="p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-1">{card.card_name}</h3>
-                      <p className="text-sm text-gray-600">•••• •••• •••• {card.card_number_last4}</p>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        card.is_active 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-red-100 text-red-800'
-                      }`}>
-                        {card.is_active ? (
-                          <><CheckCircle className="w-3 h-3 mr-1" /> Active</>
-                        ) : (
-                          <><XCircle className="w-3 h-3 mr-1" /> Inactive</>
-                        )}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Card Type</p>
-                      <p className="text-sm font-medium text-gray-900 capitalize">{card.card_type || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Balance</p>
-                      <div className="flex items-center">
-                        <IndianRupee className="h-4 w-4 text-green-600 mr-1" />
-                        <span className="text-sm font-semibold text-green-600">
-                          {Number(card.current_balance || 0).toFixed(2)}
-                        </span>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Account Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Account ID</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Balance (AED)</th>
+                  <th className="px-6 py-3"></th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {currentItems.map((acct) => (
+                  <tr key={acct.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{acct.account_name}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{acct.id}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">AED {Number(acct.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                      <div className="flex items-center gap-2 justify-end">
+                        <a href={`/cards/account/${acct.id}`} className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+                          <Eye className="h-3 w-3 mr-1" /> View Cards
+                        </a>
+                        <button onClick={() => { setSelectedAccount(acct); setAccountAmountInput(''); setShowAddAcctAmountModal(true) }} className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+                          + Add Amount
+                        </button>
                       </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                    <div className="flex items-center text-xs text-gray-500">
-                      <Calendar className="h-3 w-3 mr-1" />
-                      {formatDate(card.created_at)}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleAddBalanceClick(card)}
-                        className="inline-flex items-center px-3 py-1.5 border border-green-300 shadow-sm text-xs font-medium rounded text-green-700 bg-green-50 hover:bg-green-100 transition-colors"
-                      >
-                        <Plus className="h-3 w-3 mr-1" />
-                        Add Balance
-                      </button>
-                      <button
-                        onClick={() => handleOpenForm(card)}
-                        className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 transition-colors"
-                      >
-                        <Edit className="h-3 w-3 mr-1" />
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDeleteClick(card)}
-                        className="inline-flex items-center px-3 py-1.5 border border-red-300 shadow-sm text-xs font-medium rounded text-red-700 bg-red-50 hover:bg-red-100 transition-colors"
-                      >
-                        <Trash2 className="h-3 w-3 mr-1" />
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
 
           {/* Pagination */}
@@ -382,28 +441,15 @@ const Cards = () => {
                 Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} results
               </div>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  disabled={currentPage <= 1}
-                  className="inline-flex items-center px-3 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed rounded-md transition-colors"
-                >
-                  Previous
-                </button>
-                <span className="text-sm text-gray-700">
-                  Page {currentPage} of {totalPages}
-                </span>
-                <button
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                  disabled={currentPage >= totalPages}
-                  className="inline-flex items-center px-3 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed rounded-md transition-colors"
-                >
-                  Next
-                </button>
+                <button onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={currentPage <= 1} className="inline-flex items-center px-3 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed rounded-md transition-colors">Previous</button>
+                <span className="text-sm text-gray-700">Page {currentPage} of {totalPages}</span>
+                <button onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={currentPage >= totalPages} className="inline-flex items-center px-3 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed rounded-md transition-colors">Next</button>
               </div>
             </div>
           )}
         </>
       )}
+
 
       {/* Card Form Modal */}
       <CardForm
@@ -412,6 +458,7 @@ const Cards = () => {
         onSubmit={handleFormSubmit}
         editData={editingItem}
         isLoading={formLoading}
+        accounts={accounts}
       />
 
       {/* Delete Confirmation Modal */}
@@ -504,6 +551,74 @@ const Cards = () => {
                   onClick={handleAddBalanceCancel}
                   disabled={addBalanceLoading}
                   className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 sm:mt-0 sm:w-auto sm:text-sm transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Add Account Modal */}
+      {showAddAccountModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
+            <div className="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-md sm:w-full sm:p-6">
+              <div className="sm:flex sm:items-start">
+                <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left flex-1">
+                  <h3 className="text-lg leading-6 font-medium text-gray-900">Add Account</h3>
+                  <div className="mt-4">
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Account Name *</label>
+                      <input type="text" value={newAccountName} onChange={(e) => setNewAccountName(e.target.value)} className="block w-full px-3 py-2 border border-gray-300 rounded-md" placeholder="Enter account name" />
+                    </div>
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Amount *</label>
+                      <input type="number" step="0.01" value={newAccountAmount} onChange={(e) => setNewAccountAmount(e.target.value)} className="block w-full px-3 py-2 border border-gray-300 rounded-md" placeholder="0.00" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
+                <button
+                  onClick={async () => {
+                    if (!newAccountName.trim()) { alert('Account name is required'); return }
+                    const amt = newAccountAmount === '' ? 0 : parseFloat(newAccountAmount)
+                    if (isNaN(amt)) { alert('Amount must be a number'); return }
+                    try {
+                      setAddAccountLoading(true)
+                      const accountsService = (await import('../services/accountsService')).default
+                      const response = await accountsService.createAccount({ account_name: newAccountName.trim(), amount: amt })
+                      // backend may return different shapes: { success: true, data: { account } } or the raw account object
+                      const createdAccount = response && (response.data?.account || response.account || response)
+                      const successFlag = response && (response.success === true || (createdAccount && (createdAccount.id || createdAccount.account_name)))
+                      if (successFlag) {
+                        setShowAddAccountModal(false)
+                        setNewAccountName('')
+                        setNewAccountAmount('')
+                        // refresh account list if available
+                        try { const acctSvc = (await import('../services/accountsService')).default; await acctSvc.getAll(); } catch (e) {}
+                        alert('Account created successfully')
+                      } else {
+                        alert(response?.message || 'Failed to create account')
+                      }
+                    } catch (err) {
+                      console.error('Create account error:', err)
+                      alert(err?.response?.data?.message || 'Failed to create account')
+                    } finally {
+                      setAddAccountLoading(false)
+                    }
+                  }}
+                  disabled={addAccountLoading}
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 disabled:opacity-50 sm:ml-3 sm:w-auto sm:text-sm transition-colors"
+                >
+                  {addAccountLoading ? 'Saving...' : 'Save'}
+                </button>
+                <button
+                  onClick={() => setShowAddAccountModal(false)}
+                  disabled={addAccountLoading}
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 sm:mt-0 sm:w-auto sm:text-sm transition-colors"
                 >
                   Cancel
                 </button>

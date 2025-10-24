@@ -12,6 +12,7 @@ const {
   setCardPriority,
   getMyCards
 } = require('../controllers/cardsController');
+const { getCardsByAccount } = require('../controllers/cardsByAccountController');
 
 const { authenticateToken } = require('../middleware/authMiddleware');
 const { attachUserPermissions, modulePermissions } = require('../middleware/rbacMiddleware');
@@ -101,6 +102,9 @@ router.post('/:id/add-balance', addBalanceLimiter, modulePermissions.cards.updat
 router.patch('/:id/toggle-status', updateLimiter, modulePermissions.cards.update, checkCardOwnership, toggleCardStatus);
 router.patch('/:id/set-priority', updateLimiter, modulePermissions.cards.update, checkCardOwnership, setCardPriority);
 router.delete('/:id', deleteLimiter, modulePermissions.cards.delete, checkCardOwnership, deleteCard);
+
+// Get cards by account ID
+router.get('/by-account/:accountId', getOneLimiter, modulePermissions.cards.read, getCardsByAccount);
 
 // =============================================================================
 // ERROR HANDLING

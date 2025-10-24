@@ -25,24 +25,50 @@ class Campaign {
   static validate(data, isUpdate = false) {
     const errors = [];
 
-    // Name is required
-    if (!isUpdate && (!data.name || data.name.trim().length === 0)) {
+    // Required fields validation
+    if (!data.name || data.name.trim().length === 0) {
       errors.push('Campaign name is required');
-    }
-    
-    if (data.name && data.name.trim().length > 255) {
+    } else if (data.name.trim().length > 255) {
       errors.push('Campaign name must be less than 255 characters');
     }
 
+    // Required field validations
+    if (!data.campaign_type_id) {
+      errors.push('Campaign type is required');
+    }
+
+    if (!data.brand) {
+      errors.push('Brand is required');
+    }
+
+    // Persona validation
+    if (!data.persona || !Array.isArray(data.persona) || data.persona.length === 0) {
+      errors.push('At least one persona is required');
+    }
+
+    // Gender validation
+    if (!data.gender || !Array.isArray(data.gender) || data.gender.length === 0) {
+      errors.push('At least one gender is required');
+    }
+
+    // Location validation
+    if (!data.location || !Array.isArray(data.location) || data.location.length === 0) {
+      errors.push('At least one location is required');
+    }
+
     // Age validation
-    if (data.min_age !== undefined && data.min_age !== null) {
+    if (!data.min_age && !isUpdate) {
+      errors.push('Minimum age is required');
+    } else if (data.min_age !== undefined && data.min_age !== null) {
       const minAge = parseInt(data.min_age);
       if (isNaN(minAge) || minAge < 0 || minAge > 100) {
         errors.push('Minimum age must be a number between 0 and 100');
       }
     }
 
-    if (data.max_age !== undefined && data.max_age !== null) {
+    if (!data.max_age && !isUpdate) {
+      errors.push('Maximum age is required');
+    } else if (data.max_age !== undefined && data.max_age !== null) {
       const maxAge = parseInt(data.max_age);
       if (isNaN(maxAge) || maxAge < 0 || maxAge > 100) {
         errors.push('Maximum age must be a number between 0 and 100');
