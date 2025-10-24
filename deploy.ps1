@@ -2,68 +2,120 @@ param(
     [string]$remote_host = "65.20.84.140",
     [string]$remote_user = "deployer",
     [string]$remote_dir = "~/Ads-Management-Fresh",
-    [string]$db_name = "ads_reporting",
-    [string]$db_user = "deployer",
-    [Parameter(Mandatory=$true)]
-    [string]$db_password
+    [switch]$DryRun,
+    [switch]$Force
 )
 
-# Function to run SQL file on remote server
-function Execute-RemoteSQL {
-    param(
-        [string]$sqlFile,
-}
+Write-Host "Starting deployment process (archive-based)..." -ForegroundColor Green
 
-try {
-    # Step 1: Create a list of files to exclude from deployment
-    $excludedFiles = @(
-        '.git',
-        'node_modules',
-        '*.log',
-        'deploy.ps1',
-        '.env',
-        '.env.*',
-        'config/*.json',
-        'package-lock.json',
-        '.gitignore',
-        '.vscode',
-        'dist',
-        'build',
-        'tmp',
-        '*.local',
-        '*.development',
-        '*.test'
-    )
-
-    # Step 2: Sync files to server
-    Write-Host "Uploading files to server..." -ForegroundColor Yellow
-    
-    # Create the remote directory if it doesn't exist
-    ssh "$remote_user@$remote_host" "mkdir -p $remote_dir"
-
-    # Use filtered copy to server, excluding sensitive and environment-specific files
-    Get-ChildItem -Exclude $excludedFiles | 
-    Where-Object {
-        $item = $_
-        -not ($excludedFiles | Where-Object { $item.Name -like $_ })
-    } | 
-    ForEach-Object {
-        Write-Host "Copying $($_.Name)..." -ForegroundColor Cyan
-        scp -r $_.FullName "$remote_user@$remote_host:$remote_dir/"
-    
-    # Step 4: Restart the application
-    Write-Host "Restarting application on server..." -ForegroundColor Yellow
-    $remote_commands = @"
-        cd $remote_dir
-        pm2 reload all || pm2 restart all
-        pm2 save
-"@
-
-    ssh "$remote_user@$remote_host" $remote_commands
-
-    Write-Host "Deployment completed successfully!" -ForegroundColor Green
-
-} catch {
-    Write-Host "Deployment failed: $_" -ForegroundColor Red
+# Basic prerequisites check
+if (!(Get-Command ssh -ErrorAction SilentlyContinue)) {
+    Write-Host "Error: 'ssh' is not available in PATH." -ForegroundColor Red
     exit 1
 }
+if (!(Get-Command scp -ErrorAction SilentlyContinue)) {
+    Write-Host "Error: 'scp' is not available in PATH." -ForegroundColor Red
+    exit 1
+}
+
+# Files/folders to exclude from the archive (keeps server env intact)
+$excludes = @(
+    '\.git',
+    'node_modules',
+    '\.env',
+    'package-lock.json',
+    '\.gitignore',
+    '\.vscode',
+    'dist',
+    'build',
+    'tmp',
+    'frontend\\node_modules',
+    'frontend\\dist\\assets',
+    'frontend\\package-lock.json',
+    '\.sql$'
+)
+
+function Is-ExcludedPath($fullPath) {
+    foreach ($ex in $excludes) {
+        if ($fullPath -like "*$ex*") { return $true }
+    }
+    return $false
+}
+
+# Gather files to include
+Write-Host "Scanning project files..." -ForegroundColor Yellow
+$files = Get-ChildItem -Recurse -File | Where-Object { -not (Is-ExcludedPath $_.FullName) }
+
+if (-not $files) {
+    Write-Host "No files found to deploy after exclusions." -ForegroundColor Yellow
+    exit 0
+}
+
+$archiveName = "deploy_$(Get-Date -Format yyyyMMdd_HHmmss).zip"
+$archivePath = Join-Path $env:TEMP $archiveName
+
+Write-Host "Files to include: $($files.Count)" -ForegroundColor Cyan
+if ($DryRun) {
+    $files | ForEach-Object { Write-Host "  $_.FullName" }
+    Write-Host "Dry run enabled — no archive will be created or uploaded." -ForegroundColor Green
+    exit 0
+}
+
+if (-not $Force) {
+    $prompt = "Proceed to create archive '$archiveName' and deploy to ${remote_user}@${remote_host}:$remote_dir? (y/N)"
+    $confirm = Read-Host $prompt
+    if ($confirm -ne 'y' -and $confirm -ne 'Y') {
+        Write-Host "Aborted by user." -ForegroundColor Yellow
+        exit 0
+    }
+}
+
+Write-Host "Creating archive $archivePath ..." -ForegroundColor Yellow
+try {
+    $paths = $files | Select-Object -ExpandProperty FullName
+    Compress-Archive -Path $paths -DestinationPath $archivePath -Force
+} catch {
+    Write-Host "Archive creation failed: $_" -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "Uploading archive to server..." -ForegroundColor Yellow
+try {
+    scp $archivePath "${remote_user}@${remote_host}:/tmp/$archiveName"
+} catch {
+    Write-Host "Upload failed: $_" -ForegroundColor Red
+    Remove-Item -LiteralPath $archivePath -ErrorAction SilentlyContinue
+    exit 1
+}
+
+# Remote extraction and deploy steps (will not alter global server env)
+$remote_commands = @'
+mkdir -p __REMOTE_DIR__
+if command -v unzip >/dev/null 2>&1; then
+    unzip -o /tmp/__ARCHIVE__ -d __REMOTE_DIR__
+else
+    echo 'ERROR: unzip not found on server. Please install unzip and re-run.' >&2
+    exit 2
+fi
+rm -f /tmp/__ARCHIVE__
+cd __REMOTE_DIR__
+pm2 reload all || pm2 restart all || (echo 'PM2 not found or restart failed' >&2; exit 3)
+pm2 save || true
+'@
+
+$remote_commands = $remote_commands -replace '__REMOTE_DIR__', $remote_dir
+$remote_commands = $remote_commands -replace '__ARCHIVE__', $archiveName
+
+Write-Host "Running remote extraction and restart..." -ForegroundColor Yellow
+try {
+        ssh "${remote_user}@${remote_host}" $remote_commands
+} catch {
+        Write-Host "Remote deployment step failed: $_" -ForegroundColor Red
+        Remove-Item -LiteralPath $archivePath -ErrorAction SilentlyContinue
+        exit 1
+}
+
+# Clean up local archive
+Remove-Item -LiteralPath $archivePath -ErrorAction SilentlyContinue
+
+Write-Host "Deployment completed successfully!" -ForegroundColor Green

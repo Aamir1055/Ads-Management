@@ -483,8 +483,8 @@ class User {
 
       // Update user with 2FA secret
       await connection.query(
-        'UPDATE users SET auth_token = ?, is_2fa_enabled = 1, updated_at = NOW() WHERE id = ?',
-        [secret.base32, id]
+        'UPDATE users SET auth_token = ?, twofa_secret = COALESCE(twofa_secret, ?), two_factor_secret = COALESCE(two_factor_secret, ?), is_2fa_enabled = 1, twofa_enabled = 1, updated_at = NOW() WHERE id = ?',
+        [secret.base32, secret.base32, secret.base32, id]
       );
 
       await connection.commit();
@@ -570,9 +570,10 @@ class User {
       await connection.beginTransaction();
 
       // Store the secret in the database
+      // Try to write to all known 2FA secret columns for compatibility
       await connection.query(
-        'UPDATE users SET auth_token = ?, updated_at = NOW() WHERE id = ?',
-        [secret.base32, id]
+        'UPDATE users SET auth_token = ?, twofa_secret = COALESCE(twofa_secret, ?), two_factor_secret = COALESCE(two_factor_secret, ?), updated_at = NOW() WHERE id = ?',
+        [secret.base32, secret.base32, secret.base32, id]
       );
 
       await connection.commit();
@@ -627,7 +628,7 @@ class User {
       secret: user.auth_token,
       encoding: 'base32',
       token: token,
-      window: 2 // Allow 2 time steps tolerance
+      window: 4, // increase tolerance to reduce clock drift issues
     });
     
     console.log('🔍 TOTP verification result:', isValid);
@@ -638,12 +639,34 @@ class User {
    * Find user by ID including secret (for internal use only)
    */
   static async findByIdWithSecret(id) {
-    const [users] = await pool.query(
-      'SELECT id, username, auth_token, is_2fa_enabled FROM users WHERE id = ? AND is_active = 1',
+    const [rows] = await pool.query(
+      `SELECT 
+         id, username,
+         -- support multiple schemas/columns for 2FA flags and secret storage
+         is_2fa_enabled,
+         twofa_enabled,
+         auth_token,
+         twofa_secret,
+         two_factor_secret
+       FROM users 
+       WHERE id = ? AND is_active = 1
+       LIMIT 1`,
       [id]
     );
 
-    return users.length > 0 ? users[0] : null;
+    if (!rows || rows.length === 0) return null;
+    const row = rows[0];
+
+    // Normalize differing schemas
+    const is2FA = Boolean(row.is_2fa_enabled || row.twofa_enabled);
+    const secret = row.auth_token || row.twofa_secret || row.two_factor_secret || null;
+
+    return {
+      id: row.id,
+      username: row.username,
+      is_2fa_enabled: is2FA,
+      auth_token: secret,
+    };
   }
 
   /**

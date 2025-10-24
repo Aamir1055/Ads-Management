@@ -44,3 +44,26 @@ export const getAccountById = async (id: number): Promise<Account> => {
         throw error;
     }
 };
+
+export const addAmount = async (
+    id: number,
+    amount: number
+): Promise<{ success: boolean; message: string; data?: any }> => {
+    try {
+        const response = await axios.post(
+            `${API_URL}/accounts/${id}/add-amount`,
+            { amount },
+            { headers: await getAuthHeader() }
+        );
+        return response.data;
+    } catch (err: any) {
+        // Map 403 Forbidden to a clear permission message for UI
+        if (err?.response?.status === 403) {
+            const e = new Error("You don't have permission to update this account.");
+            (e as any).code = 'NO_UPDATE_PERMISSION';
+            throw e;
+        }
+        console.error('API addAmount error:', err?.response?.data || err);
+        throw err;
+    }
+};
