@@ -71,13 +71,13 @@ const Layout = ({ children }) => {
       'Role Management',
       'Brand Management',
       'Business Manager',
-      'Campaign Type',
-      'Cards',
-      'Cards Users',
       'Facebook Accounts',
       'Facebook Pages',
+      'Campaign Type',
       'Campaign',
-      'Report'
+      'Cards',
+      'Cards Users',
+      'Reports'
     ];
     
     // Map backend names to our expected names
@@ -85,7 +85,7 @@ const Layout = ({ children }) => {
       'Campaign Types': 'Campaign Type',
       'Campaigns': 'Campaign',
       'Card Users': 'Cards Users',
-      'Reports': 'Report'
+      'Reports': 'Reports'
     };
     
     const getOrderIndex = (name) => {
