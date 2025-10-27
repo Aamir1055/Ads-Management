@@ -308,7 +308,8 @@ const getAllCampaignData = async (req, res) => {
       LEFT JOIN brands b ON c.brand = b.id
       ${whereClause}
     `;
-    const [countRows] = await pool.execute(countQuery, queryParams);
+    // Use query() instead of execute() to avoid type strictness issues with date strings
+    const [countRows] = await pool.query(countQuery, queryParams);
     const totalCount = Number((Array.isArray(countRows) && countRows.length > 0 && countRows[0].total !== undefined) ? countRows[0].total : 0);
 
     const dataQuery = `
@@ -332,7 +333,8 @@ const getAllCampaignData = async (req, res) => {
     console.log('[CampaignDataController] Query params:', finalParams);
     console.log('[CampaignDataController] Query params types:', finalParams.map((p, i) => `${i}: ${typeof p} = ${p}`));
     
-    const [campaignData] = await pool.execute(dataQuery, finalParams);
+    // Use query() instead of execute() because execute() is stricter about parameter types
+    const [campaignData] = await pool.query(dataQuery, finalParams);
 
     const totalPages = Math.max(1, Math.ceil(totalCount / limit));
     const meta = {
