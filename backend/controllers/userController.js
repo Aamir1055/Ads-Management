@@ -55,9 +55,40 @@ const userManagementController = {
       console.log('📋 Fetching users with filters:', { page, limit, search, role_id, is_active });
       console.log('👤 Current user:', { id: req.user.id, username: req.user.username, isAdmin: isAdmin(req) });
 
-      // SECURITY NOTE: This version allows all authenticated users to see all users
-      // (unlike the privacy version which restricts regular users to see only themselves)
-      // If you need privacy filtering, use userManagementController_privacy instead
+      // PRIVACY: Regular users can only see themselves, admins see all users
+      const userIsAdmin = isAdmin(req);
+      const currentUserId = req.user.id;
+
+      if (!userIsAdmin) {
+        // Regular users can only see their own account
+        console.log('🔒 Regular user - filtering to show only their own account');
+        const user = await User.findById(currentUserId);
+        
+        if (!user) {
+          return res.status(404).json(createResponse(false, 'User not found'));
+        }
+
+        // Return single user as array with pagination metadata
+        const roles = await getRoles();
+        return res.status(200).json(createResponse(
+          true,
+          'User retrieved successfully',
+          {
+            users: [user],
+            pagination: {
+              currentPage: 1,
+              totalPages: 1,
+              totalUsers: 1,
+              limit: 1,
+              hasNextPage: false,
+              hasPrevPage: false
+            },
+            roles
+          }
+        ));
+      }
+
+      // Admins can see all users
       const result = await User.findAll({ 
         page, 
         limit, 
@@ -98,8 +129,16 @@ const userManagementController = {
       console.log('👤 Fetching user by ID:', userId);
       console.log('🔒 Current user:', { id: req.user.id, isAdmin: isAdmin(req) });
 
-      // SECURITY NOTE: This version allows any authenticated user to view any user
-      // If you need privacy restrictions, use userManagementController_privacy instead
+      // PRIVACY: Regular users can only view their own profile
+      const userIsAdmin = isAdmin(req);
+      const currentUserId = req.user.id;
+
+      if (!userIsAdmin && userId !== currentUserId) {
+        console.log('🚫 Access denied - user trying to view another user profile');
+        return res.status(403).json(
+          createResponse(false, 'Access denied. You can only view your own profile.')
+        );
+      }
 
       const user = await User.findById(userId);
       if (!user) {
