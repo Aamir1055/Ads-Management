@@ -165,13 +165,9 @@ class AdsManagerModel {
                 throw new Error('Business Manager not found');
             }
             
-            // Check if ads manager name already exists for this BM
-            const existingQuery = 'SELECT id FROM ads_managers WHERE bm_id = ? AND ads_manager_name = ?';
-            const [existing] = await pool.query(existingQuery, [bm_id, ads_manager_name]);
-            
-            if (existing.length > 0) {
-                throw new Error('Ads Manager with this name already exists for this Business Manager');
-            }
+            // REMOVED: Constraint check that prevented multiple ads managers per BM
+            // One Business Manager can now contain multiple Ads Managers
+            // The previous unique constraint check has been removed to support one-to-many relationship
             
             const query = `
                 INSERT INTO ads_managers (bm_id, ads_manager_name, email, phone_number, status, created_by)
@@ -210,20 +206,9 @@ class AdsManagerModel {
                 }
             }
             
-            // Check if ads manager name already exists for the BM (if name or BM is being changed)
-            if ((ads_manager_name && ads_manager_name !== existing.ads_manager_name) || 
-                (bm_id && bm_id !== existing.bm_id)) {
-                
-                const checkBMId = bm_id || existing.bm_id;
-                const checkName = ads_manager_name || existing.ads_manager_name;
-                
-                const nameCheck = 'SELECT id FROM ads_managers WHERE bm_id = ? AND ads_manager_name = ? AND id != ?';
-                const [nameExists] = await pool.query(nameCheck, [checkBMId, checkName, id]);
-                
-                if (nameExists.length > 0) {
-                    throw new Error('Ads Manager with this name already exists for this Business Manager');
-                }
-            }
+            // REMOVED: Constraint check that prevented multiple ads managers with same name per BM
+            // One Business Manager can now contain multiple Ads Managers with same or different names
+            // This supports the one-to-many relationship requirement
             
             const query = `
                 UPDATE ads_managers 

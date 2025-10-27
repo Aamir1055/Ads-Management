@@ -157,14 +157,8 @@ class AdsManagerController {
                 });
             }
 
-            if (error.message.includes('already exists')) {
-                return res.status(409).json({
-                    success: false,
-                    message: error.message,
-                    timestamp: new Date().toISOString()
-                });
-            }
-
+            // REMOVED: 409 conflict handling for "already exists" since we now allow multiple ads managers per BM
+            
             return res.status(500).json({
                 success: false,
                 message: error.message,
@@ -222,13 +216,7 @@ class AdsManagerController {
                 });
             }
 
-            if (error.message.includes('already exists')) {
-                return res.status(409).json({
-                    success: false,
-                    message: error.message,
-                    timestamp: new Date().toISOString()
-                });
-            }
+            // REMOVED: 409 conflict handling for "already exists" since we now allow multiple ads managers per BM
 
             return res.status(500).json({
                 success: false,
