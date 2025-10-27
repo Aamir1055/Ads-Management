@@ -1,0 +1,371 @@
+{
+  "info": {
+    "name": "Ads Reporting API - 2FA Collection",
+    "description": "Complete 2FA API testing collection with sample requests and responses",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "2fa-api-collection-001"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "user_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "username",
+      "value": "testuser",
+      "type": "string"
+    },
+    {
+      "key": "jwt_token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "1. Login (No 2FA)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"TestPassword123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Login with username/password. If user has 2FA disabled, returns JWT token. If 2FA enabled, returns requires_2fa: true."
+          },
+          "response": [
+            {
+              "name": "Success - No 2FA",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"success\": true,\n  \"message\": \"Login successful\",\n  \"data\": {\n    \"requires_2fa\": false,\n    \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n    \"user\": {\n      \"id\": 1,\n      \"username\": \"testuser\",\n      \"role_id\": 2,\n      \"role_name\": \"user\",\n      \"twofa_enabled\": false\n    }\n  },\n  \"timestamp\": \"2025-09-09T07:19:55.000Z\"\n}"
+            },
+            {
+              "name": "Success - Needs 2FA",
+              "status": "OK", 
+              "code": 200,
+              "body": "{\n  \"success\": true,\n  \"message\": \"Password verified. 2FA token required.\",\n  \"data\": {\n    \"requires_2fa\": true,\n    \"user_id\": 1,\n    \"username\": \"testuser\",\n    \"next_step\": \"Please provide your 2FA token to complete login\"\n  },\n  \"timestamp\": \"2025-09-09T07:19:55.000Z\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "2. Complete Login with 2FA",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": {{user_id}},\n  \"token\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login-2fa",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login-2fa"]
+            },
+            "description": "Complete login by providing the 6-digit 2FA token from authenticator app."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"success\": true,\n  \"message\": \"Login with 2FA successful\",\n  \"data\": {\n    \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n    \"user\": {\n      \"id\": 1,\n      \"username\": \"testuser\",\n      \"role_id\": 2,\n      \"role_name\": \"user\",\n      \"twofa_enabled\": true,\n      \"two_factor_verified\": true\n    }\n  },\n  \"timestamp\": \"2025-09-09T07:19:55.000Z\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "3. Get Current User Info",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me"]
+            },
+            "description": "Get current authenticated user information."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2FA Management",
+      "item": [
+        {
+          "name": "1. Generate 2FA Setup (QR Code)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{username}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/2fa/setup",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "2fa", "setup"]
+            },
+            "description": "Initiate 2FA setup. Returns QR code and manual entry key for authenticator app."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"success\": true,\n  \"message\": \"2FA setup initiated successfully\",\n  \"data\": {\n    \"user_id\": 1,\n    \"username\": \"testuser\",\n    \"qr_code\": \"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...\",\n    \"manual_entry_key\": \"JBSWY3DPEHPK3PXP\",\n    \"setup_instructions\": {\n      \"step1\": \"Install Google Authenticator or similar TOTP app\",\n      \"step2\": \"Scan the QR code or enter the manual key\",\n      \"step3\": \"Enter the 6-digit code from your app to complete setup\"\n    },\n    \"backup_note\": \"Save the manual entry key as backup - you'll need it if you lose access to your authenticator app\"\n  },\n  \"timestamp\": \"2025-09-09T07:19:55.000Z\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "2. Verify and Enable 2FA",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": {{user_id}},\n  \"token\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/2fa/verify-setup",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "2fa", "verify-setup"]
+            },
+            "description": "Verify the 6-digit token and permanently enable 2FA. Returns backup codes."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"success\": true,\n  \"message\": \"2FA enabled successfully\",\n  \"data\": {\n    \"user\": {\n      \"id\": 1,\n      \"username\": \"testuser\",\n      \"twofa_enabled\": true,\n      \"verified_at\": \"2025-09-09T07:19:55.000Z\"\n    },\n    \"backup_codes\": [\n      \"ABCD1234\",\n      \"EFGH5678\",\n      \"IJKL9012\",\n      \"MNOP3456\",\n      \"QRST7890\"\n    ],\n    \"important_note\": \"Save these backup codes in a secure place. Each code can only be used once for emergency access.\"\n  },\n  \"timestamp\": \"2025-09-09T07:19:55.000Z\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "3. Get 2FA Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/2fa/status/{{user_id}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "2fa", "status", "{{user_id}}"]
+            },
+            "description": "Check 2FA status for a specific user."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"success\": true,\n  \"message\": \"2FA status retrieved successfully\",\n  \"data\": {\n    \"user\": {\n      \"id\": 1,\n      \"username\": \"testuser\",\n      \"role\": \"user\",\n      \"twofa_enabled\": true,\n      \"twofa_verified_at\": \"2025-09-09T07:19:55.000Z\",\n      \"last_login\": \"2025-09-09T07:25:30.000Z\"\n    },\n    \"recommendations\": [\n      \"Your account is secured with 2FA\",\n      \"Keep your authenticator app updated\"\n    ]\n  },\n  \"timestamp\": \"2025-09-09T07:19:55.000Z\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "4. Disable 2FA",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": {{user_id}},\n  \"current_token\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/2fa/disable",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "2fa", "disable"]
+            },
+            "description": "Disable 2FA for user. Requires current 2FA token for security."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"success\": true,\n  \"message\": \"2FA disabled successfully\",\n  \"data\": {\n    \"user\": {\n      \"id\": 1,\n      \"username\": \"testuser\",\n      \"twofa_enabled\": false,\n      \"disabled_at\": \"2025-09-09T07:19:55.000Z\"\n    },\n    \"security_note\": \"Your account is now less secure. Consider re-enabling 2FA for better protection.\"\n  },\n  \"timestamp\": \"2025-09-09T07:19:55.000Z\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "5. Generate New Backup Codes",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": {{user_id}},\n  \"current_token\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/2fa/backup-codes",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "2fa", "backup-codes"]
+            },
+            "description": "Generate new backup codes. Requires current 2FA token. Previous codes become invalid."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"success\": true,\n  \"message\": \"New backup codes generated successfully\",\n  \"data\": {\n    \"user\": {\n      \"id\": 1,\n      \"username\": \"testuser\"\n    },\n    \"backup_codes\": [\n      \"WXYZ1234\",\n      \"ABCD5678\",\n      \"EFGH9012\",\n      \"IJKL3456\",\n      \"MNOP7890\"\n    ],\n    \"important_notes\": [\n      \"These codes replace any previously generated backup codes\",\n      \"Each code can only be used once\",\n      \"Store them securely - they provide emergency access to your account\",\n      \"Generate new codes if you suspect these have been compromised\"\n    ],\n    \"generated_at\": \"2025-09-09T07:19:55.000Z\"\n  },\n  \"timestamp\": \"2025-09-09T07:19:55.000Z\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "6. Verify 2FA Token (Login Alternative)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": {{user_id}},\n  \"token\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/2fa/verify-login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "2fa", "verify-login"]
+            },
+            "description": "Alternative endpoint to verify 2FA token during login. Similar to /auth/login-2fa but doesn't return JWT."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"success\": true,\n  \"message\": \"2FA verification successful\",\n  \"data\": {\n    \"user\": {\n      \"id\": 1,\n      \"username\": \"testuser\",\n      \"two_factor_verified\": true,\n      \"verified_at\": \"2025-09-09T07:19:55.000Z\"\n    }\n  },\n  \"timestamp\": \"2025-09-09T07:19:55.000Z\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "7. Get 2FA Info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/2fa/info",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "2fa", "info"]
+            },
+            "description": "Get general information about 2FA setup process and supported apps."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"success\": true,\n  \"message\": \"2FA information retrieved successfully\",\n  \"data\": {\n    \"what_is_2fa\": \"Two-Factor Authentication adds an extra layer of security to your account\",\n    \"supported_apps\": [\n      \"Google Authenticator\",\n      \"Microsoft Authenticator\",\n      \"Authy\",\n      \"LastPass Authenticator\",\n      \"1Password\"\n    ],\n    \"setup_process\": {\n      \"step1\": \"Enable 2FA in your account settings\",\n      \"step2\": \"Scan the QR code with your authenticator app\",\n      \"step3\": \"Enter the 6-digit code to complete setup\",\n      \"step4\": \"Save the backup codes in a secure location\"\n    },\n    \"token_info\": {\n      \"format\": \"6 digits\",\n      \"refresh_interval\": \"30 seconds\",\n      \"tolerance_window\": \"±90 seconds for login verification\"\n    }\n  },\n  \"timestamp\": \"2025-09-09T07:19:55.000Z\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "User Management",
+      "item": [
+        {
+          "name": "Get All Users (with 2FA status)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users"]
+            },
+            "description": "Get all users. Response now includes twofa_enabled field."
+          }
+        },
+        {
+          "name": "Get User by ID (with 2FA status)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{user_id}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "{{user_id}}"]
+            },
+            "description": "Get specific user by ID. Response includes twofa_enabled field."
+          }
+        },
+        {
+          "name": "Create New User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"newuser\",\n  \"password\": \"NewPassword123!\",\n  \"role_id\": 2\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users"]
+            },
+            "description": "Create a new user. 2FA is disabled by default."
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -13,12 +13,12 @@ const createResponse = (success, message, data = null, errors = null) => ({
 const isAdminOrOwner = (req, dataCreatedBy) => {
   const user = req.user;
   if (!user) return false;
-  
+
   // Admins can access all data (check role level or name)
   if (user.role && (user.role.level >= 8 || user.role.name === 'super_admin' || user.role.name === 'admin')) {
     return true;
   }
-  
+
   // User can access their own data
   return user.id === dataCreatedBy;
 };
@@ -39,7 +39,7 @@ const parseJsonField = (value) => {
 // Helper to format campaign data for response
 const formatCampaignData = (campaign) => {
   if (!campaign) return null;
-  
+
   return {
     ...campaign,
     persona: campaign.persona || null, // Keep persona as text
@@ -48,11 +48,24 @@ const formatCampaignData = (campaign) => {
   };
 };
 
+// Normalize pagination and provide string params for LIMIT/OFFSET (mysql2 execute workaround)
+const normalizePageLimit = (pageRaw, limitRaw) => {
+  const pageNum = parseInt(pageRaw, 10);
+  const limitNum = parseInt(limitRaw, 10);
+  const page = Number.isFinite(pageNum) && pageNum > 0 ? pageNum : 1;
+  const limit = Number.isFinite(limitNum) ? Math.min(Math.max(limitNum, 1), 100) : 50;
+  const offset = (page - 1) * limit;
+  return { page, limit, offset, limitParam: String(limit), offsetParam: String(offset) };
+};
+
 const campaignController = {
   // Get all campaigns with privacy filtering
   getAllCampaigns: async (req, res) => {
     try {
-      const { page = 1, limit = 50, search = '', campaign_type_id = null, is_enabled = null } = req.query;
+      const { page, limit, limitParam, offsetParam } = normalizePageLimit(req.query.page, req.query.limit);
+      const search = req.query.search || '';
+      const campaign_type_id = req.query.campaign_type_id || null;
+      const is_enabled = req.query.is_enabled || null;
 
       // DEBUG: Log user information
       console.log('🔍 [CAMPAIGNS DEBUG] User making request:', {
@@ -68,9 +81,9 @@ const campaignController = {
 
       // Add privacy filtering for non-admins
       const isAdmin = req.user.role && (req.user.role.level >= 8 || req.user.role.name === 'super_admin' || req.user.role.name === 'admin');
-      
+
       console.log('🔍 [CAMPAIGNS DEBUG] Admin check result:', isAdmin);
-      
+
       if (!isAdmin) {
         whereClause += ' AND c.created_by = ?';
         params.push(req.user.id);
@@ -94,8 +107,6 @@ const campaignController = {
         params.push(is_enabled === 'true' ? 1 : 0);
       }
 
-      const offset = (page - 1) * limit;
-
       const query = `
         SELECT c.*, ct.type_name as campaign_type_name
         FROM campaigns c
@@ -105,7 +116,8 @@ const campaignController = {
         LIMIT ? OFFSET ?
       `;
 
-      params.push(parseInt(limit), parseInt(offset));
+      // Push LIMIT/OFFSET as strings for mysql2 .execute workaround
+      params.push(limitParam, offsetParam);
 
       console.log('🔍 [CAMPAIGNS DEBUG] Final query:', query);
       console.log('🔍 [CAMPAIGNS DEBUG] Query parameters:', params);
@@ -119,7 +131,7 @@ const campaignController = {
 
       // Format the data
       const formattedCampaigns = campaigns.map(formatCampaignData);
-      
+
       console.log('🔍 [CAMPAIGNS DEBUG] Sending response with', formattedCampaigns.length, 'campaigns');
 
       // Get total count for pagination
@@ -129,7 +141,7 @@ const campaignController = {
         LEFT JOIN campaign_types ct ON c.campaign_type_id = ct.id
         ${whereClause}
       `;
-      
+
       const [countResult] = await pool.execute(countQuery, params.slice(0, -2)); // Remove limit and offset params
       const total = countResult[0].total;
 
@@ -262,13 +274,13 @@ const campaignController = {
       // Check for duplicate names in user's own campaigns (for non-admins)
       let duplicateQuery = 'SELECT id FROM campaigns WHERE name = ?';
       let duplicateParams = [name.trim()];
-      
+
       const isAdminForDupe = req.user.role && (req.user.role.level >= 8 || req.user.role.name === 'super_admin' || req.user.role.name === 'admin');
       if (!isAdminForDupe) {
         duplicateQuery += ' AND created_by = ?';
         duplicateParams.push(req.user.id);
       }
-      
+
       const [existingCampaigns] = await pool.execute(duplicateQuery, duplicateParams);
       if (existingCampaigns && existingCampaigns.length > 0) {
         return res.status(409).json(
@@ -283,23 +295,23 @@ const campaignController = {
           created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
       `;
-      
+
       // Validate age values
       const parsedMinAge = min_age ? parseInt(min_age) : null;
       const parsedMaxAge = max_age ? parseInt(max_age) : null;
-      
+
       if (parsedMinAge !== null && (parsedMinAge < 0 || parsedMinAge > 100)) {
         return res.status(400).json(
           createResponse(false, 'Minimum age must be between 0 and 100')
         );
       }
-      
+
       if (parsedMaxAge !== null && (parsedMaxAge < 0 || parsedMaxAge > 100)) {
         return res.status(400).json(
           createResponse(false, 'Maximum age must be between 0 and 100')
         );
       }
-      
+
       if (parsedMinAge && parsedMaxAge && parsedMinAge > parsedMaxAge) {
         return res.status(400).json(
           createResponse(false, 'Minimum age cannot be greater than maximum age')
@@ -337,7 +349,7 @@ const campaignController = {
       );
     } catch (error) {
       console.error('Create campaign error:', error);
-      
+
       if (error.code === 'ER_DUP_ENTRY') {
         return res.status(400).json(
           createResponse(false, 'Campaign name already exists')
@@ -404,18 +416,18 @@ const campaignController = {
             createResponse(false, 'Campaign name cannot be empty')
           );
         }
-        
+
         // Check for duplicate names - scoped to user for non-admins
         if (name.trim() !== campaign.name) {
           let duplicateQuery = 'SELECT id FROM campaigns WHERE name = ? AND id != ?';
           let duplicateParams = [name.trim(), id];
-          
+
           const isAdminForDupeUpdate = req.user.role && (req.user.role.level >= 8 || req.user.role.name === 'super_admin' || req.user.role.name === 'admin');
           if (!isAdminForDupeUpdate) {
             duplicateQuery += ' AND created_by = ?';
             duplicateParams.push(req.user.id);
           }
-          
+
           const [duplicates] = await pool.execute(duplicateQuery, duplicateParams);
           if (duplicates && duplicates.length > 0) {
             return res.status(409).json(
@@ -423,7 +435,7 @@ const campaignController = {
             );
           }
         }
-        
+
         updateFields.push('name = ?');
         params.push(name.trim());
       }
@@ -672,17 +684,17 @@ const campaignController = {
   getCampaignStats: async (req, res) => {
     try {
       const isAdmin = req.user.role && (req.user.role.level >= 8 || req.user.role.name === 'super_admin' || req.user.role.name === 'admin');
-      
+
       let whereClause = '';
       const params = [];
-      
+
       if (!isAdmin) {
         whereClause = 'WHERE created_by = ?';
         params.push(req.user.id);
       }
 
       const query = `
-        SELECT 
+        SELECT
           COUNT(*) as total_campaigns,
           SUM(CASE WHEN is_enabled = 1 THEN 1 ELSE 0 END) as enabled_campaigns,
           SUM(CASE WHEN is_enabled = 0 THEN 1 ELSE 0 END) as disabled_campaigns,
@@ -693,7 +705,7 @@ const campaignController = {
       `;
 
       const [stats] = await pool.execute(query, params);
-      
+
       res.status(200).json(
         createResponse(true, 'Campaign statistics retrieved successfully', stats[0])
       );
@@ -709,7 +721,9 @@ const campaignController = {
   getCampaignsByBrand: async (req, res) => {
     try {
       const { brandId } = req.params;
-      const { page = 1, limit = 50, search = '', is_enabled = null } = req.query;
+      const { page, limit, limitParam, offsetParam } = normalizePageLimit(req.query.page || 1, req.query.limit || 50);
+      const search = req.query.search || '';
+      const is_enabled = req.query.is_enabled || null;
 
       if (!brandId || isNaN(brandId)) {
         return res.status(400).json(
@@ -737,8 +751,6 @@ const campaignController = {
         params.push(is_enabled === 'true' ? 1 : 0);
       }
 
-      const offset = (page - 1) * limit;
-
       const query = `
         SELECT c.*, ct.type_name as campaign_type_name
         FROM campaigns c
@@ -748,7 +760,8 @@ const campaignController = {
         LIMIT ? OFFSET ?
       `;
 
-      params.push(parseInt(limit), parseInt(offset));
+      // Push LIMIT/OFFSET as strings for mysql2 .execute workaround
+      params.push(limitParam, offsetParam);
       const [campaigns] = await pool.execute(query, params);
       const formattedCampaigns = campaigns.map(formatCampaignData);
 

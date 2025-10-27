@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Ads Reporting API - 2FA Swagger</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui.css" />
+  <style>
+    body { margin: 0; background: #0b1021; }
+    #swagger-ui { max-width: 1200px; margin: 0 auto; }
+  </style>
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui-bundle.js"></script>
+  <script>
+    const spec = {
+      openapi: "3.0.3",
+      info: {
+        title: "Ads Reporting API - Two-Factor Authentication",
+        version: "1.0.0",
+        description: "Endpoints for 2FA setup, verification, status, disable and backup codes, plus auth with 2FA."
+      },
+      servers: [
+        { url: "http://localhost:5000", description: "Local dev" }
+      ],
+      tags: [
+        { name: "Auth", description: "Authentication with 2FA flow" },
+        { name: "2FA", description: "Two-Factor Authentication management" }
+      ],
+      components: {
+        securitySchemes: {
+          bearerAuth: {
+            type: "http",
+            scheme: "bearer",
+            bearerFormat: "JWT"
+          }
+        },
+        schemas: {
+          ApiResponse: {
+            type: "object",
+            properties: {
+              success: { type: "boolean" },
+              message: { type: "string" },
+              data: { type: "object" },
+              timestamp: { type: "string", format: "date-time" }
+            }
+          },
+          LoginRequest: {
+            type: "object",
+            required: ["username", "password"],
+            properties: {
+              username: { type: "string", example: "testuser" },
+              password: { type: "string", example: "TestPassword123!" }
+            }
+          },
+          LoginResponseNo2FA: {
+            allOf: [
+              { $ref: "#/components/schemas/ApiResponse" },
+              { type: "object", properties: { data: { type: "object", properties: {
+                requires_2fa: { type: "boolean", example: false },
+                token: { type: "string", example: "<JWT_TOKEN>" },
+                user: { type: "object", properties: {
+                  id: { type: "integer", example: 1 },
+                  username: { type: "string", example: "testuser" },
+                  role_id: { type: "integer", example: 2 },
+                  role_name: { type: "string", example: "user" },
+                  twofa_enabled: { type: "boolean", example: false }
+                }}
+              }}}}
+            ]
+          },
+          LoginResponseNeeds2FA: {
+            allOf: [
+              { $ref: "#/components/schemas/ApiResponse" },
+              { type: "object", properties: { data: { type: "object", properties: {
+                requires_2fa: { type: "boolean", example: true },
+                user_id: { type: "integer", example: 1 },
+                username: { type: "string", example: "testuser" },
+                next_step: { type: "string", example: "Please provide your 2FA token to complete login" }
+              }}}}
+            ]
+          },
+          Login2FARequest: {
+            type: "object",
+            required: ["user_id", "token"],
+            properties: {
+              user_id: { type: "integer", example: 1 },
+              token: { type: "string", example: "123456" }
+            }
+          },
+          Login2FAResponse: {
+            allOf: [
+              { $ref: "#/components/schemas/ApiResponse" },
+              { type: "object", properties: { data: { type: "object", properties: {
+                token: { type: "string", example: "<JWT_TOKEN>" },
+                user: { type: "object", properties: {
+                  id: { type: "integer", example: 1 },
+                  username: { type: "string", example: "testuser" },
+                  role_id: { type: "integer", example: 2 },
+                  role_name: { type: "string", example: "user" },
+                  twofa_enabled: { type: "boolean", example: true },
+                  two_factor_verified: { type: "boolean", example: true }
+                }}
+              }}}}
+            ]
+          },
+          TwoFASetupRequest: {
+            type: "object",
+            required: ["username"],
+            properties: { username: { type: "string", example: "testuser" } }
+          },
+          TwoFASetupResponse: {
+            allOf: [
+              { $ref: "#/components/schemas/ApiResponse" },
+              { type: "object", properties: { data: { type: "object", properties: {
+                user_id: { type: "integer", example: 1 },
+                username: { type: "string", example: "testuser" },
+                qr_code: { type: "string", example: "data:image/png;base64,...." },
+                manual_entry_key: { type: "string", example: "JBSWY3DPEHPK3PXP" }
+              }}}}
+            ]
+          },
+          TwoFAVerifySetupRequest: {
+            type: "object",
+            required: ["user_id", "token"],
+            properties: {
+              user_id: { type: "integer", example: 1 },
+              token: { type: "string", example: "123456" }
+            }
+          },
+          TwoFAVerifySetupResponse: {
+            allOf: [
+              { $ref: "#/components/schemas/ApiResponse" },
+              { type: "object", properties: { data: { type: "object", properties: {
+                user: { type: "object", properties: {
+                  id: { type: "integer", example: 1 },
+                  username: { type: "string", example: "testuser" },
+                  twofa_enabled: { type: "boolean", example: true },
+                  verified_at: { type: "string", format: "date-time" }
+                }},
+                backup_codes: { type: "array", items: { type: "string" }, example: ["ABCD1234", "EFGH5678"] }
+              }}}}
+            ]
+          },
+          TwoFAVerifyLoginRequest: {
+            type: "object",
+            required: ["user_id", "token"],
+            properties: {
+              user_id: { type: "integer", example: 1 },
+              token: { type: "string", example: "123456" }
+            }
+          },
+          TwoFAStatusResponse: {
+            allOf: [
+              { $ref: "#/components/schemas/ApiResponse" },
+              { type: "object", properties: { data: { type: "object", properties: {
+                user: { type: "object", properties: {
+                  id: { type: "integer", example: 1 },
+                  username: { type: "string", example: "testuser" },
+                  role: { type: "string", example: "user" },
+                  twofa_enabled: { type: "boolean", example: true },
+                  twofa_verified_at: { type: "string", format: "date-time", nullable: true },
+                  last_login: { type: "string", format: "date-time", nullable: true }
+                }}
+              }}}}
+            ]
+          },
+          TwoFADisableRequest: {
+            type: "object",
+            required: ["user_id", "current_token"],
+            properties: {
+              user_id: { type: "integer", example: 1 },
+              current_token: { type: "string", example: "123456" }
+            }
+          },
+          TwoFABackupCodesRequest: {
+            type: "object",
+            required: ["user_id", "current_token"],
+            properties: {
+              user_id: { type: "integer", example: 1 },
+              current_token: { type: "string", example: "123456" }
+            }
+          }
+        }
+      },
+      paths: {
+        "/api/auth/login": {
+          post: {
+            tags: ["Auth"],
+            summary: "Login (returns JWT or asks for 2FA)",
+            requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/LoginRequest" } } } },
+            responses: {
+              200: { description: "OK - Either token or requires 2FA", content: {
+                "application/json": { schema: { oneOf: [
+                  { $ref: "#/components/schemas/LoginResponseNo2FA" },
+                  { $ref: "#/components/schemas/LoginResponseNeeds2FA" }
+                ]}}
+              }},
+              400: { description: "Validation error" },
+              401: { description: "Invalid credentials" }
+            }
+          }
+        },
+        "/api/auth/login-2fa": {
+          post: {
+            tags: ["Auth"],
+            summary: "Complete login with 2FA token",
+            requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/Login2FARequest" } } } },
+            responses: {
+              200: { description: "Login success with JWT", content: { "application/json": { schema: { $ref: "#/components/schemas/Login2FAResponse" } } } },
+              400: { description: "Validation error" },
+              401: { description: "Invalid token" },
+              404: { description: "User not found" }
+            }
+          }
+        },
+        "/api/2fa/setup": {
+          post: {
+            tags: ["2FA"],
+            summary: "Generate 2FA setup (QR code & manual key)",
+            requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/TwoFASetupRequest" } } } },
+            responses: {
+              200: { description: "Setup initiated", content: { "application/json": { schema: { $ref: "#/components/schemas/TwoFASetupResponse" } } } },
+              400: { description: "Validation error" },
+              404: { description: "User not found" },
+              409: { description: "2FA already enabled" }
+            }
+          }
+        },
+        "/api/2fa/verify-setup": {
+          post: {
+            tags: ["2FA"],
+            summary: "Verify and enable 2FA",
+            requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/TwoFAVerifySetupRequest" } } } },
+            responses: {
+              200: { description: "2FA enabled", content: { "application/json": { schema: { $ref: "#/components/schemas/TwoFAVerifySetupResponse" } } } },
+              400: { description: "Invalid token or not initiated" },
+              404: { description: "User not found" },
+              409: { description: "Already enabled" }
+            }
+          }
+        },
+        "/api/2fa/verify-login": {
+          post: {
+            tags: ["2FA"],
+            summary: "Verify token during login (alt to /auth/login-2fa)",
+            requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/TwoFAVerifyLoginRequest" } } } },
+            responses: {
+              200: { description: "2FA OK", content: { "application/json": { schema: { $ref: "#/components/schemas/ApiResponse" } } } },
+              400: { description: "Validation error" },
+              401: { description: "Invalid token" },
+              404: { description: "User not found" }
+            }
+          }
+        },
+        "/api/2fa/status/{user_id}": {
+          get: {
+            tags: ["2FA"],
+            summary: "Get 2FA status for user",
+            parameters: [ { name: "user_id", in: "path", required: true, schema: { type: "integer" } } ],
+            responses: {
+              200: { description: "Status", content: { "application/json": { schema: { $ref: "#/components/schemas/TwoFAStatusResponse" } } } },
+              400: { description: "Invalid user id" },
+              404: { description: "User not found" }
+            }
+          }
+        },
+        "/api/2fa/disable": {
+          post: {
+            tags: ["2FA"],
+            summary: "Disable 2FA for user (requires current token)",
+            requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/TwoFADisableRequest" } } } },
+            responses: {
+              200: { description: "2FA disabled", content: { "application/json": { schema: { $ref: "#/components/schemas/ApiResponse" } } } },
+              400: { description: "Validation error / 2FA not enabled" },
+              401: { description: "Invalid token" },
+              404: { description: "User not found" }
+            }
+          }
+        },
+        "/api/2fa/backup-codes": {
+          post: {
+            tags: ["2FA"],
+            summary: "Generate new backup codes (requires current token)",
+            requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/TwoFABackupCodesRequest" } } } },
+            responses: {
+              200: { description: "Codes generated", content: { "application/json": { schema: { $ref: "#/components/schemas/ApiResponse" } } } },
+              400: { description: "Validation error / 2FA not enabled" },
+              401: { description: "Invalid token" },
+              404: { description: "User not found" }
+            }
+          }
+        }
+      }
+    };
+
+    window.ui = SwaggerUIBundle({
+      spec,
+      dom_id: '#swagger-ui',
+      deepLinking: true,
+      presets: [SwaggerUIBundle.presets.apis],
+      layout: 'BaseLayout'
+    });
+  </script>
+</body>
+</html>
+

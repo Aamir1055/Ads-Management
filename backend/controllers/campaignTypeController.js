@@ -85,9 +85,6 @@ const buildSearchConditions = (search, status) => {
 const UPDATABLE_FIELDS = new Set(['type_name', 'description', 'is_active']);
 
 // =============================================================================
-// CRUD
-// =============================================================================
-
 /**
  * POST /api/campaign-types
  */
@@ -126,7 +123,6 @@ const createCampaignType = async (req, res) => {
 
     await connection.commit();
 
-    // Return a single row object (not an array)
     const data = rows && rows[0] ? rows[0] : null;
     return res.status(201).json(
       createResponse(true, 'Campaign type created successfully', data)
@@ -142,33 +138,42 @@ const createCampaignType = async (req, res) => {
 
 /**
  * GET /api/campaign-types
+ * FIX: Pass LIMIT/OFFSET as strings for mysql2 .execute to avoid ER_WRONG_ARGUMENTS.
  */
 const getAllCampaignTypes = async (req, res) => {
   try {
     const query = req.validatedQuery || req.query || {};
-    const page = Math.max(1, parseInt(query.page, 10) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(query.limit, 10) || 10));
+    const pageRaw = parseInt(query.page, 10);
+    const limitRaw = parseInt(query.limit, 10);
+
+    // Normalize pagination
+    const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1;
+    const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 100) : 10;
+    const offset = (page - 1) * limit;
+
     const search = (query.search || '').trim() || null;
     const status = query.status || 'all';
-    const offset = (page - 1) * limit;
 
     const { whereClause, queryParams } = buildSearchConditions(search, status);
 
-    const [countRows] = await pool.execute(
-      `SELECT COUNT(*) AS total FROM campaign_types ${whereClause}`,
-      queryParams
-    );
-    // FIX: countRows is an array; pick the first element
+    // Count
+    const countQuery = `SELECT COUNT(*) AS total FROM campaign_types ${whereClause}`;
+    const [countRows] = await pool.execute(countQuery, queryParams || []);
     const totalCount = (countRows && countRows[0] && Number(countRows[0].total)) || 0;
 
-    const [rows] = await pool.execute(
-      `SELECT id, type_name, description, is_active, created_at, updated_at
+    // Main query
+    const selectQuery = `SELECT id, type_name, description, is_active, created_at, updated_at
        FROM campaign_types
        ${whereClause}
        ORDER BY created_at DESC
-       LIMIT ? OFFSET ?`,
-      [...queryParams, Number(limit), Number(offset)]
-    );
+       LIMIT ? OFFSET ?`;
+
+    // Workaround: LIMIT/OFFSET as strings for .execute
+    const limitParam = String(limit);
+    const offsetParam = String(offset);
+
+    const selectParams = [...(queryParams || []), limitParam, offsetParam];
+    const [rows] = await pool.execute(selectQuery, selectParams);
 
     const totalPages = Math.max(1, Math.ceil(totalCount / limit));
     const meta = {
@@ -217,7 +222,6 @@ const getCampaignTypeById = async (req, res) => {
       return res.status(404).json(createResponse(false, 'Campaign type not found'));
     }
 
-    // Return a single row object (not an array)
     const data = rows && rows[0] ? rows[0] : null;
     return res.status(200).json(
       createResponse(true, 'Campaign type retrieved successfully', data)
@@ -331,7 +335,6 @@ const deleteCampaignType = async (req, res) => {
       return res.status(404).json(createResponse(false, 'Campaign type not found'));
     }
 
-    // FIX: pick the first row
     const row = existing[0];
 
     if (row.is_active === 0) {

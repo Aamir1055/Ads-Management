@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Ads Reporting Software</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .login-container {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+            position: relative;
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .login-header h1 {
+            color: #333;
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .login-header p {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #e1e5e9;
+            border-radius: 5px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .form-group input.error {
+            border-color: #e74c3c;
+        }
+
+        .form-group input.success {
+            border-color: #27ae60;
+        }
+
+        .error-message {
+            color: #e74c3c;
+            font-size: 0.8rem;
+            margin-top: 0.25rem;
+            display: none;
+        }
+
+        .twofa-group {
+            display: none;
+            animation: slideDown 0.3s ease-out;
+        }
+
+        .twofa-group.show {
+            display: block;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 0.75rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .login-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .login-btn:active {
+            transform: translateY(0);
+        }
+
+        .login-btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 1rem 0;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .alert {
+            padding: 0.75rem;
+            border-radius: 5px;
+            margin-bottom: 1rem;
+            display: none;
+        }
+
+        .alert.show {
+            display: block;
+        }
+
+        .alert.error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        .alert.success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .forgot-password {
+            text-align: center;
+            margin-top: 1rem;
+        }
+
+        .forgot-password a {
+            color: #667eea;
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+
+        .forgot-password a:hover {
+            text-decoration: underline;
+        }
+
+        .twofa-info {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 0.25rem;
+        }
+
+        @media (max-width: 480px) {
+            .login-container {
+                padding: 1.5rem;
+                margin: 10px;
+            }
+            
+            .login-header h1 {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-header">
+            <h1>Welcome Back</h1>
+            <p>Please sign in to your account</p>
+        </div>
+
+        <div id="alert" class="alert"></div>
+
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required>
+                <div class="error-message" id="username-error"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required>
+                <div class="error-message" id="password-error"></div>
+            </div>
+
+            <div class="form-group twofa-group" id="twofa-group">
+                <label for="twofa_code">Two-Factor Authentication Code</label>
+                <input type="text" id="twofa_code" name="twofa_code" placeholder="Enter 6-digit code" maxlength="6">
+                <div class="twofa-info">Enter the 6-digit code from your authenticator app</div>
+                <div class="error-message" id="twofa-error"></div>
+            </div>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <span>Authenticating...</span>
+            </div>
+
+            <button type="submit" class="login-btn" id="login-btn">Sign In</button>
+        </form>
+
+        <div class="forgot-password">
+            <a href="#" onclick="alert('Contact your administrator to reset your password.')">Forgot your password?</a>
+        </div>
+    </div>
+
+    <script>
+        class LoginManager {
+            constructor() {
+                this.form = document.getElementById('loginForm');
+                this.usernameInput = document.getElementById('username');
+                this.passwordInput = document.getElementById('password');
+                this.twofaInput = document.getElementById('twofa_code');
+                this.twofaGroup = document.getElementById('twofa-group');
+                this.loginBtn = document.getElementById('login-btn');
+                this.loading = document.getElementById('loading');
+                this.alert = document.getElementById('alert');
+                
+                this.currentStep = 'credentials'; // 'credentials' or '2fa'
+                this.userRequires2FA = false;
+                
+                this.init();
+            }
+
+            init() {
+                this.form.addEventListener('submit', (e) => this.handleSubmit(e));
+                
+                // Auto-format 2FA code input
+                this.twofaInput.addEventListener('input', (e) => {
+                    e.target.value = e.target.value.replace(/\D/g, '').substring(0, 6);
+                });
+
+                // Clear errors on input
+                [this.usernameInput, this.passwordInput, this.twofaInput].forEach(input => {
+                    input.addEventListener('input', () => this.clearFieldError(input));
+                });
+            }
+
+            async handleSubmit(e) {
+                e.preventDefault();
+                
+                if (this.currentStep === 'credentials') {
+                    await this.handleCredentialsStep();
+                } else if (this.currentStep === '2fa') {
+                    await this.handle2FAStep();
+                }
+            }
+
+            async handleCredentialsStep() {
+                const username = this.usernameInput.value.trim();
+                const password = this.passwordInput.value;
+
+                // Clear previous errors
+                this.clearAllErrors();
+
+                // Basic validation
+                if (!username) {
+                    this.showFieldError('username', 'Username is required');
+                    return;
+                }
+
+                if (!password) {
+                    this.showFieldError('password', 'Password is required');
+                    return;
+                }
+
+                this.setLoading(true);
+
+                try {
+                    const response = await fetch('auth.php', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            action: 'check_credentials',
+                            username: username,
+                            password: password
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        if (data.requires_2fa) {
+                            this.userRequires2FA = true;
+                            this.show2FAStep();
+                        } else {
+                            // Login successful without 2FA
+                            this.showAlert('Login successful! Redirecting...', 'success');
+                            setTimeout(() => {
+                                window.location.href = data.redirect_url || 'dashboard.php';
+                            }, 1500);
+                        }
+                    } else {
+                        this.showAlert(data.message || 'Invalid username or password', 'error');
+                    }
+                } catch (error) {
+                    console.error('Login error:', error);
+                    this.showAlert('An error occurred. Please try again.', 'error');
+                } finally {
+                    this.setLoading(false);
+                }
+            }
+
+            async handle2FAStep() {
+                const twofaCode = this.twofaInput.value.trim();
+
+                if (!twofaCode || twofaCode.length !== 6) {
+                    this.showFieldError('twofa_code', 'Please enter a valid 6-digit code');
+                    return;
+                }
+
+                this.setLoading(true);
+
+                try {
+                    const response = await fetch('auth.php', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            action: 'verify_2fa',
+                            username: this.usernameInput.value.trim(),
+                            password: this.passwordInput.value,
+                            twofa_code: twofaCode
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        this.showAlert('Login successful! Redirecting...', 'success');
+                        setTimeout(() => {
+                            window.location.href = data.redirect_url || 'dashboard.php';
+                        }, 1500);
+                    } else {
+                        this.showAlert(data.message || 'Invalid 2FA code', 'error');
+                        this.twofaInput.value = '';
+                        this.twofaInput.focus();
+                    }
+                } catch (error) {
+                    console.error('2FA verification error:', error);
+                    this.showAlert('An error occurred. Please try again.', 'error');
+                } finally {
+                    this.setLoading(false);
+                }
+            }
+
+            show2FAStep() {
+                this.currentStep = '2fa';
+                this.twofaGroup.classList.add('show');
+                this.loginBtn.textContent = 'Verify & Sign In';
+                this.twofaInput.focus();
+                this.showAlert('Please enter your 2FA code to complete login', 'success');
+            }
+
+            setLoading(loading) {
+                if (loading) {
+                    this.loading.classList.add('show');
+                    this.loginBtn.disabled = true;
+                    this.loginBtn.style.opacity = '0.7';
+                } else {
+                    this.loading.classList.remove('show');
+                    this.loginBtn.disabled = false;
+                    this.loginBtn.style.opacity = '1';
+                }
+            }
+
+            showAlert(message, type) {
+                this.alert.textContent = message;
+                this.alert.className = `alert ${type} show`;
+                
+                // Auto-hide success messages
+                if (type === 'success') {
+                    setTimeout(() => {
+                        this.alert.classList.remove('show');
+                    }, 3000);
+                }
+            }
+
+            showFieldError(fieldName, message) {
+                const field = document.getElementById(fieldName);
+                const errorElement = document.getElementById(`${fieldName}-error`);
+                
+                field.classList.add('error');
+                errorElement.textContent = message;
+                errorElement.style.display = 'block';
+            }
+
+            clearFieldError(field) {
+                field.classList.remove('error');
+                const errorId = field.id + '-error';
+                const errorElement = document.getElementById(errorId);
+                if (errorElement) {
+                    errorElement.style.display = 'none';
+                }
+            }
+
+            clearAllErrors() {
+                ['username', 'password', 'twofa_code'].forEach(fieldName => {
+                    const field = document.getElementById(fieldName);
+                    if (field) {
+                        field.classList.remove('error');
+                        const errorElement = document.getElementById(`${fieldName}-error`);
+                        if (errorElement) {
+                            errorElement.style.display = 'none';
+                        }
+                    }
+                });
+                this.alert.classList.remove('show');
+            }
+        }
+
+        // Initialize the login manager when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new LoginManager();
+        });
+    </script>
+</body>
+</html>

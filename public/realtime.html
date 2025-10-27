@@ -1,0 +1,1317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-time Analytics Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #667eea;
+            --secondary: #764ba2;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --info: #3b82f6;
+            --dark: #1f2937;
+            --light: #f8fafc;
+            --border: #e2e8f0;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            --online: #10b981;
+            --offline: #ef4444;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, var(--light) 0%, #e2e8f0 100%);
+            color: var(--dark);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+            padding: 2rem;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            border-radius: 16px;
+            color: white;
+            box-shadow: var(--shadow-lg);
+            position: relative;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            margin-bottom: 1rem;
+        }
+
+        .connection-status {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            padding: 0.5rem 1rem;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.online {
+            background-color: var(--online);
+        }
+
+        .status-indicator.offline {
+            background-color: var(--offline);
+            animation: none;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .controls {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            margin-bottom: 2rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            min-width: 150px;
+        }
+
+        .control-group label {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--dark);
+            font-size: 0.9rem;
+        }
+
+        .control-group input,
+        .control-group select {
+            padding: 0.75rem;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+        }
+
+        .control-group input:focus,
+        .control-group select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.9rem;
+            align-self: end;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn.success {
+            background: var(--success);
+        }
+
+        .btn.danger {
+            background: var(--danger);
+        }
+
+        .notifications {
+            position: fixed;
+            top: 2rem;
+            right: 2rem;
+            z-index: 1000;
+            max-width: 350px;
+        }
+
+        .notification {
+            background: white;
+            border-left: 4px solid var(--info);
+            box-shadow: var(--shadow-lg);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .notification.success {
+            border-left-color: var(--success);
+        }
+
+        .notification.warning {
+            border-left-color: var(--warning);
+        }
+
+        .notification.danger {
+            border-left-color: var(--danger);
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 3rem;
+        }
+
+        .kpi-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            text-align: center;
+            border-left: 4px solid var(--primary);
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kpi-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .kpi-card.updating {
+            background: linear-gradient(45deg, #f8fafc, #e2e8f0, #f8fafc);
+            background-size: 200% 200%;
+            animation: gradientShift 2s ease infinite;
+        }
+
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .kpi-card h3 {
+            color: #6b7280;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+
+        .kpi-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--dark);
+            margin-bottom: 0.5rem;
+        }
+
+        .kpi-change {
+            font-size: 0.9rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.25rem;
+        }
+
+        .kpi-change.positive {
+            color: var(--success);
+        }
+
+        .kpi-change.negative {
+            color: var(--danger);
+        }
+
+        .trend-arrow {
+            font-size: 0.8rem;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .chart-container {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            position: relative;
+        }
+
+        .chart-container h3 {
+            margin-bottom: 1.5rem;
+            color: var(--dark);
+            font-size: 1.2rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .chart-canvas {
+            position: relative;
+            height: 300px;
+        }
+
+        .live-indicator {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.8rem;
+            color: var(--success);
+            font-weight: 600;
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--success);
+            animation: pulse 2s infinite;
+        }
+
+        .table-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            margin-bottom: 2rem;
+        }
+
+        .table-header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            padding: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .table-header h3 {
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        .last-updated {
+            font-size: 0.8rem;
+            opacity: 0.9;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .data-table th {
+            background: #f8fafc;
+            font-weight: 600;
+            color: var(--dark);
+        }
+
+        .data-table tbody tr:hover {
+            background: #f1f5f9;
+        }
+
+        .data-table tbody tr.updating {
+            background: linear-gradient(90deg, #f1f5f9, #e2e8f0, #f1f5f9);
+            background-size: 200% 100%;
+            animation: rowShift 1.5s ease infinite;
+        }
+
+        @keyframes rowShift {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        .metric-badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            background: var(--primary);
+            color: white;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .metric-badge.success {
+            background: var(--success);
+        }
+
+        .metric-badge.warning {
+            background: var(--warning);
+        }
+
+        .metric-badge.danger {
+            background: var(--danger);
+        }
+
+        .websocket-info {
+            background: white;
+            padding: 1rem;
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            font-size: 0.9rem;
+        }
+
+        .websocket-stats {
+            display: flex;
+            gap: 2rem;
+        }
+
+        .websocket-stat {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+
+        .websocket-stat strong {
+            font-size: 1.2rem;
+            color: var(--primary);
+        }
+
+        .websocket-stat span {
+            font-size: 0.8rem;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .connection-status {
+                position: relative;
+                top: auto;
+                right: auto;
+                margin-top: 1rem;
+            }
+            
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .kpi-grid {
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            }
+
+            .notifications {
+                left: 1rem;
+                right: 1rem;
+                max-width: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="notifications" id="notifications"></div>
+
+    <div class="container">
+        <div class="header">
+            <div class="connection-status" id="connectionStatus">
+                <div class="status-indicator offline" id="statusIndicator"></div>
+                <span id="statusText">Disconnected</span>
+            </div>
+            <h1>🚀 Real-time Analytics Dashboard</h1>
+            <p>Live campaign performance insights with real-time data updates</p>
+            <div class="websocket-info" style="margin-top: 1rem;">
+                <div class="websocket-stats">
+                    <div class="websocket-stat">
+                        <strong id="clientCount">0</strong>
+                        <span>Connected Clients</span>
+                    </div>
+                    <div class="websocket-stat">
+                        <strong id="updateCount">0</strong>
+                        <span>Updates Received</span>
+                    </div>
+                    <div class="websocket-stat">
+                        <strong id="lastUpdateTime">Never</strong>
+                        <span>Last Update</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <label for="dateFrom">Start Date</label>
+                <input type="date" id="dateFrom" name="dateFrom">
+            </div>
+            <div class="control-group">
+                <label for="dateTo">End Date</label>
+                <input type="date" id="dateTo" name="dateTo">
+            </div>
+            <div class="control-group">
+                <label for="brandFilter">Brand Filter</label>
+                <select id="brandFilter" name="brandFilter">
+                    <option value="">All Brands</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="campaignFilter">Campaign Filter</label>
+                <select id="campaignFilter" name="campaignFilter">
+                    <option value="">All Campaigns</option>
+                </select>
+            </div>
+            <button type="button" class="btn success" onclick="toggleRealtime()" id="realtimeBtn">
+                🔴 Start Real-time
+            </button>
+            <button type="button" class="btn" onclick="manualRefresh()" id="manualRefreshBtn">
+                🔄 Refresh Now
+            </button>
+        </div>
+
+        <div id="analyticsContent">
+            <div class="kpi-grid">
+                <div class="kpi-card" id="leadsCard">
+                    <h3>Total Leads</h3>
+                    <div class="kpi-value" id="totalLeads">-</div>
+                    <div class="kpi-change" id="leadsChange">
+                        <span class="trend-arrow">📈</span>
+                        <span>-</span>
+                    </div>
+                </div>
+                <div class="kpi-card" id="spentCard">
+                    <h3>Total Spent</h3>
+                    <div class="kpi-value" id="totalSpent">-</div>
+                    <div class="kpi-change" id="spentChange">
+                        <span class="trend-arrow">📈</span>
+                        <span>-</span>
+                    </div>
+                </div>
+                <div class="kpi-card" id="cplCard">
+                    <h3>Avg Cost Per Lead</h3>
+                    <div class="kpi-value" id="avgCPL">-</div>
+                    <div class="kpi-change" id="cplChange">
+                        <span class="trend-arrow">📉</span>
+                        <span>-</span>
+                    </div>
+                </div>
+                <div class="kpi-card" id="campaignsCard">
+                    <h3>Active Campaigns</h3>
+                    <div class="kpi-value" id="totalCampaigns">-</div>
+                    <div class="kpi-change" id="campaignsChange">
+                        <span class="trend-arrow">📈</span>
+                        <span>-</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="charts-grid">
+                <div class="chart-container">
+                    <div class="live-indicator">
+                        <div class="live-dot"></div>
+                        <span>LIVE</span>
+                    </div>
+                    <h3>📈 Performance Trends</h3>
+                    <div class="chart-canvas">
+                        <canvas id="trendsChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <div class="live-indicator">
+                        <div class="live-dot"></div>
+                        <span>LIVE</span>
+                    </div>
+                    <h3>🎯 Leads by Brand</h3>
+                    <div class="chart-canvas">
+                        <canvas id="brandsChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <div class="live-indicator">
+                        <div class="live-dot"></div>
+                        <span>LIVE</span>
+                    </div>
+                    <h3>💰 Spending Distribution</h3>
+                    <div class="chart-canvas">
+                        <canvas id="spendingChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <div class="live-indicator">
+                        <div class="live-dot"></div>
+                        <span>LIVE</span>
+                    </div>
+                    <h3>⚡ Campaign Performance</h3>
+                    <div class="chart-canvas">
+                        <canvas id="campaignChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <div class="table-header">
+                    <h3>📋 Top Campaigns Performance</h3>
+                    <div class="last-updated" id="campaignTableUpdated">Updated: Never</div>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Campaign</th>
+                                <th>Brand</th>
+                                <th>Leads</th>
+                                <th>Spending</th>
+                                <th>Cost/Lead</th>
+                                <th>Performance</th>
+                            </tr>
+                        </thead>
+                        <tbody id="campaignTableBody">
+                            <tr>
+                                <td colspan="6" style="text-align: center; padding: 2rem; color: #6b7280;">
+                                    Waiting for real-time data...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <div class="table-header">
+                    <h3>🏢 Brand Performance Summary</h3>
+                    <div class="last-updated" id="brandTableUpdated">Updated: Never</div>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Brand</th>
+                                <th>Total Leads</th>
+                                <th>Total Spending</th>
+                                <th>Market Share</th>
+                                <th>Trend</th>
+                            </tr>
+                        </thead>
+                        <tbody id="brandTableBody">
+                            <tr>
+                                <td colspan="5" style="text-align: center; padding: 2rem; color: #6b7280;">
+                                    Waiting for real-time data...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let ws = null;
+        let charts = {};
+        let analyticsData = null;
+        let isRealtimeActive = false;
+        let updateCount = 0;
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 5;
+
+        // Initialize the dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeDateInputs();
+            loadFilterOptions();
+            connectWebSocket();
+        });
+
+        function initializeDateInputs() {
+            const now = new Date();
+            const thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
+            
+            document.getElementById('dateFrom').value = thirtyDaysAgo.toISOString().split('T')[0];
+            document.getElementById('dateTo').value = now.toISOString().split('T')[0];
+        }
+
+        async function loadFilterOptions() {
+            try {
+                const response = await fetch('/api/reports/filters');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const brandSelect = document.getElementById('brandFilter');
+                    const campaignSelect = document.getElementById('campaignFilter');
+                    
+                    // Populate brands
+                    data.data.brands.forEach(brand => {
+                        const option = document.createElement('option');
+                        option.value = brand;
+                        option.textContent = brand;
+                        brandSelect.appendChild(option);
+                    });
+                    
+                    // Populate campaigns
+                    data.data.campaigns.forEach(campaign => {
+                        const option = document.createElement('option');
+                        option.value = campaign.id;
+                        option.textContent = `${campaign.name} (${campaign.brand || 'No Brand'})`;
+                        campaignSelect.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading filter options:', error);
+                showNotification('Failed to load filter options', 'danger');
+            }
+        }
+
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws/analytics`;
+            
+            try {
+                ws = new WebSocket(wsUrl);
+                
+                ws.onopen = function(event) {
+                    console.log('WebSocket connected');
+                    updateConnectionStatus(true);
+                    reconnectAttempts = 0;
+                    
+                    // Subscribe to updates with current filters
+                    subscribeToUpdates();
+                };
+                
+                ws.onmessage = function(event) {
+                    try {
+                        const message = JSON.parse(event.data);
+                        handleWebSocketMessage(message);
+                    } catch (error) {
+                        console.error('Error parsing WebSocket message:', error);
+                    }
+                };
+                
+                ws.onclose = function(event) {
+                    console.log('WebSocket disconnected');
+                    updateConnectionStatus(false);
+                    
+                    // Attempt to reconnect if not intentional
+                    if (!event.wasClean && reconnectAttempts < maxReconnectAttempts) {
+                        setTimeout(() => {
+                            reconnectAttempts++;
+                            console.log(`Reconnecting... Attempt ${reconnectAttempts}/${maxReconnectAttempts}`);
+                            connectWebSocket();
+                        }, 2000 * reconnectAttempts);
+                    }
+                };
+                
+                ws.onerror = function(error) {
+                    console.error('WebSocket error:', error);
+                    updateConnectionStatus(false);
+                    showNotification('WebSocket connection error', 'danger');
+                };
+                
+            } catch (error) {
+                console.error('Failed to create WebSocket connection:', error);
+                updateConnectionStatus(false);
+                showNotification('Failed to establish real-time connection', 'danger');
+            }
+        }
+
+        function subscribeToUpdates() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                const filters = {
+                    dateFrom: document.getElementById('dateFrom').value,
+                    dateTo: document.getElementById('dateTo').value,
+                    brand: document.getElementById('brandFilter').value || null,
+                    campaignId: document.getElementById('campaignFilter').value || null
+                };
+                
+                ws.send(JSON.stringify({
+                    type: 'subscribe',
+                    filters: filters,
+                    updateFrequency: 30000
+                }));
+            }
+        }
+
+        function handleWebSocketMessage(message) {
+            console.log('WebSocket message received:', message.type);
+            
+            switch (message.type) {
+                case 'welcome':
+                    showNotification('Connected to real-time analytics', 'success');
+                    break;
+                    
+                case 'initial_data':
+                case 'data_update':
+                case 'realtime_update':
+                    analyticsData = message.data;
+                    updateCount++;
+                    updateAnalytics();
+                    updateWebSocketStats();
+                    if (message.type === 'realtime_update') {
+                        showUpdateAnimation();
+                    }
+                    break;
+                    
+                case 'subscription_confirmed':
+                    console.log('Subscription confirmed:', message);
+                    break;
+                    
+                case 'alert':
+                    showNotification(message.data.message, message.data.type || 'warning');
+                    break;
+                    
+                case 'system_message':
+                    showNotification(message.message, 'info');
+                    break;
+                    
+                case 'error':
+                    console.error('WebSocket error message:', message.message);
+                    showNotification(message.message, 'danger');
+                    break;
+                    
+                case 'server_shutdown':
+                    showNotification('Server is shutting down', 'warning');
+                    break;
+                    
+                default:
+                    console.log('Unknown message type:', message.type);
+            }
+        }
+
+        function updateConnectionStatus(connected) {
+            const indicator = document.getElementById('statusIndicator');
+            const text = document.getElementById('statusText');
+            
+            if (connected) {
+                indicator.className = 'status-indicator online';
+                text.textContent = 'Live';
+            } else {
+                indicator.className = 'status-indicator offline';
+                text.textContent = 'Disconnected';
+            }
+        }
+
+        function updateWebSocketStats() {
+            document.getElementById('clientCount').textContent = '1'; // Current client
+            document.getElementById('updateCount').textContent = updateCount;
+            document.getElementById('lastUpdateTime').textContent = new Date().toLocaleTimeString();
+        }
+
+        function showUpdateAnimation() {
+            // Animate KPI cards
+            document.querySelectorAll('.kpi-card').forEach(card => {
+                card.classList.add('updating');
+                setTimeout(() => card.classList.remove('updating'), 2000);
+            });
+        }
+
+        function toggleRealtime() {
+            const btn = document.getElementById('realtimeBtn');
+            
+            if (!isRealtimeActive) {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    isRealtimeActive = true;
+                    btn.textContent = '🟢 Real-time Active';
+                    btn.className = 'btn danger';
+                    subscribeToUpdates();
+                    showNotification('Real-time analytics activated', 'success');
+                } else {
+                    showNotification('WebSocket connection not available', 'danger');
+                    connectWebSocket();
+                }
+            } else {
+                isRealtimeActive = false;
+                btn.textContent = '🔴 Start Real-time';
+                btn.className = 'btn success';
+                showNotification('Real-time analytics deactivated', 'info');
+            }
+        }
+
+        function manualRefresh() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'request_update' }));
+                showNotification('Manual refresh requested', 'info');
+            } else {
+                showNotification('WebSocket connection not available', 'danger');
+            }
+        }
+
+        function updateAnalytics() {
+            if (!analyticsData) return;
+            
+            updateKPIs();
+            renderCharts();
+            renderTables();
+        }
+
+        function updateKPIs() {
+            const { summary } = analyticsData;
+            
+            document.getElementById('totalLeads').textContent = formatNumber(summary.totalLeads);
+            document.getElementById('totalSpent').textContent = '$' + formatNumber(summary.totalSpent, 2);
+            document.getElementById('avgCPL').textContent = '$' + formatNumber(summary.avgCostPerLead, 2);
+            document.getElementById('totalCampaigns').textContent = summary.totalCampaigns;
+            
+            // Update change indicators with real data
+            if (summary.changes) {
+                updateChangeIndicator('leadsChange', summary.changes.leadsChange);
+                updateChangeIndicator('spentChange', summary.changes.spentChange);
+                updateChangeIndicator('cplChange', summary.changes.cplChange);
+                
+                const campaignsChange = document.getElementById('campaignsChange');
+                campaignsChange.innerHTML = `<span class="trend-arrow">📈</span><span>${summary.changes.campaignsChange > 0 ? '+' : ''}${summary.changes.campaignsChange}</span>`;
+                campaignsChange.className = `kpi-change ${summary.changes.campaignsChange >= 0 ? 'positive' : 'negative'}`;
+            }
+        }
+
+        function updateChangeIndicator(elementId, changeData) {
+            const element = document.getElementById(elementId);
+            const arrow = changeData.isPositive ? '📈' : '📉';
+            const className = changeData.isPositive ? 'positive' : 'negative';
+            
+            element.innerHTML = `<span class="trend-arrow">${arrow}</span><span>${changeData.formatted}</span>`;
+            element.className = `kpi-change ${className}`;
+        }
+
+        function renderCharts() {
+            // Destroy existing charts
+            Object.values(charts).forEach(chart => {
+                if (chart) chart.destroy();
+            });
+            charts = {};
+            
+            renderTrendsChart();
+            renderBrandsChart();
+            renderSpendingChart();
+            renderCampaignChart();
+        }
+
+        function renderTrendsChart() {
+            const ctx = document.getElementById('trendsChart').getContext('2d');
+            const { trends } = analyticsData;
+            
+            const labels = trends.map(item => new Date(item.date).toLocaleDateString());
+            const leadsData = trends.map(item => item.leads);
+            const spentData = trends.map(item => item.spent);
+            
+            charts.trends = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Leads',
+                        data: leadsData,
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        tension: 0.4,
+                        yAxisID: 'y'
+                    }, {
+                        label: 'Spending',
+                        data: spentData,
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        tension: 0.4,
+                        yAxisID: 'y1'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: {
+                        duration: 750
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'Leads'
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'Spending ($)'
+                            },
+                            grid: {
+                                drawOnChartArea: false,
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderBrandsChart() {
+            const ctx = document.getElementById('brandsChart').getContext('2d');
+            const { brandPerformance } = analyticsData;
+            
+            const labels = brandPerformance.map(item => item.brand);
+            const data = brandPerformance.map(item => item.leads);
+            const colors = generateColors(labels.length);
+            
+            charts.brands = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: colors,
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: {
+                        animateRotate: true,
+                        duration: 1000
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderSpendingChart() {
+            const ctx = document.getElementById('spendingChart').getContext('2d');
+            const { brandPerformance } = analyticsData;
+            
+            const labels = brandPerformance.map(item => item.brand);
+            const data = brandPerformance.map(item => item.spent);
+            
+            charts.spending = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Spending',
+                        data: data,
+                        backgroundColor: 'rgba(102, 126, 234, 0.8)',
+                        borderColor: '#667eea',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: {
+                        duration: 1000
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Spending ($)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderCampaignChart() {
+            const ctx = document.getElementById('campaignChart').getContext('2d');
+            const { topCampaigns } = analyticsData;
+            
+            const labels = topCampaigns.map(item => item.campaignName || `Campaign ${item.campaignId}`);
+            const leadsData = topCampaigns.map(item => item.leads);
+            const spentData = topCampaigns.map(item => item.spent);
+            
+            charts.campaign = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Leads',
+                        data: leadsData,
+                        backgroundColor: 'rgba(102, 126, 234, 0.8)',
+                        yAxisID: 'y'
+                    }, {
+                        label: 'Spending',
+                        data: spentData,
+                        backgroundColor: 'rgba(16, 185, 129, 0.8)',
+                        yAxisID: 'y1'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: {
+                        duration: 1000
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: {
+                                maxRotation: 45,
+                                minRotation: 45
+                            }
+                        },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'Leads'
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'Spending ($)'
+                            },
+                            grid: {
+                                drawOnChartArea: false,
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderTables() {
+            renderCampaignTable();
+            renderBrandTable();
+        }
+
+        function renderCampaignTable() {
+            const tbody = document.getElementById('campaignTableBody');
+            const { topCampaigns } = analyticsData;
+            
+            tbody.innerHTML = '';
+            
+            topCampaigns.forEach((campaign, index) => {
+                const row = document.createElement('tr');
+                const performance = getPerformanceBadge(campaign.cpl);
+                
+                row.innerHTML = `
+                    <td>${campaign.campaignName || `Campaign ${campaign.campaignId}`}</td>
+                    <td>${campaign.brand || 'Unknown'}</td>
+                    <td>${formatNumber(campaign.leads)}</td>
+                    <td>$${formatNumber(campaign.spent, 2)}</td>
+                    <td>$${formatNumber(campaign.cpl, 2)}</td>
+                    <td>${performance}</td>
+                `;
+                
+                // Add animation delay for updating effect
+                setTimeout(() => {
+                    row.classList.add('updating');
+                    setTimeout(() => row.classList.remove('updating'), 1500);
+                }, index * 100);
+                
+                tbody.appendChild(row);
+            });
+            
+            document.getElementById('campaignTableUpdated').textContent = 
+                `Updated: ${new Date().toLocaleTimeString()}`;
+        }
+
+        function renderBrandTable() {
+            const tbody = document.getElementById('brandTableBody');
+            const { brandPerformance } = analyticsData;
+            
+            tbody.innerHTML = '';
+            
+            const totalLeads = brandPerformance.reduce((sum, brand) => sum + brand.leads, 0);
+            
+            brandPerformance.forEach((brand, index) => {
+                const row = document.createElement('tr');
+                const marketShare = totalLeads > 0 ? (brand.leads / totalLeads * 100) : 0;
+                const trend = Math.random() > 0.5 ? '📈 +' + (Math.random() * 10).toFixed(1) + '%' : '📉 -' + (Math.random() * 5).toFixed(1) + '%';
+                
+                row.innerHTML = `
+                    <td>${brand.brand}</td>
+                    <td>${formatNumber(brand.leads)}</td>
+                    <td>$${formatNumber(brand.spent, 2)}</td>
+                    <td>${formatNumber(marketShare, 1)}%</td>
+                    <td>${trend}</td>
+                `;
+                
+                // Add animation delay for updating effect
+                setTimeout(() => {
+                    row.classList.add('updating');
+                    setTimeout(() => row.classList.remove('updating'), 1500);
+                }, index * 100);
+                
+                tbody.appendChild(row);
+            });
+            
+            document.getElementById('brandTableUpdated').textContent = 
+                `Updated: ${new Date().toLocaleTimeString()}`;
+        }
+
+        // Utility functions
+        function formatNumber(number, decimals = 0) {
+            if (isNaN(number) || number === null || number === undefined) return '0';
+            return Number(number).toLocaleString('en-US', {
+                minimumFractionDigits: decimals,
+                maximumFractionDigits: decimals
+            });
+        }
+
+        function generateColors(count) {
+            const colors = [
+                '#667eea', '#764ba2', '#10b981', '#ef4444', '#f59e0b',
+                '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'
+            ];
+            
+            const result = [];
+            for (let i = 0; i < count; i++) {
+                result.push(colors[i % colors.length]);
+            }
+            return result;
+        }
+
+        function getPerformanceBadge(cpl) {
+            if (cpl === 0) return '<span class="metric-badge">No Data</span>';
+            if (cpl < 5) return '<span class="metric-badge success">Excellent</span>';
+            if (cpl < 15) return '<span class="metric-badge">Good</span>';
+            if (cpl < 25) return '<span class="metric-badge warning">Average</span>';
+            return '<span class="metric-badge danger">Poor</span>';
+        }
+
+        function showNotification(message, type = 'info') {
+            const notifications = document.getElementById('notifications');
+            const notification = document.createElement('div');
+            
+            notification.className = `notification ${type}`;
+            notification.innerHTML = `
+                <strong>${type.charAt(0).toUpperCase() + type.slice(1)}</strong>
+                <p>${message}</p>
+            `;
+            
+            notifications.appendChild(notification);
+            
+            // Auto remove after 5 seconds
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease-in forwards';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300);
+            }, 5000);
+        }
+
+        // Handle filter changes
+        document.getElementById('dateFrom').addEventListener('change', subscribeToUpdates);
+        document.getElementById('dateTo').addEventListener('change', subscribeToUpdates);
+        document.getElementById('brandFilter').addEventListener('change', subscribeToUpdates);
+        document.getElementById('campaignFilter').addEventListener('change', subscribeToUpdates);
+
+        // Handle page unload
+        window.addEventListener('beforeunload', function() {
+            if (ws) {
+                ws.close();
+            }
+        });
+    </script>
+
+    <style>
+        @keyframes slideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+    </style>
+</body>
+</html>

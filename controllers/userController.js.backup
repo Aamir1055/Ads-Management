@@ -1,0 +1,455 @@
+const User = require('../models/User');
+const Joi = require('joi');
+
+// Validation schemas with improved constraints
+const createUserSchema = Joi.object({
+  username: Joi.string()
+    .alphanum()
+    .min(3)
+    .max(30)
+    .trim()
+    .lowercase()
+    .required()
+    .messages({
+      'string.alphanum': 'Username must only contain letters and numbers',
+      'string.min': 'Username must be at least 3 characters long',
+      'string.max': 'Username cannot exceed 30 characters',
+      'any.required': 'Username is required'
+    }),
+  password: Joi.string()
+    .pattern(new RegExp('^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]{8,50}$'))
+    .required()
+    .messages({
+      'string.pattern.base': 'Password must be 8-50 characters with uppercase, lowercase, number, and special character (@$!%*?&)',
+      'any.required': 'Password is required'
+    }),
+  confirm_password: Joi.string()
+    .required()
+    .valid(Joi.ref('password'))
+    .messages({
+      'any.required': 'Confirm password is required',
+      'any.only': 'Passwords do not match'
+    }),
+  role_id: Joi.number()
+    .integer()
+    .positive()
+    .required()
+    .messages({
+      'number.base': 'Role ID must be a number',
+      'number.positive': 'Invalid role specified',
+      'any.required': 'Role is required'
+    }),
+  enable_2fa: Joi.boolean()
+    .default(false)
+    .messages({
+      'boolean.base': 'Enable 2FA must be a boolean value'
+    })
+});
+
+const updateUserSchema = Joi.object({
+  username: Joi.string()
+    .alphanum()
+    .min(3)
+    .max(30)
+    .trim()
+    .lowercase()
+    .messages({
+      'string.alphanum': 'Username must only contain letters and numbers',
+      'string.min': 'Username must be at least 3 characters long',
+      'string.max': 'Username cannot exceed 30 characters'
+    }),
+  password: Joi.string()
+    .pattern(new RegExp('^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]{8,50}$'))
+    .messages({
+      'string.pattern.base': 'Password must be 8-50 characters with uppercase, lowercase, number, and special character (@$!%*?&)'
+    }),
+  role_id: Joi.number()
+    .integer()
+    .positive()
+    .messages({
+      'number.base': 'Role ID must be a number',
+      'number.positive': 'Invalid role specified'
+    })
+}).min(1).messages({
+  'object.min': 'At least one field is required for update'
+});
+
+// Helper functions
+const createResponse = (success, message, data = null, errors = null) => ({
+  success,
+  message,
+  timestamp: new Date().toISOString(),
+  ...(data && { data }),
+  ...(errors && { errors })
+});
+
+const userController = {
+  // Create a new user (POST)
+  createUser: async (req, res) => {
+    try {
+      // Validate input
+      const { error, value } = createUserSchema.validate(req.body);
+      if (error) {
+        return res.status(400).json(
+          createResponse(false, 'Validation failed', null, error.details.map(d => d.message))
+        );
+      }
+
+      const { username, password, confirm_password, role_id, enable_2fa } = value;
+
+      // Always validate confirm_password and pass to model for internal validation
+      const result = await User.create({
+        username,
+        password,
+        confirm_password,
+        role_id,
+        enable_2fa
+      });
+
+      // Response data
+      const responseData = {
+        user: result.user,
+        message: 'User created successfully'
+      };
+
+      // Add QR code if 2FA is enabled
+      if (enable_2fa && result.qrCode) {
+        responseData.twoFA = {
+          qrCode: result.qrCode,
+          message: 'Scan this QR code with your authenticator app'
+        };
+      }
+
+      res.status(201).json(
+        createResponse(true, 'User created successfully', responseData)
+      );
+      
+    } catch (error) {
+      console.error('Create user error:', error);
+      
+      // Handle specific errors
+      if (error.message === 'Username already exists') {
+        return res.status(409).json(
+          createResponse(false, 'Username already exists')
+        );
+      }
+      
+      if (error.message === 'Invalid role specified') {
+        return res.status(400).json(
+          createResponse(false, 'Invalid role specified')
+        );
+      }
+      
+      if (error.message === 'Passwords do not match') {
+        return res.status(400).json(
+          createResponse(false, 'Passwords do not match')
+        );
+      }
+      
+      return res.status(500).json(
+        createResponse(false, 'Failed to create user', null, ['Internal server error'])
+      );
+    }
+  },
+
+  // Get all users (GET)
+  getAllUsers: async (req, res) => {
+    try {
+      // Parse query parameters
+      const page = Math.max(1, parseInt(req.query.page) || 1);
+      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 10));
+      const search = req.query.search?.trim() || '';
+      const role_id = req.query.role_id ? parseInt(req.query.role_id) : null;
+      const is_active = req.query.is_active !== undefined ? req.query.is_active === 'true' : true;
+
+      // Get users using the model
+      const result = await User.findAll({
+        page,
+        limit,
+        search,
+        role_id,
+        is_active
+      });
+
+      res.status(200).json(
+        createResponse(true, 'Users fetched successfully', result)
+      );
+      
+    } catch (error) {
+      console.error('Get all users error:', error);
+      return res.status(500).json(
+        createResponse(false, 'Failed to fetch users', null, ['Internal server error'])
+      );
+    }
+  },
+
+  // Get user by ID (GET)
+  getUserById: async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      if (!userId || isNaN(userId) || userId <= 0) {
+        return res.status(400).json(
+          createResponse(false, 'Invalid user ID - must be a positive number')
+        );
+      }
+
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json(
+          createResponse(false, 'User not found or inactive')
+        );
+      }
+
+      res.status(200).json(
+        createResponse(true, 'User retrieved successfully', { user })
+      );
+      
+    } catch (error) {
+      console.error('Get user by ID error:', error);
+      return res.status(500).json(
+        createResponse(false, 'Failed to fetch user', null, ['Internal server error'])
+      );
+    }
+  },
+
+  // Update user (PUT)
+  updateUser: async (req, res) => {
+    try {
+      const userId = Number(req.params.id);
+      if (!Number.isInteger(userId) || userId <= 0) {
+        return res.status(400).json(
+          createResponse(false, 'Invalid user ID - must be a positive integer')
+        );
+      }
+
+      // Validate request body
+      const { error, value } = updateUserSchema.validate(req.body);
+      if (error) {
+        return res.status(400).json(
+          createResponse(false, 'Validation failed', null, error.details.map(d => d.message))
+        );
+      }
+
+      // If password is present, require confirm_password and check match
+      if (value.password !== undefined) {
+        if (!req.body.confirm_password) {
+          return res.status(400).json(
+            createResponse(false, 'Confirm password is required when updating password')
+          );
+        }
+        if (value.password !== req.body.confirm_password) {
+          return res.status(400).json(
+            createResponse(false, 'Passwords do not match')
+          );
+        }
+        value.confirm_password = req.body.confirm_password;
+      }
+
+      // Update user using the model
+      const user = await User.updateById(userId, value);
+
+      res.status(200).json(
+        createResponse(true, 'User updated successfully', { user })
+      );
+        
+    } catch (error) {
+      console.error('Update user error:', error);
+      
+      // Handle specific errors
+      if (error.message === 'User not found') {
+        return res.status(404).json(
+          createResponse(false, 'User not found or inactive')
+        );
+      }
+      
+      if (error.message === 'Username already exists') {
+        return res.status(409).json(
+          createResponse(false, 'Username already exists')
+        );
+      }
+      
+      if (error.message === 'Invalid role specified') {
+        return res.status(400).json(
+          createResponse(false, 'Invalid role specified')
+        );
+      }
+      
+      return res.status(500).json(
+        createResponse(false, 'Failed to update user', null, ['Internal server error'])
+      );
+    }
+  },
+
+  // Delete user (DELETE)
+  deleteUser: async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      if (!userId || isNaN(userId) || userId <= 0) {
+        return res.status(400).json(
+          createResponse(false, 'Invalid user ID - must be a positive number')
+        );
+      }
+
+      // Delete user using the model
+      const result = await User.deleteById(userId);
+
+      res.status(200).json(
+        createResponse(true, result.message)
+      );
+        
+    } catch (error) {
+      console.error('Delete user error:', error);
+      
+      // Handle specific errors
+      if (error.message === 'User not found') {
+        return res.status(404).json(
+          createResponse(false, 'User not found or already inactive')
+        );
+      }
+      
+      if (error.message === 'Cannot delete admin users') {
+        return res.status(403).json(
+          createResponse(false, 'Cannot delete admin users')
+        );
+      }
+      
+      return res.status(500).json(
+        createResponse(false, 'Failed to delete user', null, ['Internal server error'])
+      );
+    }
+  },
+
+  // Additional utility method - Toggle user status
+  toggleUserStatus: async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      if (!userId || isNaN(userId) || userId <= 0) {
+        return res.status(400).json(
+          createResponse(false, 'Invalid user ID')
+        );
+      }
+
+      // Toggle user status using the model
+      const result = await User.toggleStatus(userId);
+
+      res.status(200).json(
+        createResponse(true, result.message, {
+          user: {
+            id: result.id,
+            username: result.username,
+            is_active: result.is_active
+          }
+        })
+      );
+
+    } catch (error) {
+      console.error('Toggle user status error:', error);
+      
+      if (error.message === 'User not found') {
+        return res.status(404).json(
+          createResponse(false, 'User not found')
+        );
+      }
+      
+      return res.status(500).json(
+        createResponse(false, 'Failed to toggle user status', null, ['Internal server error'])
+      );
+    }
+  },
+
+  // Get all available roles
+  getRoles: async (req, res) => {
+    try {
+      const roles = await User.getRoles();
+
+      res.status(200).json(
+        createResponse(true, 'Roles fetched successfully', { roles })
+      );
+      
+    } catch (error) {
+      console.error('Get roles error:', error);
+      return res.status(500).json(
+        createResponse(false, 'Failed to fetch roles', null, ['Internal server error'])
+      );
+    }
+  },
+
+  // Enable 2FA for user
+  enable2FA: async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      if (!userId || isNaN(userId) || userId <= 0) {
+        return res.status(400).json(
+          createResponse(false, 'Invalid user ID - must be a positive number')
+        );
+      }
+
+      const result = await User.enable2FA(userId);
+
+      res.status(200).json(
+        createResponse(true, result.message, {
+          qrCode: result.qrCode,
+          instructions: 'Scan this QR code with your authenticator app'
+        })
+      );
+      
+    } catch (error) {
+      console.error('Enable 2FA error:', error);
+      
+      if (error.message === 'User not found') {
+        return res.status(404).json(
+          createResponse(false, 'User not found')
+        );
+      }
+      
+      if (error.message === '2FA is already enabled for this user') {
+        return res.status(400).json(
+          createResponse(false, '2FA is already enabled for this user')
+        );
+      }
+      
+      return res.status(500).json(
+        createResponse(false, 'Failed to enable 2FA', null, ['Internal server error'])
+      );
+    }
+  },
+
+  // Disable 2FA for user
+  disable2FA: async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      if (!userId || isNaN(userId) || userId <= 0) {
+        return res.status(400).json(
+          createResponse(false, 'Invalid user ID - must be a positive number')
+        );
+      }
+
+      const result = await User.disable2FA(userId);
+
+      res.status(200).json(
+        createResponse(true, result.message)
+      );
+      
+    } catch (error) {
+      console.error('Disable 2FA error:', error);
+      
+      if (error.message === 'User not found') {
+        return res.status(404).json(
+          createResponse(false, 'User not found')
+        );
+      }
+      
+      if (error.message === '2FA is not enabled for this user') {
+        return res.status(400).json(
+          createResponse(false, '2FA is not enabled for this user')
+        );
+      }
+      
+      return res.status(500).json(
+        createResponse(false, 'Failed to disable 2FA', null, ['Internal server error'])
+      );
+    }
+  }
+};
+
+module.exports = userController;

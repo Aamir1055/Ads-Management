@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ads Reporting Analytics Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/index.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #667eea;
+            --secondary: #764ba2;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --info: #3b82f6;
+            --dark: #1f2937;
+            --light: #f8fafc;
+            --border: #e2e8f0;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, var(--light) 0%, #e2e8f0 100%);
+            color: var(--dark);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+            padding: 2rem;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            border-radius: 16px;
+            color: white;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .controls {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            margin-bottom: 2rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            min-width: 150px;
+        }
+
+        .control-group label {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--dark);
+            font-size: 0.9rem;
+        }
+
+        .control-group input,
+        .control-group select {
+            padding: 0.75rem;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+        }
+
+        .control-group input:focus,
+        .control-group select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.9rem;
+            align-self: end;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        .error {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #dc2626;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+        }
+
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 3rem;
+        }
+
+        .kpi-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            text-align: center;
+            border-left: 4px solid var(--primary);
+            transition: all 0.2s ease;
+        }
+
+        .kpi-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .kpi-card h3 {
+            color: #6b7280;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+
+        .kpi-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--dark);
+            margin-bottom: 0.5rem;
+        }
+
+        .kpi-change {
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .kpi-change.positive {
+            color: var(--success);
+        }
+
+        .kpi-change.negative {
+            color: var(--danger);
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .chart-container {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            position: relative;
+        }
+
+        .chart-container h3 {
+            margin-bottom: 1.5rem;
+            color: var(--dark);
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        .chart-canvas {
+            position: relative;
+            height: 300px;
+        }
+
+        .table-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            margin-bottom: 2rem;
+        }
+
+        .table-header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            padding: 1.5rem;
+        }
+
+        .table-header h3 {
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .data-table th {
+            background: #f8fafc;
+            font-weight: 600;
+            color: var(--dark);
+        }
+
+        .data-table tbody tr:hover {
+            background: #f1f5f9;
+        }
+
+        .export-controls {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .export-btn {
+            padding: 0.5rem 1rem;
+            background: var(--info);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .export-btn:hover {
+            background: #2563eb;
+            transform: translateY(-1px);
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .kpi-grid {
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            }
+        }
+
+        .refresh-indicator {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 0.5rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .metric-badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            background: var(--primary);
+            color: white;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .metric-badge.success {
+            background: var(--success);
+        }
+
+        .metric-badge.warning {
+            background: var(--warning);
+        }
+
+        .metric-badge.danger {
+            background: var(--danger);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Analytics Dashboard</h1>
+            <p>Comprehensive campaign performance insights and data visualization</p>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <label for="dateFrom">Start Date</label>
+                <input type="date" id="dateFrom" name="dateFrom">
+            </div>
+            <div class="control-group">
+                <label for="dateTo">End Date</label>
+                <input type="date" id="dateTo" name="dateTo">
+            </div>
+            <div class="control-group">
+                <label for="brandFilter">Brand Filter</label>
+                <select id="brandFilter" name="brandFilter">
+                    <option value="">All Brands</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="campaignFilter">Campaign Filter</label>
+                <select id="campaignFilter" name="campaignFilter">
+                    <option value="">All Campaigns</option>
+                </select>
+            </div>
+            <button type="button" class="btn" onclick="loadAnalytics()" id="loadBtn">
+                Load Analytics
+            </button>
+            <button type="button" class="btn" onclick="autoRefresh()" id="autoRefreshBtn" style="background: var(--success);">
+                Auto Refresh: OFF
+            </button>
+        </div>
+
+        <div id="loadingIndicator" class="loading" style="display: none;">
+            <div class="refresh-indicator"></div>
+            Loading analytics data...
+        </div>
+
+        <div id="errorContainer" class="error" style="display: none;">
+        </div>
+
+        <div id="analyticsContent" style="display: none;">
+            <div class="export-controls">
+                <button class="export-btn" onclick="exportToPNG()">📷 Export Charts</button>
+                <button class="export-btn" onclick="exportToCSV()">📊 Export CSV</button>
+                <button class="export-btn" onclick="printReport()">🖨️ Print Report</button>
+            </div>
+
+            <div class="kpi-grid">
+                <div class="kpi-card">
+                    <h3>Total Leads</h3>
+                    <div class="kpi-value" id="totalLeads">-</div>
+                    <div class="kpi-change" id="leadsChange">-</div>
+                </div>
+                <div class="kpi-card">
+                    <h3>Total Spent</h3>
+                    <div class="kpi-value" id="totalSpent">-</div>
+                    <div class="kpi-change" id="spentChange">-</div>
+                </div>
+                <div class="kpi-card">
+                    <h3>Avg Cost Per Lead</h3>
+                    <div class="kpi-value" id="avgCPL">-</div>
+                    <div class="kpi-change" id="cplChange">-</div>
+                </div>
+                <div class="kpi-card">
+                    <h3>Active Campaigns</h3>
+                    <div class="kpi-value" id="totalCampaigns">-</div>
+                    <div class="kpi-change" id="campaignsChange">-</div>
+                </div>
+            </div>
+
+            <div class="charts-grid">
+                <div class="chart-container">
+                    <h3>📈 Performance Trends</h3>
+                    <div class="chart-canvas">
+                        <canvas id="trendsChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <h3>🎯 Leads by Brand</h3>
+                    <div class="chart-canvas">
+                        <canvas id="brandsChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <h3>💰 Spending Distribution</h3>
+                    <div class="chart-canvas">
+                        <canvas id="spendingChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <h3>⚡ Campaign Performance</h3>
+                    <div class="chart-canvas">
+                        <canvas id="campaignChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <div class="table-header">
+                    <h3>📋 Top Campaigns Performance</h3>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Campaign</th>
+                                <th>Leads</th>
+                                <th>Spending</th>
+                                <th>Cost/Lead</th>
+                                <th>Performance</th>
+                            </tr>
+                        </thead>
+                        <tbody id="campaignTableBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <div class="table-header">
+                    <h3>🏢 Brand Performance Summary</h3>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Brand</th>
+                                <th>Total Leads</th>
+                                <th>Total Spending</th>
+                                <th>Avg Cost/Lead</th>
+                                <th>Market Share</th>
+                            </tr>
+                        </thead>
+                        <tbody id="brandTableBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let charts = {};
+        let analyticsData = null;
+        let autoRefreshInterval = null;
+        let isAutoRefresh = false;
+
+        // Initialize the dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeDateInputs();
+            loadFilterOptions();
+            loadAnalytics();
+        });
+
+        function initializeDateInputs() {
+            const now = new Date();
+            const thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
+            
+            document.getElementById('dateFrom').value = thirtyDaysAgo.toISOString().split('T')[0];
+            document.getElementById('dateTo').value = now.toISOString().split('T')[0];
+        }
+
+        async function loadFilterOptions() {
+            try {
+                const response = await fetch('/api/reports/filters');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const brandSelect = document.getElementById('brandFilter');
+                    const campaignSelect = document.getElementById('campaignFilter');
+                    
+                    // Populate brands
+                    data.data.brands.forEach(brand => {
+                        const option = document.createElement('option');
+                        option.value = brand;
+                        option.textContent = brand;
+                        brandSelect.appendChild(option);
+                    });
+                    
+                    // Populate campaigns
+                    data.data.campaigns.forEach(campaign => {
+                        const option = document.createElement('option');
+                        option.value = campaign.id;
+                        option.textContent = `${campaign.name} (${campaign.brand || 'No Brand'})`;
+                        campaignSelect.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading filter options:', error);
+            }
+        }
+
+        async function loadAnalytics() {
+            const loadBtn = document.getElementById('loadBtn');
+            const loading = document.getElementById('loadingIndicator');
+            const error = document.getElementById('errorContainer');
+            const content = document.getElementById('analyticsContent');
+            
+            loadBtn.disabled = true;
+            loadBtn.innerHTML = '<span class="refresh-indicator"></span>Loading...';
+            loading.style.display = 'block';
+            error.style.display = 'none';
+            content.style.display = 'none';
+            
+            try {
+                const params = new URLSearchParams({
+                    date_from: document.getElementById('dateFrom').value,
+                    date_to: document.getElementById('dateTo').value
+                });
+                
+                const brand = document.getElementById('brandFilter').value;
+                const campaign = document.getElementById('campaignFilter').value;
+                
+                if (brand) params.append('brand', brand);
+                if (campaign) params.append('campaign_id', campaign);
+                
+                const response = await fetch(`/api/reports/charts?${params}`);
+                const data = await response.json();
+                
+                if (!data.success) {
+                    throw new Error(data.message || 'Failed to load analytics data');
+                }
+                
+                analyticsData = data.data;
+                renderAnalytics();
+                
+                loading.style.display = 'none';
+                content.style.display = 'block';
+                
+            } catch (error) {
+                console.error('Error loading analytics:', error);
+                loading.style.display = 'none';
+                error.style.display = 'block';
+                error.textContent = `Error: ${error.message}`;
+            } finally {
+                loadBtn.disabled = false;
+                loadBtn.innerHTML = 'Load Analytics';
+            }
+        }
+
+        function renderAnalytics() {
+            if (!analyticsData) return;
+            
+            updateKPIs();
+            renderCharts();
+            renderTables();
+        }
+
+        function updateKPIs() {
+            const { series, byBrand, topCampaigns } = analyticsData;
+            
+            const totalLeads = series.reduce((sum, item) => sum + (item.leads || 0), 0);
+            const totalSpent = series.reduce((sum, item) => sum + (item.spent || 0), 0);
+            const avgCPL = totalLeads > 0 ? (totalSpent / totalLeads) : 0;
+            
+            document.getElementById('totalLeads').textContent = formatNumber(totalLeads);
+            document.getElementById('totalSpent').textContent = '$' + formatNumber(totalSpent, 2);
+            document.getElementById('avgCPL').textContent = '$' + formatNumber(avgCPL, 2);
+            document.getElementById('totalCampaigns').textContent = topCampaigns.length;
+            
+            // Add performance indicators (mock data for demonstration)
+            document.getElementById('leadsChange').textContent = '+12.5%';
+            document.getElementById('leadsChange').className = 'kpi-change positive';
+            
+            document.getElementById('spentChange').textContent = '+8.3%';
+            document.getElementById('spentChange').className = 'kpi-change positive';
+            
+            document.getElementById('cplChange').textContent = '-4.2%';
+            document.getElementById('cplChange').className = 'kpi-change positive';
+            
+            document.getElementById('campaignsChange').textContent = '+2';
+            document.getElementById('campaignsChange').className = 'kpi-change positive';
+        }
+
+        function renderCharts() {
+            // Destroy existing charts
+            Object.values(charts).forEach(chart => {
+                if (chart) chart.destroy();
+            });
+            charts = {};
+            
+            renderTrendsChart();
+            renderBrandsChart();
+            renderSpendingChart();
+            renderCampaignChart();
+        }
+
+        function renderTrendsChart() {
+            const ctx = document.getElementById('trendsChart').getContext('2d');
+            const { series } = analyticsData;
+            
+            const labels = series.map(item => new Date(item.date).toLocaleDateString());
+            const leadsData = series.map(item => item.leads || 0);
+            const spentData = series.map(item => item.spent || 0);
+            
+            charts.trends = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Leads',
+                        data: leadsData,
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        tension: 0.4,
+                        yAxisID: 'y'
+                    }, {
+                        label: 'Spending',
+                        data: spentData,
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        tension: 0.4,
+                        yAxisID: 'y1'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'Leads'
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'Spending ($)'
+                            },
+                            grid: {
+                                drawOnChartArea: false,
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderBrandsChart() {
+            const ctx = document.getElementById('brandsChart').getContext('2d');
+            const { byBrand } = analyticsData;
+            
+            const labels = byBrand.map(item => item.brand || 'Unknown');
+            const data = byBrand.map(item => item.leads || 0);
+            const colors = generateColors(labels.length);
+            
+            charts.brands = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: colors,
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderSpendingChart() {
+            const ctx = document.getElementById('spendingChart').getContext('2d');
+            const { byBrand } = analyticsData;
+            
+            const labels = byBrand.map(item => item.brand || 'Unknown');
+            const data = byBrand.map(item => item.spent || 0);
+            
+            charts.spending = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Spending',
+                        data: data,
+                        backgroundColor: 'rgba(102, 126, 234, 0.8)',
+                        borderColor: '#667eea',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Spending ($)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderCampaignChart() {
+            const ctx = document.getElementById('campaignChart').getContext('2d');
+            const { topCampaigns } = analyticsData;
+            
+            const top10 = topCampaigns.slice(0, 10);
+            const labels = top10.map(item => item.campaign_name || `Campaign ${item.campaign_id}`);
+            const leadsData = top10.map(item => item.leads || 0);
+            const spentData = top10.map(item => item.spent || 0);
+            
+            charts.campaign = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Leads',
+                        data: leadsData,
+                        backgroundColor: 'rgba(102, 126, 234, 0.8)',
+                        yAxisID: 'y'
+                    }, {
+                        label: 'Spending',
+                        data: spentData,
+                        backgroundColor: 'rgba(16, 185, 129, 0.8)',
+                        yAxisID: 'y1'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: {
+                                maxRotation: 45,
+                                minRotation: 45
+                            }
+                        },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'Leads'
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'Spending ($)'
+                            },
+                            grid: {
+                                drawOnChartArea: false,
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderTables() {
+            renderCampaignTable();
+            renderBrandTable();
+        }
+
+        function renderCampaignTable() {
+            const tbody = document.getElementById('campaignTableBody');
+            const { topCampaigns } = analyticsData;
+            
+            tbody.innerHTML = '';
+            
+            topCampaigns.slice(0, 10).forEach(campaign => {
+                const row = document.createElement('tr');
+                const cpl = campaign.cpl || 0;
+                const performance = getPerformanceBadge(cpl);
+                
+                row.innerHTML = `
+                    <td>${campaign.campaign_name || `Campaign ${campaign.campaign_id}`}</td>
+                    <td>${formatNumber(campaign.leads || 0)}</td>
+                    <td>$${formatNumber(campaign.spent || 0, 2)}</td>
+                    <td>$${formatNumber(cpl, 2)}</td>
+                    <td>${performance}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function renderBrandTable() {
+            const tbody = document.getElementById('brandTableBody');
+            const { byBrand } = analyticsData;
+            
+            tbody.innerHTML = '';
+            
+            const totalLeads = byBrand.reduce((sum, brand) => sum + (brand.leads || 0), 0);
+            
+            byBrand.forEach(brand => {
+                const row = document.createElement('tr');
+                const marketShare = totalLeads > 0 ? ((brand.leads || 0) / totalLeads * 100) : 0;
+                
+                row.innerHTML = `
+                    <td>${brand.brand || 'Unknown'}</td>
+                    <td>${formatNumber(brand.leads || 0)}</td>
+                    <td>$${formatNumber(brand.spent || 0, 2)}</td>
+                    <td>$${formatNumber((brand.spent || 0) / (brand.leads || 1), 2)}</td>
+                    <td>${formatNumber(marketShare, 1)}%</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function autoRefresh() {
+            const btn = document.getElementById('autoRefreshBtn');
+            
+            if (isAutoRefresh) {
+                clearInterval(autoRefreshInterval);
+                isAutoRefresh = false;
+                btn.textContent = 'Auto Refresh: OFF';
+                btn.style.background = 'var(--success)';
+            } else {
+                autoRefreshInterval = setInterval(loadAnalytics, 30000); // 30 seconds
+                isAutoRefresh = true;
+                btn.textContent = 'Auto Refresh: ON';
+                btn.style.background = 'var(--danger)';
+            }
+        }
+
+        // Utility functions
+        function formatNumber(number, decimals = 0) {
+            if (isNaN(number) || number === null || number === undefined) return '0';
+            return Number(number).toLocaleString('en-US', {
+                minimumFractionDigits: decimals,
+                maximumFractionDigits: decimals
+            });
+        }
+
+        function generateColors(count) {
+            const colors = [
+                '#667eea', '#764ba2', '#10b981', '#ef4444', '#f59e0b',
+                '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'
+            ];
+            
+            const result = [];
+            for (let i = 0; i < count; i++) {
+                result.push(colors[i % colors.length]);
+            }
+            return result;
+        }
+
+        function getPerformanceBadge(cpl) {
+            if (cpl === 0) return '<span class="metric-badge">No Data</span>';
+            if (cpl < 5) return '<span class="metric-badge success">Excellent</span>';
+            if (cpl < 15) return '<span class="metric-badge">Good</span>';
+            if (cpl < 25) return '<span class="metric-badge warning">Average</span>';
+            return '<span class="metric-badge danger">Poor</span>';
+        }
+
+        // Export functions
+        function exportToPNG() {
+            // This would require a library like html2canvas
+            alert('PNG export functionality would be implemented with html2canvas library');
+        }
+
+        function exportToCSV() {
+            if (!analyticsData) return;
+            
+            const { topCampaigns, byBrand, series } = analyticsData;
+            
+            let csv = 'Campaign Performance\n';
+            csv += 'Campaign,Leads,Spending,Cost per Lead\n';
+            topCampaigns.forEach(campaign => {
+                csv += `"${campaign.campaign_name || 'Unknown'}",${campaign.leads || 0},${campaign.spent || 0},${campaign.cpl || 0}\n`;
+            });
+            
+            csv += '\n\nBrand Performance\n';
+            csv += 'Brand,Leads,Spending\n';
+            byBrand.forEach(brand => {
+                csv += `"${brand.brand || 'Unknown'}",${brand.leads || 0},${brand.spent || 0}\n`;
+            });
+            
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'analytics_report.csv';
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+
+        function printReport() {
+            window.print();
+        }
+
+        // Handle date input changes
+        document.getElementById('dateFrom').addEventListener('change', loadAnalytics);
+        document.getElementById('dateTo').addEventListener('change', loadAnalytics);
+        document.getElementById('brandFilter').addEventListener('change', loadAnalytics);
+        document.getElementById('campaignFilter').addEventListener('change', loadAnalytics);
+    </script>
+</body>
+</html>

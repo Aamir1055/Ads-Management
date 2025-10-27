@@ -1,0 +1,286 @@
+You have triggered an unhandledRejection, you may have forgotten to catch a Promise rejection:
+ReferenceError: require is not defined in ES module scope, you can use import instead
+This file is being treated as an ES module because it has a '.js' file extension and '/home/deployer/Ads-Management-Fresh/package.json' contains "type": "module". To treat it as a CommonJS script, rename it to use the '.cjs' file extension.
+    at file:///home/deployer/Ads-Management-Fresh/server.js:1:13
+    at ModuleJob.run (node:internal/modules/esm/module_job:263:25)
+    at async ModuleLoader.import (node:internal/modules/esm/loader:540:24)
+Error: Cannot find module 'express'
+Require stack:
+- /home/deployer/Ads-Management-Fresh/app.js
+- /home/deployer/Ads-Management-Fresh/server.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1212:15)
+    at Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:81:25)
+    at require (node:internal/modules/helpers:182:18)
+    at Object.<anonymous> (/home/deployer/Ads-Management-Fresh/app.js:1:17)
+    at Module._compile (node:internal/modules/cjs/loader:1529:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1613:10)
+    at Module.load (node:internal/modules/cjs/loader:1275:32)
+    at Module._load (node:internal/modules/cjs/loader:1096:12)
+    at Module.require (node:internal/modules/cjs/loader:1298:19)
+    at Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:101:39)
+Error: Cannot find module 'express'
+Require stack:
+- /home/deployer/Ads-Management-Fresh/app.js
+- /home/deployer/Ads-Management-Fresh/server.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1212:15)
+    at Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:81:25)
+    at require (node:internal/modules/helpers:182:18)
+    at Object.<anonymous> (/home/deployer/Ads-Management-Fresh/app.js:1:17)
+    at Module._compile (node:internal/modules/cjs/loader:1529:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1613:10)
+    at Module.load (node:internal/modules/cjs/loader:1275:32)
+    at Module._load (node:internal/modules/cjs/loader:1096:12)
+    at Module.require (node:internal/modules/cjs/loader:1298:19)
+    at Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:101:39)
+Error: Cannot find module 'express'
+Require stack:
+- /home/deployer/Ads-Management-Fresh/app.js
+- /home/deployer/Ads-Management-Fresh/server.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1212:15)
+    at Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:81:25)
+    at require (node:internal/modules/helpers:182:18)
+    at Object.<anonymous> (/home/deployer/Ads-Management-Fresh/app.js:1:17)
+    at Module._compile (node:internal/modules/cjs/loader:1529:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1613:10)
+    at Module.load (node:internal/modules/cjs/loader:1275:32)
+    at Module._load (node:internal/modules/cjs/loader:1096:12)
+    at Module.require (node:internal/modules/cjs/loader:1298:19)
+    at Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:101:39)
+Error: Cannot find module 'express'
+Require stack:
+- /home/deployer/Ads-Management-Fresh/app.js
+- /home/deployer/Ads-Management-Fresh/server.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1212:15)
+    at Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:81:25)
+    at require (node:internal/modules/helpers:182:18)
+    at Object.<anonymous> (/home/deployer/Ads-Management-Fresh/app.js:1:17)
+    at Module._compile (node:internal/modules/cjs/loader:1529:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1613:10)
+    at Module.load (node:internal/modules/cjs/loader:1275:32)
+    at Module._load (node:internal/modules/cjs/loader:1096:12)
+    at Module.require (node:internal/modules/cjs/loader:1298:19)
+    at Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:101:39)
+Error: Cannot find module 'express'
+Require stack:
+- /home/deployer/Ads-Management-Fresh/app.js
+- /home/deployer/Ads-Management-Fresh/server.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1212:15)
+    at Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:81:25)
+    at require (node:internal/modules/helpers:182:18)
+    at Object.<anonymous> (/home/deployer/Ads-Management-Fresh/app.js:1:17)
+    at Module._compile (node:internal/modules/cjs/loader:1529:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1613:10)
+    at Module.load (node:internal/modules/cjs/loader:1275:32)
+    at Module._load (node:internal/modules/cjs/loader:1096:12)
+    at Module.require (node:internal/modules/cjs/loader:1298:19)
+    at Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:101:39)
+Error: Cannot find module 'express'
+Require stack:
+- /home/deployer/Ads-Management-Fresh/app.js
+- /home/deployer/Ads-Management-Fresh/server.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1212:15)
+    at Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:81:25)
+    at require (node:internal/modules/helpers:182:18)
+    at Object.<anonymous> (/home/deployer/Ads-Management-Fresh/app.js:1:17)
+    at Module._compile (node:internal/modules/cjs/loader:1529:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1613:10)
+    at Module.load (node:internal/modules/cjs/loader:1275:32)
+    at Module._load (node:internal/modules/cjs/loader:1096:12)
+    at Module.require (node:internal/modules/cjs/loader:1298:19)
+    at Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:101:39)
+Error: Cannot find module 'express'
+Require stack:
+- /home/deployer/Ads-Management-Fresh/app.js
+- /home/deployer/Ads-Management-Fresh/server.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1212:15)
+    at Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:81:25)
+    at require (node:internal/modules/helpers:182:18)
+    at Object.<anonymous> (/home/deployer/Ads-Management-Fresh/app.js:1:17)
+    at Module._compile (node:internal/modules/cjs/loader:1529:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1613:10)
+    at Module.load (node:internal/modules/cjs/loader:1275:32)
+    at Module._load (node:internal/modules/cjs/loader:1096:12)
+    at Module.require (node:internal/modules/cjs/loader:1298:19)
+    at Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:101:39)
+Error: Cannot find module 'express'
+Require stack:
+- /home/deployer/Ads-Management-Fresh/app.js
+- /home/deployer/Ads-Management-Fresh/server.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1212:15)
+    at Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:81:25)
+    at require (node:internal/modules/helpers:182:18)
+    at Object.<anonymous> (/home/deployer/Ads-Management-Fresh/app.js:1:17)
+    at Module._compile (node:internal/modules/cjs/loader:1529:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1613:10)
+    at Module.load (node:internal/modules/cjs/loader:1275:32)
+    at Module._load (node:internal/modules/cjs/loader:1096:12)
+    at Module.require (node:internal/modules/cjs/loader:1298:19)
+    at Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:101:39)
+Error: Cannot find module 'express'
+Require stack:
+- /home/deployer/Ads-Management-Fresh/app.js
+- /home/deployer/Ads-Management-Fresh/server.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1212:15)
+    at Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:81:25)
+    at require (node:internal/modules/helpers:182:18)
+    at Object.<anonymous> (/home/deployer/Ads-Management-Fresh/app.js:1:17)
+    at Module._compile (node:internal/modules/cjs/loader:1529:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1613:10)
+    at Module.load (node:internal/modules/cjs/loader:1275:32)
+    at Module._load (node:internal/modules/cjs/loader:1096:12)
+    at Module.require (node:internal/modules/cjs/loader:1298:19)
+    at Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:101:39)
+Error: Cannot find module 'express'
+Require stack:
+- /home/deployer/Ads-Management-Fresh/app.js
+- /home/deployer/Ads-Management-Fresh/server.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1212:15)
+    at Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:81:25)
+    at require (node:internal/modules/helpers:182:18)
+    at Object.<anonymous> (/home/deployer/Ads-Management-Fresh/app.js:1:17)
+    at Module._compile (node:internal/modules/cjs/loader:1529:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1613:10)
+    at Module.load (node:internal/modules/cjs/loader:1275:32)
+    at Module._load (node:internal/modules/cjs/loader:1096:12)
+    at Module.require (node:internal/modules/cjs/loader:1298:19)
+    at Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:101:39)
+Error: Cannot find module 'express'
+Require stack:
+- /home/deployer/Ads-Management-Fresh/app.js
+- /home/deployer/Ads-Management-Fresh/server.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1212:15)
+    at Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:81:25)
+    at require (node:internal/modules/helpers:182:18)
+    at Object.<anonymous> (/home/deployer/Ads-Management-Fresh/app.js:1:17)
+    at Module._compile (node:internal/modules/cjs/loader:1529:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1613:10)
+    at Module.load (node:internal/modules/cjs/loader:1275:32)
+    at Module._load (node:internal/modules/cjs/loader:1096:12)
+    at Module.require (node:internal/modules/cjs/loader:1298:19)
+    at Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:101:39)
+Error: Cannot find module 'express'
+Require stack:
+- /home/deployer/Ads-Management-Fresh/app.js
+- /home/deployer/Ads-Management-Fresh/server.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1212:15)
+    at Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:81:25)
+    at require (node:internal/modules/helpers:182:18)
+    at Object.<anonymous> (/home/deployer/Ads-Management-Fresh/app.js:1:17)
+    at Module._compile (node:internal/modules/cjs/loader:1529:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1613:10)
+    at Module.load (node:internal/modules/cjs/loader:1275:32)
+    at Module._load (node:internal/modules/cjs/loader:1096:12)
+    at Module.require (node:internal/modules/cjs/loader:1298:19)
+    at Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:101:39)
+Error: Cannot find module 'express'
+Require stack:
+- /home/deployer/Ads-Management-Fresh/app.js
+- /home/deployer/Ads-Management-Fresh/server.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1212:15)
+    at Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:81:25)
+    at require (node:internal/modules/helpers:182:18)
+    at Object.<anonymous> (/home/deployer/Ads-Management-Fresh/app.js:1:17)
+    at Module._compile (node:internal/modules/cjs/loader:1529:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1613:10)
+    at Module.load (node:internal/modules/cjs/loader:1275:32)
+    at Module._load (node:internal/modules/cjs/loader:1096:12)
+    at Module.require (node:internal/modules/cjs/loader:1298:19)
+    at Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:101:39)
+Error: Cannot find module 'express'
+Require stack:
+- /home/deployer/Ads-Management-Fresh/app.js
+- /home/deployer/Ads-Management-Fresh/server.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1212:15)
+    at Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:81:25)
+    at require (node:internal/modules/helpers:182:18)
+    at Object.<anonymous> (/home/deployer/Ads-Management-Fresh/app.js:1:17)
+    at Module._compile (node:internal/modules/cjs/loader:1529:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1613:10)
+    at Module.load (node:internal/modules/cjs/loader:1275:32)
+    at Module._load (node:internal/modules/cjs/loader:1096:12)
+    at Module.require (node:internal/modules/cjs/loader:1298:19)
+    at Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:101:39)
+Error: Cannot find module 'express'
+Require stack:
+- /home/deployer/Ads-Management-Fresh/app.js
+- /home/deployer/Ads-Management-Fresh/server.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1212:15)
+    at Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:81:25)
+    at require (node:internal/modules/helpers:182:18)
+    at Object.<anonymous> (/home/deployer/Ads-Management-Fresh/app.js:1:17)
+    at Module._compile (node:internal/modules/cjs/loader:1529:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1613:10)
+    at Module.load (node:internal/modules/cjs/loader:1275:32)
+    at Module._load (node:internal/modules/cjs/loader:1096:12)
+    at Module.require (node:internal/modules/cjs/loader:1298:19)
+    at Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:101:39)
+Error: Cannot find module 'express'
+Require stack:
+- /home/deployer/Ads-Management-Fresh/app.js
+- /home/deployer/Ads-Management-Fresh/server.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1212:15)
+    at Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:81:25)
+    at require (node:internal/modules/helpers:182:18)
+    at Object.<anonymous> (/home/deployer/Ads-Management-Fresh/app.js:1:17)
+    at Module._compile (node:internal/modules/cjs/loader:1529:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1613:10)
+    at Module.load (node:internal/modules/cjs/loader:1275:32)
+    at Module._load (node:internal/modules/cjs/loader:1096:12)
+    at Module.require (node:internal/modules/cjs/loader:1298:19)
+    at Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:101:39)
+Error: Cannot find module 'express'
+Require stack:
+- /home/deployer/Ads-Management-Fresh/app.js
+- /home/deployer/Ads-Management-Fresh/server.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1212:15)
+    at Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:81:25)
+    at require (node:internal/modules/helpers:182:18)
+    at Object.<anonymous> (/home/deployer/Ads-Management-Fresh/app.js:1:17)
+    at Module._compile (node:internal/modules/cjs/loader:1529:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1613:10)
+    at Module.load (node:internal/modules/cjs/loader:1275:32)
+    at Module._load (node:internal/modules/cjs/loader:1096:12)
+    at Module.require (node:internal/modules/cjs/loader:1298:19)
+    at Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:101:39)
+Error: Cannot find module 'express'
+Require stack:
+- /home/deployer/Ads-Management-Fresh/app.js
+- /home/deployer/Ads-Management-Fresh/server.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1212:15)
+    at Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:81:25)
+    at require (node:internal/modules/helpers:182:18)
+    at Object.<anonymous> (/home/deployer/Ads-Management-Fresh/app.js:1:17)
+    at Module._compile (node:internal/modules/cjs/loader:1529:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1613:10)
+    at Module.load (node:internal/modules/cjs/loader:1275:32)
+    at Module._load (node:internal/modules/cjs/loader:1096:12)
+    at Module.require (node:internal/modules/cjs/loader:1298:19)
+    at Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:101:39)
+Error: Cannot find module 'express'
+Require stack:
+- /home/deployer/Ads-Management-Fresh/app.js
+- /home/deployer/Ads-Management-Fresh/server.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1212:15)
+    at Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:81:25)
+    at require (node:internal/modules/helpers:182:18)
+    at Object.<anonymous> (/home/deployer/Ads-Management-Fresh/app.js:1:17)
+    at Module._compile (node:internal/modules/cjs/loader:1529:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1613:10)
+    at Module.load (node:internal/modules/cjs/loader:1275:32)
+    at Module._load (node:internal/modules/cjs/loader:1096:12)
+    at Module.require (node:internal/modules/cjs/loader:1298:19)
+    at Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:101:39)
+Error: Cannot find module 'express'
+Require stack:
+- /home/deployer/Ads-Management-Fresh/app.js
+- /home/deployer/Ads-Management-Fresh/server.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1212:15)
+    at Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:81:25)
+    at require (node:internal/modules/helpers:182:18)
+    at Object.<anonymous> (/home/deployer/Ads-Management-Fresh/app.js:1:17)
+    at Module._compile (node:internal/modules/cjs/loader:1529:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1613:10)
+    at Module.load (node:internal/modules/cjs/loader:1275:32)
+    at Module._load (node:internal/modules/cjs/loader:1096:12)
+    at Module.require (node:internal/modules/cjs/loader:1298:19)
+    at Hook._require.Module.require (/usr/lib/node_modules/pm2/node_modules/require-in-the-middle/index.js:101:39)
