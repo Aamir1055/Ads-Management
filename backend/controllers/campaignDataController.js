@@ -327,7 +327,12 @@ const getAllCampaignData = async (req, res) => {
       ORDER BY cd.data_date DESC, cd.created_at DESC
       LIMIT ? OFFSET ?
     `;
-    const [campaignData] = await pool.execute(dataQuery, [...queryParams, Number(limit), Number(offset)]);
+    
+    const finalParams = [...queryParams, Number(limit), Number(offset)];
+    console.log('[CampaignDataController] Query params:', finalParams);
+    console.log('[CampaignDataController] Query params types:', finalParams.map((p, i) => `${i}: ${typeof p} = ${p}`));
+    
+    const [campaignData] = await pool.execute(dataQuery, finalParams);
 
     const totalPages = Math.max(1, Math.ceil(totalCount / limit));
     const meta = {
