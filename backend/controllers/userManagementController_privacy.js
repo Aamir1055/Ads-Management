@@ -51,8 +51,13 @@ const userManagementController = {
       const role_id = req.query.role_id ? parseInt(req.query.role_id, 10) : null;
       const is_active = req.query.is_active !== undefined ? req.query.is_active === 'true' : null;
 
-      console.log('📋 Fetching users with filters:', { page, limit, search, role_id, is_active });
-      console.log('👤 Current user:', { id: req.user.id, username: req.user.username, isAdmin: isAdmin(req) });
+      console.log('📋 🔥 PRIVACY CONTROLLER - Fetching users with filters:', { page, limit, search, role_id, is_active });
+      console.log('👤 🔥 PRIVACY CONTROLLER - Current user:', { 
+        id: req.user.id, 
+        username: req.user.username, 
+        role: req.user.role,
+        isAdmin: isAdmin(req) 
+      });
 
       // Privacy filtering: Regular users can only see themselves
       if (!isAdmin(req)) {
