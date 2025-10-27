@@ -72,11 +72,11 @@ const Layout = ({ children }) => {
       'Brand Management',
       'Business Manager',
       'Campaign Type',
-      'Campaign',
       'Cards',
       'Cards Users',
       'Facebook Accounts',
       'Facebook Pages',
+      'Campaign',
       'Report'
     ];
     
