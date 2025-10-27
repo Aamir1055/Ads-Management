@@ -72,8 +72,8 @@ const permissionsController = {
       console.log('[Permissions] createRole - Inserting role:', { roleName, description, is_active, roleLevel });
 
       const [result] = await pool.query(
-        'INSERT INTO roles (name, description, level, is_active, created_at) VALUES (?,?,?,?,NOW())',
-        [roleName, description, roleLevel, is_active ? 1 : 0]
+        'INSERT INTO roles (name, display_name, description, level, is_active, created_at) VALUES (?,?,?,?,?,NOW())',
+        [roleName, roleName, description, roleLevel, is_active ? 1 : 0]
       );
       
       console.log('[Permissions] createRole - Insert successful, ID:', result.insertId);
