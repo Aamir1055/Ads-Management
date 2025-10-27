@@ -138,6 +138,21 @@ class BMModel {
 
             const query = `UPDATE bm SET bm_name = ?, email = ?, phone_number = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
             await pool.query(query, [bm_name, email, phone_number, status, id]);
+            
+            // Cascade status change to associated Ads Managers when BM is disabled
+            if (status === 'disabled' && existing.status !== 'disabled') {
+                console.log(`📉 BM ${id} disabled - cascading to Ads Managers...`);
+                const updateAdsManagersQuery = `UPDATE ads_managers SET status = 'disabled', updated_at = CURRENT_TIMESTAMP WHERE bm_id = ? AND status != 'disabled'`;
+                const [result] = await pool.query(updateAdsManagersQuery, [id]);
+                console.log(`📉 Disabled ${result.affectedRows} Ads Managers for BM ${id}`);
+            }
+            // When BM is re-enabled, optionally re-enable Ads Managers (commented out - you may want manual control)
+            // else if (status === 'enabled' && existing.status !== 'enabled') {
+            //     console.log(`📈 BM ${id} enabled - re-enabling Ads Managers...`);
+            //     const updateAdsManagersQuery = `UPDATE ads_managers SET status = 'enabled', updated_at = CURRENT_TIMESTAMP WHERE bm_id = ?`;
+            //     await pool.query(updateAdsManagersQuery, [id]);
+            // }
+            
             return await this.getById(id);
         } catch (error) {
             console.error('Error in BMModel.update:', error);
@@ -175,6 +190,21 @@ class BMModel {
 
             const query = 'UPDATE bm SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?';
             await pool.query(query, [newStatus, id]);
+            
+            // Cascade status change to associated Ads Managers when BM is disabled
+            if (newStatus === 'disabled') {
+                console.log(`📉 BM ${id} toggled to disabled - cascading to Ads Managers...`);
+                const updateAdsManagersQuery = `UPDATE ads_managers SET status = 'disabled', updated_at = CURRENT_TIMESTAMP WHERE bm_id = ? AND status != 'disabled'`;
+                const [result] = await pool.query(updateAdsManagersQuery, [id]);
+                console.log(`📉 Disabled ${result.affectedRows} Ads Managers for BM ${id}`);
+            }
+            // When BM is re-enabled, optionally re-enable Ads Managers (commented out - you may want manual control)
+            // else if (newStatus === 'enabled') {
+            //     console.log(`📈 BM ${id} toggled to enabled - re-enabling Ads Managers...`);
+            //     const updateAdsManagersQuery = `UPDATE ads_managers SET status = 'enabled', updated_at = CURRENT_TIMESTAMP WHERE bm_id = ?`;
+            //     await pool.query(updateAdsManagersQuery, [id]);
+            // }
+            
             return await this.getById(id);
         } catch (error) {
             console.error('Error in BMModel.toggleStatus:', error);
