@@ -70,7 +70,7 @@ const userManagementRoutes = require("./routes/userManagementRoutes");
 app.use("/api/brands", brandRoutes);
 app.use("/api/roles", roleRoutes);
 app.use("/api/bm", bmRoutes);
-app.use("/api/ads", adsManagerRoutes);
+app.use("/api/ads-managers", adsManagerRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/dashboard", dashboardRoutes);
