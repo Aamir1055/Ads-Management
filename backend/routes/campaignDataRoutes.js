@@ -107,9 +107,6 @@ const helperLimiter = createRateLimit(5 * 60 * 1000, 200);
 // Returns active campaigns for dropdowns (helper routes before auth)
 router.get('/campaigns', helperLimiter, getCampaignsForDropdown);
 
-// Returns active cards for dropdowns  
-router.get('/cards', helperLimiter, getCardsForDropdown);
-
 // =============================================================================
 // AUTHENTICATION REQUIRED FOR ALL DATA OPERATIONS
 // =============================================================================
@@ -127,6 +124,9 @@ router.use(campaignDataPrivacy);
 // =============================================================================
 // DATA PRIVACY ENABLED ROUTES
 // =============================================================================
+
+// Returns active cards for dropdowns (requires authentication for privacy filtering)
+router.get('/cards', helperLimiter, getCardsForDropdown);
 
 /**
  * GET /api/campaign-data
