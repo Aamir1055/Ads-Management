@@ -50,22 +50,44 @@ const permissionsController = {
   createRole: async (req, res) => {
     try {
       // Support both 'name' (frontend) and 'role_name' (legacy) fields
-      const { role_name, name, description = '', is_active = true } = req.body || {};
+      const { role_name, name, description = '', is_active = true, level = 1 } = req.body || {};
       const roleName = (name || role_name || '').trim();
-      if (!roleName) return res.status(400).json(createResponse(false, 'name or role_name is required'));
+      
+      console.log('[Permissions] createRole - Request body:', JSON.stringify(req.body, null, 2));
+      
+      if (!roleName) {
+        console.log('[Permissions] createRole - Missing role name');
+        return res.status(400).json(createResponse(false, 'name or role_name is required'));
+      }
 
       const existing = await getRoleByName(roleName);
-      if (existing) return res.status(409).json(createResponse(false, 'Role already exists'));
+      if (existing) {
+        console.log('[Permissions] createRole - Role already exists:', roleName);
+        return res.status(409).json(createResponse(false, 'Role already exists'));
+      }
+
+      // Ensure level is a valid number between 1-10
+      const roleLevel = Math.min(Math.max(parseInt(level) || 1, 1), 10);
+      
+      console.log('[Permissions] createRole - Inserting role:', { roleName, description, is_active, roleLevel });
 
       const [result] = await pool.query(
-        'INSERT INTO roles (name, description, is_active, created_at) VALUES (?,?,?,NOW())',
-        [roleName, description, is_active ? 1 : 0]
+        'INSERT INTO roles (name, description, level, is_active, created_at) VALUES (?,?,?,?,NOW())',
+        [roleName, description, roleLevel, is_active ? 1 : 0]
       );
+      
+      console.log('[Permissions] createRole - Insert successful, ID:', result.insertId);
+      
       const [rows] = await pool.query('SELECT * FROM roles WHERE id = ?', [result.insertId]);
+      
+      console.log('[Permissions] createRole - Role retrieved:', rows?.[0]);
+      
       return res.status(201).json(createResponse(true, 'Role created', rows?.length ? rows[0] : null));
     } catch (error) {
-      console.error('[Permissions] createRole error:', error);
-      return res.status(500).json(createResponse(false, 'Failed to create role', null, process.env.NODE_ENV === 'development' ? { error: error.message } : null));
+      console.error('[Permissions] createRole error - Full details:', error);
+      console.error('[Permissions] createRole error - Stack:', error.stack);
+      console.error('[Permissions] createRole error - SQL:', error.sql);
+      return res.status(500).json(createResponse(false, 'Failed to create role', null, process.env.NODE_ENV === 'development' ? { error: error.message, code: error.code, sqlMessage: error.sqlMessage } : null));
     }
   },
 
