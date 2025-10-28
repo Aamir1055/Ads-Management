@@ -134,16 +134,6 @@ class BMController {
             });
         } catch (error) {
             console.error('Error in BMController.create:', error);
-            
-                // Map DB duplicate-key error to 409 conflict
-                if (error && error.code === 'ER_DUP_ENTRY') {
-                    return res.status(409).json({
-                        success: false,
-                        message: 'A Business Manager with this email already exists',
-                        details: error.sqlMessage || error.message,
-                        timestamp: new Date().toISOString()
-                    });
-                }
 
             return res.status(500).json({
                 success: false,
