@@ -116,6 +116,7 @@ class BMController {
                 bm_name,
                 email,
                 phone_number,
+                profile_link,
                 status = 'enabled'
             } = req.body;
 
@@ -123,6 +124,7 @@ class BMController {
                 bm_name,
                 email,
                 phone_number,
+                profile_link,
                 status,
                 created_by: userId
             });
@@ -176,7 +178,8 @@ class BMController {
                 account_name, 
                 facebook_account_id, 
                 email, 
-                phone_number, 
+                phone_number,
+                profile_link, 
                 status 
             } = req.body;
 
@@ -196,6 +199,7 @@ class BMController {
                 facebook_account_id,
                 email,
                 phone_number,
+                profile_link,
                 status
             });
 
@@ -370,9 +374,8 @@ class BMController {
                 .isLength({ min: 2, max: 255 })
                 .withMessage('Business Manager name must be between 2 and 255 characters'),
             body('email')
+                .optional({ checkFalsy: true })
                 .trim()
-                .notEmpty()
-                .withMessage('Email is required')
                 .isEmail()
                 .withMessage('Please provide a valid email address')
                 .normalizeEmail(),
@@ -387,6 +390,11 @@ class BMController {
                     return /^\+?[1-9]\d{1,14}$/.test(value.trim());
                 })
                 .withMessage('Please provide a valid phone number or leave it empty'),
+            body('profile_link')
+                .optional({ checkFalsy: true })
+                .trim()
+                .isLength({ max: 500 })
+                .withMessage('Profile link must not exceed 500 characters'),
             body('status')
                 .optional()
                 .isIn(['enabled', 'disabled'])

@@ -1,17 +1,6 @@
 const { pool } = require('../config/database');
 
 class BMModel {
-    // Get Facebook account by email (helper)
-    static async getFacebookAccountByEmail(email) {
-        try {
-            const [rows] = await pool.query('SELECT id, email FROM facebook_accounts WHERE email = ?', [email]);
-            return rows[0] || null;
-        } catch (error) {
-            console.error('Error in BMModel.getFacebookAccountByEmail:', error);
-            throw error;
-        }
-    }
-
     // Get all BMs with pagination, filtering, and search (filtered by user)
     static async getAll({ page = 1, limit = 10, search = '', status = '', sortBy = 'created_at', sortOrder = 'DESC', userId = null, userRole = null } = {}) {
         try {
@@ -27,8 +16,8 @@ class BMModel {
 
             // Search functionality
             if (search) {
-                whereConditions.push('(bm.bm_name LIKE ? OR bm.email LIKE ? OR bm.phone_number LIKE ?)');
-                queryParams.push(`%${search}%`, `%${search}%`, `%${search}%`);
+                whereConditions.push('(bm.bm_name LIKE ? OR bm.email LIKE ? OR bm.phone_number LIKE ? OR bm.profile_link LIKE ?)');
+                queryParams.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
             }
 
             // Status filter
@@ -56,6 +45,7 @@ class BMModel {
                     bm.bm_name,
                     bm.email,
                     bm.phone_number,
+                    bm.profile_link,
                     bm.status,
                     bm.created_by,
                     bm.created_at,
@@ -95,6 +85,7 @@ class BMModel {
                     bm.bm_name,
                     bm.email,
                     bm.phone_number,
+                    bm.profile_link,
                     bm.status,
                     bm.created_by,
                     bm.created_at,
@@ -118,10 +109,10 @@ class BMModel {
     }
 
     // Create new BM (does NOT enforce email uniqueness)
-    static async create({ bm_name, email, phone_number, status = 'enabled', created_by }) {
+    static async create({ bm_name, email, phone_number, profile_link, status = 'enabled', created_by }) {
         try {
-            const query = `INSERT INTO bm (bm_name, email, phone_number, status, created_by) VALUES (?, ?, ?, ?, ?)`;
-            const [result] = await pool.query(query, [bm_name, email, phone_number || null, status, created_by || null]);
+            const query = `INSERT INTO bm (bm_name, email, phone_number, profile_link, status, created_by) VALUES (?, ?, ?, ?, ?, ?)`;
+            const [result] = await pool.query(query, [bm_name, email || null, phone_number || null, profile_link || null, status, created_by || null]);
             return await this.getById(result.insertId);
         } catch (error) {
             // Preserve the original DB error (including .code) so callers can inspect it
@@ -131,13 +122,13 @@ class BMModel {
     }
 
     // Update BM
-    static async update(id, { bm_name, email, phone_number, status }) {
+    static async update(id, { bm_name, email, phone_number, profile_link, status }) {
         try {
             const existing = await this.getById(id);
             if (!existing) throw new Error('BM not found');
 
-            const query = `UPDATE bm SET bm_name = ?, email = ?, phone_number = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
-            await pool.query(query, [bm_name, email, phone_number, status, id]);
+            const query = `UPDATE bm SET bm_name = ?, email = ?, phone_number = ?, profile_link = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
+            await pool.query(query, [bm_name, email || null, phone_number || null, profile_link || null, status, id]);
             
             // Cascade status change to associated Ads Managers when BM is disabled
             if (status === 'disabled' && existing.status !== 'disabled') {
