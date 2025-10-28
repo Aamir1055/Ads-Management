@@ -11,40 +11,12 @@ const BMForm = ({ bm, onClose, onSave, setMessage }) => {
     bm_name: '',
     email: '',
     phone_number: '',
+    profile_link: '',
     status: 'enabled'
   });
-  const [facebookAccounts, setFacebookAccounts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [validationErrors, setValidationErrors] = useState({});
-
-  // Fetch Facebook accounts
-  useEffect(() => {
-    const fetchFacebookAccounts = async () => {
-      try {
-        const response = await axios.get(`${API_BASE_URL}/facebook-accounts`);
-        if (Array.isArray(response.data)) {
-          setFacebookAccounts(response.data);
-        } else if (response.data.data && Array.isArray(response.data.data)) {
-          setFacebookAccounts(response.data.data);
-        } else {
-          console.error('Invalid Facebook accounts response format:', response.data);
-          toast.error('Failed to load Facebook accounts: Invalid data format');
-          setFacebookAccounts([]);
-        }
-      } catch (error) {
-        if (isAccessDeniedError(error)) {
-          handleAccessDenied();
-        } else {
-          console.error('Error fetching Facebook accounts:', error);
-          toast.error('Failed to load Facebook accounts');
-        }
-        setFacebookAccounts([]);
-      }
-    };
-
-    fetchFacebookAccounts();
-  }, []);
 
   // Get auth token
   const getAuthToken = () => {
@@ -67,6 +39,7 @@ const BMForm = ({ bm, onClose, onSave, setMessage }) => {
         bm_name: bm.bm_name || '',
         email: bm.email || '',
         phone_number: bm.phone_number || '',
+        profile_link: bm.profile_link || '',
         status: bm.status || 'enabled'
       });
     } else {
@@ -74,6 +47,7 @@ const BMForm = ({ bm, onClose, onSave, setMessage }) => {
         bm_name: '',
         email: '',
         phone_number: '',
+        profile_link: '',
         status: 'enabled'
       });
     }
@@ -120,14 +94,19 @@ const BMForm = ({ bm, onClose, onSave, setMessage }) => {
       newErrors.bm_name = 'Business Manager name must be less than 255 characters';
     }
 
-    // Email validation
-    if (!formData.email) {
-      newErrors.email = 'Please select an email address';
+    // Email validation (optional now)
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = 'Please enter a valid email address';
     }
 
     // Phone validation (optional)
     if (formData.phone_number && formData.phone_number.trim().length > 50) {
       newErrors.phone_number = 'Phone number must be less than 50 characters';
+    }
+
+    // Profile link validation (optional)
+    if (formData.profile_link && formData.profile_link.trim().length > 500) {
+      newErrors.profile_link = 'Profile link must be less than 500 characters';
     }
 
     // Status validation
@@ -160,8 +139,9 @@ const BMForm = ({ bm, onClose, onSave, setMessage }) => {
       
       const submitData = {
         bm_name: formData.bm_name.trim(),
-        email: formData.email,
+        email: formData.email.trim() || null,
         phone_number: formData.phone_number.trim() || null,
+        profile_link: formData.profile_link.trim() || null,
         status: formData.status
       };
 
@@ -282,29 +262,23 @@ const BMForm = ({ bm, onClose, onSave, setMessage }) => {
 
 
 
-            {/* Email Selection */}
+            {/* Email */}
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Email Address *
+                Email Address
               </label>
-              <select
+              <input
+                type="email"
                 id="email"
                 name="email"
                 value={formData.email}
                 onChange={handleInputChange}
                 disabled={loading}
+                placeholder="Enter email address (optional)"
                 className={`mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${
                   (errors.email || validationErrors.email) ? 'border-red-500' : ''
                 }`}
-                required
-              >
-                <option value="">Select an Email Address</option>
-                {Array.isArray(facebookAccounts) && facebookAccounts.map(account => (
-                  <option key={account?.id} value={account?.email}>
-                    {account?.email}
-                  </option>
-                ))}
-              </select>
+              />
               {(errors.email || validationErrors.email) && (
                 <div className="mt-1 flex items-center text-sm text-red-600">
                   <AlertCircle className="h-4 w-4 mr-1" />
@@ -340,6 +314,32 @@ const BMForm = ({ bm, onClose, onSave, setMessage }) => {
                 <div className="mt-1 flex items-center text-sm text-red-600">
                   <AlertCircle className="h-4 w-4 mr-1" />
                   {errors.phone_number || validationErrors.phone_number}
+                </div>
+              )}
+            </div>
+
+            {/* Profile Link */}
+            <div>
+              <label htmlFor="profile_link" className="block text-sm font-medium text-gray-700">
+                Profile Link
+              </label>
+              <input
+                type="text"
+                id="profile_link"
+                name="profile_link"
+                value={formData.profile_link}
+                onChange={handleInputChange}
+                disabled={loading}
+                placeholder="Enter profile link (optional)"
+                className={`mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${
+                  (errors.profile_link || validationErrors.profile_link) ? 'border-red-500' : ''
+                }`}
+                maxLength={500}
+              />
+              {(errors.profile_link || validationErrors.profile_link) && (
+                <div className="mt-1 flex items-center text-sm text-red-600">
+                  <AlertCircle className="h-4 w-4 mr-1" />
+                  {errors.profile_link || validationErrors.profile_link}
                 </div>
               )}
             </div>
