@@ -549,16 +549,13 @@ const Reports = () => {
                     Zoho Leads
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Total Leads
+                    Spent
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Facebook Cost Per Lead
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Zoho Cost Per Lead
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Total Cost Per Lead
                   </th>
                 </tr>
               </thead>
@@ -584,16 +581,13 @@ const Reports = () => {
                       {formatNumber(report.zoho_leads || report.zoho_result || 0)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
-                      {formatNumber(report.total_leads || report.leads || 0)}
+                      {formatCurrency(report.amount_spend || report.spent || 0)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {formatCurrency(report.facebook_cost_per_lead || (report.amount_spend || report.spent || 0) / (report.facebook_leads || report.facebook_result || 1))}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {formatCurrency(report.zoho_cost_per_lead || (report.amount_spend || report.spent || 0) / (report.zoho_leads || report.zoho_result || 1))}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
-                      {formatCurrency(report.total_cost_per_lead || 0)}
                     </td>
                   </tr>
                 ))}
