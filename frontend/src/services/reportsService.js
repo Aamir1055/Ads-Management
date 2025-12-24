@@ -276,15 +276,18 @@ const reportsService = {
           dateFrom: reportsService.formatDate(yesterday),
           dateTo: reportsService.formatDate(yesterday)
         };
+        
 
       case 'last7days':
         const last7Days = new Date(today);
         last7Days.setDate(today.getDate() - 7);
         return {
-          dateFrom: reportsService.formatDate(last7Days),
+          dateFrom: reportsService
+          .formatDate(last7Days),
           dateTo: reportsService.formatDate(yesterday)
         };
 
+        
       case 'last30days':
         const last30Days = new Date(today);
         last30Days.setDate(today.getDate() - 30);
