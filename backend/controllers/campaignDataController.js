@@ -529,6 +529,46 @@ const updateCampaignData = async (req, res) => {
       return res.status(404).json(createResponse(false, 'Campaign data not found or access denied'));
     }
 
+    // If data_date was updated, update corresponding report entry
+    if (updateData.data_date && existing.data_date !== updateData.data_date) {
+      try {
+        console.log(`[CampaignDataController] Date changed from ${existing.data_date} to ${updateData.data_date} for campaign ${existing.campaign_id}`);
+        
+        // Check if a report exists for the old date
+        const [oldReport] = await connection.execute(
+          'SELECT id FROM reports WHERE campaign_id = ? AND report_date = ?',
+          [existing.campaign_id, existing.data_date]
+        );
+        
+        if (oldReport && oldReport.length > 0) {
+          // Delete old report entry for the old date
+          await connection.execute(
+            'DELETE FROM reports WHERE campaign_id = ? AND report_date = ?',
+            [existing.campaign_id, existing.data_date]
+          );
+          console.log(`[CampaignDataController] Deleted old report (ID: ${oldReport[0].id}) for campaign ${existing.campaign_id} on date ${existing.data_date}`);
+        } else {
+          console.log(`[CampaignDataController] No existing report found for old date ${existing.data_date}`);
+        }
+        
+        // Check if a report already exists for the new date
+        const [existingNewReport] = await connection.execute(
+          'SELECT id FROM reports WHERE campaign_id = ? AND report_date = ?',
+          [existing.campaign_id, updateData.data_date]
+        );
+        
+        if (existingNewReport && existingNewReport.length > 0) {
+          console.log(`[CampaignDataController] Report already exists for new date ${updateData.data_date}, will be updated by next sync`);
+        } else {
+          console.log(`[CampaignDataController] New report will be created for date ${updateData.data_date} on next sync`);
+        }
+        
+      } catch (reportError) {
+        console.error('[CampaignDataController] Error updating report entry:', reportError);
+        // Don't fail the whole transaction if report update fails
+      }
+    }
+
     // Fetch updated record with user filtering
     let fetchQuery = `
       SELECT 

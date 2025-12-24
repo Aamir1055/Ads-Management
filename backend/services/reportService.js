@@ -11,20 +11,12 @@ class ReportService {
       console.log(`📊 Generating reports from ${dateFrom} to ${dateTo}`);
       
       // Query to fetch and aggregate data from multiple tables
-      // Use created_at/updated_at for date, and calculate cost per lead
+      // Use data_date as the report date (this is the actual date of the campaign performance)
       const query = `
         SELECT 
-          -- Use created_at as primary date, updated_at if record was updated
-          CASE 
-            WHEN cd.updated_at > cd.created_at THEN DATE(cd.updated_at)
-            ELSE DATE(cd.created_at)
-          END as report_date,
-          DATE_FORMAT(
-            CASE 
-              WHEN cd.updated_at > cd.created_at THEN cd.updated_at
-              ELSE cd.created_at
-            END, '%Y-%m'
-          ) as report_month,
+          -- Use data_date as the report date
+          DATE(cd.data_date) as report_date,
+          DATE_FORMAT(cd.data_date, '%Y-%m') as report_month,
           cd.campaign_id,
           c.name as campaign_name,
           ct.type_name as campaign_type,
@@ -72,23 +64,15 @@ class ReportService {
         LEFT JOIN campaigns c ON cd.campaign_id = c.id
         LEFT JOIN campaign_types ct ON c.campaign_type_id = ct.id  
         LEFT JOIN brands b ON c.brand = b.id
-        WHERE (
-          DATE(cd.created_at) >= ? AND DATE(cd.created_at) <= ?
-          OR DATE(cd.updated_at) >= ? AND DATE(cd.updated_at) <= ?
-        )
+        WHERE DATE(cd.data_date) >= ? AND DATE(cd.data_date) <= ?
         ${userRole !== 'super_admin' && userId ? 'AND c.created_by = ?' : ''}
         ${options.campaignId ? 'AND cd.campaign_id = ?' : ''}
         ${options.brandId ? 'AND c.brand = ?' : ''}
-        GROUP BY DATE(
-          CASE 
-            WHEN cd.updated_at > cd.created_at THEN cd.updated_at
-            ELSE cd.created_at
-          END
-        ), cd.campaign_id
+        GROUP BY DATE(cd.data_date), cd.campaign_id
         ORDER BY report_date DESC, cd.campaign_id
       `;
 
-      const params = [dateFrom, dateTo, dateFrom, dateTo];
+      const params = [dateFrom, dateTo];
       if (userRole !== 'super_admin' && userId) params.push(userId);
       if (options.campaignId) params.push(options.campaignId);
       if (options.brandId) params.push(options.brandId);

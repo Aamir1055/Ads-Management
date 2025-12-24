@@ -234,6 +234,29 @@ const CampaignDetail = () => {
       }
       
       if (response.success || response.data) {
+        // Update date filter to include the newly added date if needed
+        const newDate = formatToDisplayDate(submitData.data_date)
+        setDateFilter(prev => {
+          const currentFrom = prev.from
+          const currentTo = prev.to
+          
+          // If the new date is outside the current range, expand the range
+          if (isValidDate(newDate)) {
+            const newDateObj = parseDisplayDate(newDate)
+            const fromDateObj = isValidDate(currentFrom) ? parseDisplayDate(currentFrom) : newDateObj
+            const toDateObj = isValidDate(currentTo) ? parseDisplayDate(currentTo) : newDateObj
+            
+            const minDate = newDateObj < fromDateObj ? newDate : currentFrom
+            const maxDate = newDateObj > toDateObj ? newDate : currentTo
+            
+            return {
+              from: minDate,
+              to: maxDate
+            }
+          }
+          return prev
+        })
+        
         setShowForm(false)
         setEditingItem(null)
         setFormData({
@@ -243,7 +266,11 @@ const CampaignDetail = () => {
           data_date: '',
           card_id: ''
         })
-        fetchCampaignData() // Refresh the list
+        
+        // Small delay to ensure state is updated before fetching
+        setTimeout(() => {
+          fetchCampaignData() // Refresh the list
+        }, 100)
       } else {
         throw new Error(response.message || 'Operation failed')
       }
@@ -391,6 +418,15 @@ const CampaignDetail = () => {
     return date.getFullYear() === yearNum && 
            date.getMonth() === monthNum - 1 && 
            date.getDate() === dayNum
+  }
+
+  // Parse display date (dd/mm/yyyy) to Date object for comparison
+  const parseDisplayDate = (dateStr) => {
+    if (!dateStr) return null
+    const parts = dateStr.split('/')
+    if (parts.length !== 3) return null
+    const [day, month, year] = parts
+    return new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
   }
 
   // Set default date filter to current month

@@ -63,8 +63,12 @@ const reportsService = {
       // This ensures we always get the latest data with new structure
       const { date_from, date_to, campaign_id, brand_id, ...otherParams } = params;
       
-      // Set default date range if not provided (last 30 days)
-      const defaultDateTo = reportsService.formatDate(new Date());
+      // Set default date range if not provided (last 30 days + next 7 days to include future dates)
+      const defaultDateTo = (() => {
+        const date = new Date();
+        date.setDate(date.getDate() + 7); // Include next 7 days for future campaign dates
+        return reportsService.formatDate(date);
+      })();
       const defaultDateFrom = (() => {
         const date = new Date();
         date.setDate(date.getDate() - 30);
